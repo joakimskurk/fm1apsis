@@ -8,12 +8,12 @@ Last updated: 2026-10-23
 
 Phase 2 musical/state core is complete and merged to `main` at `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
-Unfinished work is intentionally checkpointed on active branch:
-- branch: `m3-transport-core`
-- latest checkpoint commit at handoff: `70322515a3391bb8dabcf7a096d409123d45a04d`
-- latest code/test commit before the handoff doc: `17faba6bd944726c804d52e5456afaadf3e99093`
+Unfinished work is intentionally checkpointed on:
+- branch `m3-transport-core`
+- draft PR #4: `M3a: deterministic sample-referenced transport core`
+- last transport code/test commit before handoff documentation: `17faba6bd944726c804d52e5456afaadf3e99093`
 
-A new chat should inspect that branch before changing code.
+A new chat should inspect the current branch HEAD and PR #4 before changing code. Documentation-only commits after the code commit are expected.
 
 ## Product invariant
 
@@ -103,10 +103,25 @@ Do not infer final state-change priority solely from JavaScript call order. Brow
 
 Native transport should preserve musical boundary semantics, not main-thread timer jitter.
 
+## Verification status
+
+### Merged `main`
+Phase 2/M2c is automated-test, sanitizer, target-build and emulator-smoke verified.
+
+### Current M3a code
+The new transport source and regression suite have now passed GitHub Actions workflow **APSIS core**, including:
+- source-derived core regression: PASS
+- ASAN/UBSAN: PASS
+
+Evidence run: `APSIS core` run #49 on branch commit `338d8fb863fab31951f2077382c4e692ef395f6e`. Later handoff commits are documentation-only and do not change transport code.
+
+Transport is **not yet target-validated** because it is still absent from the Dinghy overlay copy/include path. A staged build that does not compile `apsis_transport.[ch]` into `overlay/dinghy.c` does not count as target verification of M3a.
+
+No physical FM-1 validation has been performed; hardware is not currently available.
+
 ## Incomplete / current risks
 
 M3a is checkpointed but **not complete or merge-ready**:
-- latest transport work has not yet passed the full GitHub Actions gate
 - `apsis_transport.[ch]` is not yet copied by `ci/apply_apsis.sh`
 - transport is not yet included in the real FM-1 single-translation-unit `overlay/dinghy.c`
 - transport is not yet consumed by `app_audio()`
@@ -120,24 +135,16 @@ Risks to test before merge:
 - queue high-water under 4x Spiral plus secondary events and later bound events
 - native randomness must remain explicit/deterministic rather than implicit `Math.random()`
 
-## Verification status
-
-Merged `main` through Phase 2/M2c is automated-test, sanitizer, target-build and emulator-smoke verified.
-
-Current `m3-transport-core` transport code is implemented/committed but **not yet fully CI verified**. Do not claim M3a complete until all gates pass.
-
-No physical FM-1 validation has been performed; hardware is not currently available.
-
 ## Exact next action
 
-1. Checkout/inspect `m3-transport-core`.
-2. Read `apsis/apsis_transport.[ch]`, `tests/test_transport.c`, `Makefile` and the source-lock docs.
-3. Run/trigger `make test` and `make sanitize`; fix any issue first.
-4. Add `apsis_transport.h/.c` to `ci/apply_apsis.sh`.
-5. Include `apsis_transport.h/.c` in `overlay/dinghy.c` for the actual FM-1 single-translation-unit build.
-6. Run the full staged validation: source core, pinned upstream, unchanged Dinghy, APSIS host, real JieLi `FM-1_972` target, emulator smoke.
-7. Record target resource numbers and package SHA in `TESTING.md` / this file.
-8. Only after every gate is green: finalize M3a PR and merge.
+1. Checkout/inspect `m3-transport-core` / draft PR #4.
+2. Read `apsis/apsis_transport.[ch]`, `tests/test_transport.c`, `Makefile`, `ci/apply_apsis.sh`, `overlay/dinghy.c` and source-lock docs.
+3. Add `apsis_transport.h/.c` to `ci/apply_apsis.sh`.
+4. Include `apsis_transport.h/.c` in `overlay/dinghy.c` so the actual single-translation-unit FM-1 build compiles the transport.
+5. Run the complete staged validation again: core, pinned upstream, unchanged Dinghy, APSIS host, real JieLi `FM-1_972` target, emulator smoke.
+6. Fix any single-TU/target issue before expanding M3 functionality.
+7. Record target image/RAM/pool deltas and package SHA in `TESTING.md` / this file.
+8. Only after every gate is green: mark PR #4 ready, finalize M3a and squash-merge.
 9. Next milestone after merge: M3b runtime consumers for Mother/Chain/Gravity/Spiral/Bloom on the shared event timeline.
 
 ## Do not regress
