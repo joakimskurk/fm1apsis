@@ -1,0 +1,17 @@
+name: APSIS core
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source-derived core regression
+        run: make test
+      - name: ASAN/UBSAN
+        run: make sanitize
