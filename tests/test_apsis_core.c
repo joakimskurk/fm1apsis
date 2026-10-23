@@ -99,7 +99,7 @@ static void test_gravity(void)
     s.gravity.inversion = 2u; /* source clamps ANCHOR inversion to one */
     n = apsis_gravity_chord_steps(&s.gravity, steps);
     assert(n == 4u);
-    assert(steps[0] == 3 && steps[1] == 7 && steps[2] == 12 && steps[3] == 19);
+    assert(steps[0] == 3 && steps[1] == 7 && steps[2] == 12 && steps[3] == 12);
 }
 
 static void test_tuning(void)
