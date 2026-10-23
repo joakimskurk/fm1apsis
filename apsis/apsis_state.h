@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define APSIS_STATE_VERSION 1u
+#define APSIS_STATE_VERSION 2u
 #define APSIS_SPIRAL_POINTS 36u
 #define APSIS_SPIRAL_ROUTE_MAX 30u
 #define APSIS_ATTRACTOR_STEPS 24u
@@ -44,9 +44,12 @@ typedef enum {
     APSIS_ANCHOR_NINTH
 } ApsisStringAnchor;
 typedef enum { APSIS_HARMONY_SCALE = 0, APSIS_HARMONY_CHORD, APSIS_HARMONY_CHROMATIC } ApsisStringHarmony;
-typedef enum { APSIS_STRING_CHARACTER_CLASSIC = 0 } ApsisStringCharacter;
-typedef enum { APSIS_STRING_RHYTHM_OFF = 0 } ApsisStringRhythm;
-typedef enum { APSIS_STRING_FILTER_OFF = 0 } ApsisStringFilterMode;
+typedef enum { APSIS_STRING_CHARACTER_CLASSIC = 0, APSIS_STRING_CHARACTER_HYBRID, APSIS_STRING_CHARACTER_BOWED } ApsisStringCharacter;
+typedef enum { APSIS_STRING_RHYTHM_OFF = 0, APSIS_STRING_RHYTHM_BOW, APSIS_STRING_RHYTHM_PIZZ, APSIS_STRING_RHYTHM_MOTION } ApsisStringRhythm;
+typedef enum { APSIS_STRING_TRIGGER_EVERY = 0, APSIS_STRING_TRIGGER_SEQUENCE } ApsisStringRhythmTrigger;
+typedef enum { APSIS_STRING_FILTER_OFF = 0, APSIS_STRING_FILTER_SEQUENCE, APSIS_STRING_FILTER_ATTRACTOR } ApsisStringFilterMode;
+typedef enum { APSIS_STRING_PULSE_FULL = 0, APSIS_STRING_PULSE_SUSTAIN, APSIS_STRING_PULSE_FILTER, APSIS_STRING_PULSE_EXCITE } ApsisStringPulseDiag;
+typedef enum { APSIS_STRING_ATTRACTOR_HALF = 0, APSIS_STRING_ATTRACTOR_1, APSIS_STRING_ATTRACTOR_2, APSIS_STRING_ATTRACTOR_4, APSIS_STRING_ATTRACTOR_8 } ApsisStringAttractorEvery;
 typedef enum { APSIS_CLOCK_STONE = 0 } ApsisClockVoice;
 typedef enum { APSIS_SPIRAL_THREAD = 0, APSIS_SPIRAL_GLASS, APSIS_SPIRAL_REED, APSIS_SPIRAL_HALO } ApsisSpiralVoice;
 typedef enum { APSIS_BLOOM_VEIL = 0, APSIS_BLOOM_CHOIR, APSIS_BLOOM_ORGAN, APSIS_BLOOM_GLASS } ApsisBloomVoice;
@@ -84,8 +87,9 @@ typedef struct {
     uint16_t foundation_level_q15;
     int8_t foundation_octave;
     uint8_t rhythm;
+    uint8_t rhythm_trigger;
     uint8_t rhythm_every;
-    uint8_t rhythm_steps[4];
+    uint32_t rhythm_mask;
     uint16_t rhythm_level_q15;
     uint8_t filter_mode;
     uint16_t filter_cutoff_hz;
@@ -93,7 +97,7 @@ typedef struct {
     uint16_t filter_q_q15;
     uint16_t filter_decay_q15;
     uint16_t filter_slew_q15;
-    uint8_t filter_steps[4];
+    uint32_t filter_mask;
     uint8_t filter_attractor_every;
     uint8_t filter_attractor_length;
     uint16_t filter_attractor_lock_q15;
@@ -101,6 +105,7 @@ typedef struct {
     uint16_t filter_attractor_strum_level_q15;
     uint16_t filter_attractor_gates;
     uint16_t filter_attractor_seed;
+    uint8_t pulse_diag;
     uint8_t motion_loop_length;
     uint8_t motion_loop_play;
     uint8_t motion_loop_pitch_continuous;
