@@ -41,8 +41,8 @@ void apsis_bloom_harmony_from_state(const ApsisState *s, ApsisBloomHarmony *h)
     h->scale = s->gravity.scale < APSIS_SCALE_COUNT ? s->gravity.scale : APSIS_SCALE_DORIAN;
     h->degree = s->gravity.degree > 7u ? 7u : s->gravity.degree;
     h->voicing = s->gravity.voicing > 2u ? 2u : s->gravity.voicing;
-    h->inversion = s->gravity.inversion;
     h->voices = clamp_u8(s->gravity.voices, 3u, 5u);
+    h->inversion = s->gravity.inversion >= h->voices ? (uint8_t)(h->voices - 1u) : s->gravity.inversion;
 }
 
 uint8_t apsis_bloom_voice_count(const ApsisState *s, const ApsisBloomHarmony *h)
@@ -173,7 +173,7 @@ static int32_t candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
     int32_t center_milli = (int32_t)(min + max) * 500;
     int32_t base_center, desired, cost;
     int8_t reg = s ? clamp_i8(s->bloom.register_oct, -1, 1) : 0;
-    uint8_t grav_inv = h ? h->inversion : 0u;
+    uint8_t grav_inv = h ? (h->inversion >= n ? (uint8_t)(n - 1u) : h->inversion) : 0u;
 
     base_n = apsis_bloom_base_chord_steps(s, h, base);
     base_center = base_n ? (int32_t)(base[0] + base[base_n - 1u]) * 500 + reg * 12000 : 0;
