@@ -1,17 +1,17 @@
 #include "apsis_gravity.h"
 #include "apsis_harmony.h"
 
-static int8_t clamp_i8(int8_t value, int8_t lo, int8_t hi)
+static int8_t gravity_clamp_i8(int8_t value, int8_t lo, int8_t hi)
 {
     return value < lo ? lo : (value > hi ? hi : value);
 }
 
-static uint16_t clamp_u16(uint16_t value, uint16_t lo, uint16_t hi)
+static uint16_t gravity_clamp_u16(uint16_t value, uint16_t lo, uint16_t hi)
 {
     return value < lo ? lo : (value > hi ? hi : value);
 }
 
-static uint16_t q15_milli(uint32_t milli)
+static uint16_t gravity_q15_milli(uint32_t milli)
 {
     return (uint16_t)((milli * APSIS_Q15_ONE + 500u) / 1000u);
 }
@@ -37,8 +37,8 @@ ApsisGravityPoint apsis_gravity_point_default(uint8_t degree, uint8_t ring)
     p.enabled = 1u;
     p.offset = 0;
     p.octave = 0;
-    p.level_q15 = q15_milli((uint32_t)base_level_milli[r] + 25u * mod);
-    p.brightness_q15 = q15_milli((uint32_t)base_bright_milli[r] + 18u * mod);
+    p.level_q15 = gravity_q15_milli((uint32_t)base_level_milli[r] + 25u * mod);
+    p.brightness_q15 = gravity_q15_milli((uint32_t)base_bright_milli[r] + 18u * mod);
     p.attack_ms = (uint16_t)(base_attack_ms[r] + ((d + r) % 3u) * 8u);
     p.release_ms = (uint16_t)(base_release_ms[r] + (d % 3u) * 70u);
     return p;
@@ -60,12 +60,12 @@ void apsis_gravity_sanitize_point(ApsisGravityPoint *p)
 {
     if (!p) return;
     p->enabled = p->enabled ? 1u : 0u;
-    p->offset = clamp_i8(p->offset, -2, 2);
-    p->octave = clamp_i8(p->octave, -1, 1);
-    p->level_q15 = clamp_u16(p->level_q15, APSIS_Q15_MILLI(150), APSIS_Q15_MILLI(1250));
-    p->brightness_q15 = clamp_u16(p->brightness_q15, APSIS_Q15_MILLI(150), APSIS_Q15_MILLI(780));
-    p->attack_ms = clamp_u16(p->attack_ms, 12u, 220u);
-    p->release_ms = clamp_u16(p->release_ms, 250u, 3000u);
+    p->offset = gravity_clamp_i8(p->offset, -2, 2);
+    p->octave = gravity_clamp_i8(p->octave, -1, 1);
+    p->level_q15 = gravity_clamp_u16(p->level_q15, APSIS_Q15_MILLI(150), APSIS_Q15_MILLI(1250));
+    p->brightness_q15 = gravity_clamp_u16(p->brightness_q15, APSIS_Q15_MILLI(150), APSIS_Q15_MILLI(780));
+    p->attack_ms = gravity_clamp_u16(p->attack_ms, 12u, 220u);
+    p->release_ms = gravity_clamp_u16(p->release_ms, 250u, 3000u);
 }
 
 void apsis_gravity_reset_point(ApsisGravityState *g, uint8_t degree, uint8_t ring)
