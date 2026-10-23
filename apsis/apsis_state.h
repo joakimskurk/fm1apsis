@@ -6,7 +6,7 @@
 #define APSIS_STATE_VERSION 1u
 #define APSIS_SPIRAL_POINTS 36u
 #define APSIS_SPIRAL_ROUTE_MAX 30u
-#define APSIS_ATTRACTOR_STEPS 16u
+#define APSIS_ATTRACTOR_STEPS 24u
 #define APSIS_CLOCK_STEPS_MAX 24u
 #define APSIS_KEEP_SLOTS 8u
 #define APSIS_CHAIN_MAX 32u
@@ -148,7 +148,7 @@ typedef struct {
     uint16_t attractor_lock_q15;
     uint16_t attractor_density_q15;
     uint16_t attractor_seed;
-    uint16_t attractor_gates;
+    uint32_t attractor_gates;
     uint16_t attractor_energy_q15[APSIS_ATTRACTOR_STEPS];
     uint16_t send_q15;
     uint8_t sound;
