@@ -37,6 +37,13 @@ static uint32_t valid_mask(uint8_t n)
     return n >= 32u ? 0xFFFFFFFFu : ((1u << n) - 1u);
 }
 
+static uint32_t mul_q15_u32(uint32_t v, uint16_t q15)
+{
+    uint32_t whole = v / APSIS_Q15_ONE;
+    uint32_t rem = v - whole * APSIS_Q15_ONE;
+    return whole * q15 + (rem * q15 + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
+}
+
 uint8_t apsis_clock_groups(const ApsisClockState *c, uint8_t out[APSIS_CLOCK_GROUPS_MAX])
 {
     uint8_t b[3], count = 0u, i, j, n, prev = 0u;
@@ -75,9 +82,8 @@ uint32_t apsis_clock_base_interval_us(const ApsisClockState *c)
 uint32_t apsis_clock_interval_us(const ApsisClockState *c, uint32_t absolute_step)
 {
     uint32_t base = apsis_clock_base_interval_us(c);
-    uint32_t delta;
     uint16_t swing = c ? clamp_swing(c->swing_q15) : 0u;
-    delta = (base * swing + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
+    uint32_t delta = mul_q15_u32(base, swing);
     return (absolute_step & 1u) ? base + delta : base - delta;
 }
 
