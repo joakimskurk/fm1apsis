@@ -11,7 +11,8 @@
 typedef enum {
     /* Numeric order is the browser tick() scheduling order for events that
      * share one target sample. It is not a DSP voice priority. */
-    APSIS_EVENT_STRING_FILTER_CLOCK = 0,
+    APSIS_EVENT_STEP_ONE_RESYNC = 0,
+    APSIS_EVENT_STRING_FILTER_CLOCK,
     APSIS_EVENT_PLAYHEAD,
     APSIS_EVENT_MOTHER_PULSE,
     APSIS_EVENT_CLOCK_MAIN,
