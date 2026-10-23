@@ -1,34 +1,10 @@
 #include "apsis_state.h"
+#include "apsis_gravity.h"
 
 static void apsis_zero(void *ptr, uint32_t n)
 {
     uint8_t *p = (uint8_t *)ptr;
     while (n--) *p++ = 0u;
-}
-
-static ApsisGravityPoint gravity_point_default_local(uint8_t degree, uint8_t ring)
-{
-    static const uint16_t base_bright[3] = {
-        APSIS_Q15_MILLI(240), APSIS_Q15_MILLI(390), APSIS_Q15_MILLI(560)
-    };
-    static const uint16_t base_level[3] = {
-        APSIS_Q15_MILLI(760), APSIS_Q15_MILLI(680), APSIS_Q15_MILLI(600)
-    };
-    static const uint16_t base_attack_ms[3] = {50u, 34u, 20u};
-    static const uint16_t base_release_ms[3] = {920u, 1120u, 1420u};
-    ApsisGravityPoint p;
-    uint8_t d = degree > 7u ? 7u : degree;
-    uint8_t r = ring > 2u ? 2u : ring;
-    uint8_t seed = (uint8_t)(((uint32_t)d * 17u + (uint32_t)r * 31u + 7u) % 23u);
-    uint8_t mod = (uint8_t)(seed % 3u);
-    p.enabled = 1u;
-    p.offset = 0;
-    p.octave = 0;
-    p.level_q15 = (uint16_t)(base_level[r] + APSIS_Q15_MILLI(25) * mod);
-    p.brightness_q15 = (uint16_t)(base_bright[r] + APSIS_Q15_MILLI(18) * mod);
-    p.attack_ms = (uint16_t)(base_attack_ms[r] + ((d + r) % 3u) * 8u);
-    p.release_ms = (uint16_t)(base_release_ms[r] + (d % 3u) * 70u);
-    return p;
 }
 
 void apsis_state_default(ApsisState *s)
@@ -196,7 +172,7 @@ void apsis_state_default(ApsisState *s)
     for (i = 0u; i < APSIS_GRAVITY_POINTS; ++i) {
         uint8_t degree = (uint8_t)(i / APSIS_GRAVITY_RINGS);
         uint8_t ring = (uint8_t)(i % APSIS_GRAVITY_RINGS);
-        s->gravity.points[i] = gravity_point_default_local(degree, ring);
+        s->gravity.points[i] = apsis_gravity_point_default(degree, ring);
     }
 
     s->space.mix_q15 = APSIS_Q15_MILLI(480);
