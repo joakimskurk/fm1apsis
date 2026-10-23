@@ -48,10 +48,12 @@ static uint32_t ratio_q16_from_split(uint16_t split_q15)
     hi = s > other ? s : other;
     lo = s > other ? other : s;
     if (!lo) return Q16_ONE;
-    return (uint32_t)(((uint64_t)hi << 16) / lo);
+    return (hi << 16) / lo;
 }
 
-/* Binary logarithm in Q16.16. Input is >= 1.0 in Q16.16. */
+/* Binary logarithm in Q16.16. Input is >= 1.0 in Q16.16.
+ * The only 64-bit operation is multiply+shift, never division.
+ */
 static uint32_t log2_q16(uint32_t x)
 {
     uint32_t exponent = 0u, frac = 0u, i;
@@ -72,7 +74,7 @@ static uint32_t log2_q16(uint32_t x)
 static int32_t raw_semis_milli(uint16_t split_q15)
 {
     uint32_t lg = log2_q16(ratio_q16_from_split(split_q15));
-    return (int32_t)(((uint64_t)lg * 12000u + 32768u) >> 16);
+    return (int32_t)((lg * 12000u + 32768u) >> 16);
 }
 
 static int32_t mapped_semis_milli(int32_t raw)
@@ -83,7 +85,7 @@ static int32_t mapped_semis_milli(int32_t raw)
     num = raw - STRING_TWO_OCT_SEMIS_MILLI;
     den = STRING_RAW_MAX_SEMIS_MILLI - STRING_TWO_OCT_SEMIS_MILLI;
     return STRING_TWO_OCT_SEMIS_MILLI +
-           (int32_t)(((int64_t)num * (STRING_CLASSIC_MAX_SEMIS_MILLI - STRING_TWO_OCT_SEMIS_MILLI) + den / 2) / den);
+           (num * (STRING_CLASSIC_MAX_SEMIS_MILLI - STRING_TWO_OCT_SEMIS_MILLI) + den / 2) / den;
 }
 
 void apsis_string_pitch_memory_reset(ApsisStringPitchMemory *m)
@@ -128,7 +130,7 @@ ApsisStringRatio apsis_string_ratio(uint16_t split_q15)
     out.near_simple = 0u;
 
     for (i = 0u; i < (uint32_t)(sizeof SIMPLE_RATIOS / sizeof SIMPLE_RATIOS[0]); ++i) {
-        uint32_t q = (uint32_t)(((uint64_t)SIMPLE_RATIOS[i].n << 16) / SIMPLE_RATIOS[i].d);
+        uint32_t q = ((uint32_t)SIMPLE_RATIOS[i].n << 16) / SIMPLE_RATIOS[i].d;
         uint32_t err = raw > q ? raw - q : q - raw;
         if (err < best_err) {
             best_err = err;
@@ -137,7 +139,7 @@ ApsisStringRatio apsis_string_ratio(uint16_t split_q15)
             out.denominator = SIMPLE_RATIOS[i].d;
         }
     }
-    if ((uint64_t)best_err * 1000u < (uint64_t)best_q16 * 18u) {
+    if (best_err * 1000u < best_q16 * 18u) {
         out.near_simple = 1u;
         out.effective_ratio_q16 = best_q16;
     }
@@ -146,9 +148,9 @@ ApsisStringRatio apsis_string_ratio(uint16_t split_q15)
 
 int32_t apsis_string_magnitude_milli(uint16_t split_q15, uint16_t span_q15)
 {
-    int32_t mapped = mapped_semis_milli(raw_semis_milli(split_q15));
+    uint32_t mapped = (uint32_t)mapped_semis_milli(raw_semis_milli(split_q15));
     uint32_t span = clamp_u16(span_q15, STRING_SPAN_MIN_Q15, STRING_SPAN_MAX_Q15);
-    return (int32_t)(((int64_t)mapped * span + APSIS_Q15_ONE / 2) / APSIS_Q15_ONE);
+    return (int32_t)((mapped * span + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
 int32_t apsis_string_side_degree(const ApsisState *s, uint8_t side)
