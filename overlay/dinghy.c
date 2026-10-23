@@ -2,7 +2,7 @@
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
  * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock/
- * Spiral/Gravity/Bloom behaviour is established before DSP shapes architecture.
+ * Spiral/Gravity/Bloom/KEEP/CHAIN/Mother behaviour is established before DSP.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
@@ -14,6 +14,9 @@
 #include "apsis_clock.h"
 #include "apsis_spiral.h"
 #include "apsis_bloom.h"
+#include "apsis_keep.h"
+#include "apsis_chain.h"
+#include "apsis_mother.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"
@@ -22,10 +25,16 @@
 #include "apsis_clock.c"
 #include "apsis_spiral.c"
 #include "apsis_bloom.c"
+#include "apsis_keep.c"
+#include "apsis_chain.c"
+#include "apsis_mother.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
 static ApsisBloomVoicingState bloom_voicing_state;
+static ApsisKeepBank keep_bank;
+static ApsisChainSequence chain_sequence;
+static ApsisMotherPending mother_pending;
 
 enum {
     SURF_MOTHER = 0,
@@ -194,6 +203,9 @@ static void app_main(void)
     apsis_state_default(&apsis);
     apsis_string_pitch_memory_reset(&string_pitch_memory);
     apsis_bloom_voicing_reset(&bloom_voicing_state);
+    apsis_keep_bank_reset(&keep_bank);
+    apsis_chain_sequence_reset(&chain_sequence);
+    apsis_mother_pending_reset(&mother_pending);
     lcd_fill(0, 0, 240, 240, C_BLACK);
 
     for (;;) {
