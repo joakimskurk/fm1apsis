@@ -11,6 +11,11 @@ static uint16_t clamp_u16(uint16_t value, uint16_t lo, uint16_t hi)
     return value < lo ? lo : (value > hi ? hi : value);
 }
 
+static uint16_t q15_milli(uint32_t milli)
+{
+    return (uint16_t)((milli * APSIS_Q15_ONE + 500u) / 1000u);
+}
+
 uint8_t apsis_gravity_point_index(uint8_t degree, uint8_t ring)
 {
     uint8_t d = degree > 7u ? 7u : degree;
@@ -20,12 +25,8 @@ uint8_t apsis_gravity_point_index(uint8_t degree, uint8_t ring)
 
 ApsisGravityPoint apsis_gravity_point_default(uint8_t degree, uint8_t ring)
 {
-    static const uint16_t base_bright[3] = {
-        APSIS_Q15_MILLI(240), APSIS_Q15_MILLI(390), APSIS_Q15_MILLI(560)
-    };
-    static const uint16_t base_level[3] = {
-        APSIS_Q15_MILLI(760), APSIS_Q15_MILLI(680), APSIS_Q15_MILLI(600)
-    };
+    static const uint16_t base_bright_milli[3] = {240u, 390u, 560u};
+    static const uint16_t base_level_milli[3] = {760u, 680u, 600u};
     static const uint16_t base_attack_ms[3] = {50u, 34u, 20u};
     static const uint16_t base_release_ms[3] = {920u, 1120u, 1420u};
     ApsisGravityPoint p;
@@ -36,8 +37,8 @@ ApsisGravityPoint apsis_gravity_point_default(uint8_t degree, uint8_t ring)
     p.enabled = 1u;
     p.offset = 0;
     p.octave = 0;
-    p.level_q15 = (uint16_t)(base_level[r] + APSIS_Q15_MILLI(25) * mod);
-    p.brightness_q15 = (uint16_t)(base_bright[r] + APSIS_Q15_MILLI(18) * mod);
+    p.level_q15 = q15_milli((uint32_t)base_level_milli[r] + 25u * mod);
+    p.brightness_q15 = q15_milli((uint32_t)base_bright_milli[r] + 18u * mod);
     p.attack_ms = (uint16_t)(base_attack_ms[r] + ((d + r) % 3u) * 8u);
     p.release_ms = (uint16_t)(base_release_ms[r] + (d % 3u) * 70u);
     return p;
