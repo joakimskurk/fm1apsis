@@ -23,12 +23,19 @@ EMU=work/fm1-emu/target/release/fm1-emu
 
 python3 - <<'PY'
 from pathlib import Path
-import hashlib, json, struct, wave
+import hashlib, json, re, struct, wave
 
 root = Path('work/emu-smoke')
 for p in Path('work').glob('lcd_*.bmp'):
     (root / p.name).write_bytes(p.read_bytes())
-shots = sorted(root.glob('lcd_*.bmp'))
+
+def snap_time(path):
+    m = re.search(r'(\d+)(?=\.bmp$)', path.name)
+    if not m:
+        raise SystemExit(f'FAIL: cannot parse snapshot timestamp: {path.name}')
+    return int(m.group(1))
+
+shots = sorted(root.glob('lcd_*.bmp'), key=snap_time)
 if len(shots) < 3:
     print((root / 'run.log').read_text(errors='replace'))
     raise SystemExit(f'FAIL: expected 3 LCD snapshots, got {len(shots)}')
@@ -37,6 +44,8 @@ if h[0] == h[1]:
     raise SystemExit('FAIL: SEQ did not visibly change APSIS surface')
 if h[1] == h[2]:
     raise SystemExit('FAIL: HOME did not visibly return from CLOCK surface')
+if h[0] != h[2]:
+    raise SystemExit('FAIL: HOME did not restore the original MOTHER surface')
 
 wp = root / 'apsis.wav'
 with wave.open(str(wp), 'rb') as w:
