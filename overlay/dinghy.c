@@ -2,25 +2,30 @@
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
  * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock/
- * Spiral behaviour is established before DSP is allowed to shape architecture.
+ * Spiral/Gravity/Bloom behaviour is established before DSP shapes architecture.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
 #include "apsis_state.h"
 #include "apsis_harmony.h"
+#include "apsis_gravity.h"
 #include "apsis_string.h"
 #include "apsis_drift.h"
 #include "apsis_clock.h"
 #include "apsis_spiral.h"
+#include "apsis_bloom.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
+#include "apsis_gravity.c"
 #include "apsis_string.c"
 #include "apsis_drift.c"
 #include "apsis_clock.c"
 #include "apsis_spiral.c"
+#include "apsis_bloom.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
+static ApsisBloomVoicingState bloom_voicing_state;
 
 enum {
     SURF_MOTHER = 0,
@@ -109,8 +114,6 @@ static uint8_t spiral_selected(uint8_t step)
 
 static void draw_spiral(void)
 {
-    /* Same 36-point Archimedean geometry and 6-o'clock outer endpoint as the
-     * browser, scaled into the FM-1's 64-pixel native surface strip. */
     static const uint8_t px[36] = {
         118,115,114,114,116,120,124,128,130,130,126,120,
         114,108,106,107,112,120,128,135,138,136,130,120,
@@ -190,6 +193,7 @@ static void app_main(void)
     uint8_t drawn = 255u;
     apsis_state_default(&apsis);
     apsis_string_pitch_memory_reset(&string_pitch_memory);
+    apsis_bloom_voicing_reset(&bloom_voicing_state);
     lcd_fill(0, 0, 240, 240, C_BLACK);
 
     for (;;) {
