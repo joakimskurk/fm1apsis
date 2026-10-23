@@ -29,7 +29,7 @@ typedef struct {
     uint64_t sample;
     uint64_t interval_q32;
     uint32_t absolute_pulse;
-    uint16_t serial;
+    uint32_t serial;
     uint8_t type;
     uint8_t clock_step;
     uint8_t sub_index;
@@ -44,7 +44,7 @@ typedef struct {
 typedef struct {
     ApsisTransportEvent events[APSIS_TRANSPORT_QUEUE_CAP];
     uint16_t count;
-    uint16_t next_serial;
+    uint32_t next_serial;
     uint8_t overflowed;
 } ApsisEventQueue;
 
