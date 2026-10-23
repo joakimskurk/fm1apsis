@@ -50,7 +50,8 @@ typedef struct {
 
 typedef struct {
     uint32_t sample_rate;
-    uint64_t next_sample_q32;
+    uint64_t next_sample;
+    uint32_t next_frac_q32;
     uint32_t absolute_pulse;
     uint32_t melody_step;
     uint8_t cycle_pos;
