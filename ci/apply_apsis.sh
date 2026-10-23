@@ -15,6 +15,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_string.h apsis/apsis_string.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
+   apsis/apsis_spiral.h apsis/apsis_spiral.c \
    work/apsis/firmware/src/
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
