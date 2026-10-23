@@ -82,6 +82,7 @@ Physical FM-1: **not tested**.
 ## Phase 3 / M3a current branch
 
 Active branch: `m3-transport-core`.
+Draft PR: #4.
 
 Implemented:
 - sample-referenced shared transport
@@ -93,7 +94,7 @@ Implemented:
 New suite:
 - `tests/test_transport.c`
 
-Coverage currently written includes:
+Coverage includes:
 - source-derived String timing-state defaults
 - default 72 BPM / 1/8 interval at 44.1 kHz
 - event ordering on Clock 1
@@ -112,27 +113,37 @@ Coverage currently written includes:
 
 ### Current M3a verification state
 
+GitHub Actions `APSIS core` run #49 on commit `338d8fb863fab31951f2077382c4e692ef395f6e`:
+- source-derived core regression: PASS
+- `tests/test_transport.c`: PASS as part of the root test target
+- ASAN/UBSAN: PASS
+
+Subsequent commits at handoff are documentation-only and do not alter the transport implementation.
+
+Current verification levels:
 - implemented: YES
 - committed: YES
-- desktop `make test`: **not yet confirmed after latest M3 commits**
-- sanitizer: **not yet confirmed after latest M3 commits**
-- real target build with transport in overlay: NO
-- emulator with transport in overlay: NO
+- desktop/core regression: PASS
+- sanitizer: PASS
+- real target build **with transport compiled into overlay**: NO
+- emulator **with transport compiled into overlay**: NO
 - physical FM-1: NO
+
+Important: the staged Phase-1 workflow can still build the old overlay successfully before transport is included. Such a pass is a regression check for the existing shell, **not** target verification of `apsis_transport.[ch]`.
 
 Reason target/emulator are not yet valid for M3a: `apsis_transport.[ch]` is not yet copied by `ci/apply_apsis.sh` or included in `overlay/dinghy.c`.
 
 ## Required validation before M3a merge
 
-1. run `make test`
-2. run `make sanitize`
-3. add transport sources to `ci/apply_apsis.sh`
-4. include transport in `overlay/dinghy.c`
-5. rerun complete staged CI
+1. add transport sources to `ci/apply_apsis.sh`
+2. include transport in `overlay/dinghy.c`
+3. rerun core regression + sanitizer
+4. rerun complete staged CI
+5. confirm real JieLi target compiles the transport in the single translation unit
 6. record image/RAM/pool deltas and package SHA
 7. inspect emulator smoke
 8. update `PROJECT_STATE.md` and this file
-9. only then merge
+9. only then mark PR #4 ready and merge
 
 ## Release-level validation not yet performed
 
