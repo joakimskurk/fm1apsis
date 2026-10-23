@@ -2,7 +2,7 @@ CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 SAN_CFLAGS ?= -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined
 INC = -Iapsis
-SRC = apsis/apsis_state.c apsis/apsis_harmony.c
+SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c
 OBJ = $(patsubst apsis/%.c,build/%.o,$(SRC))
 SAN_OBJ = $(patsubst apsis/%.c,build/san_%.o,$(SRC))
 

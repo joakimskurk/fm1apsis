@@ -138,7 +138,7 @@ uint8_t apsis_gravity_chord_steps(const ApsisGravityState *g, int16_t out[APSIS_
     if (!g || !out) return 0u;
     voices = apsis_gravity_ring_intervals(g, intervals);
     ring = clamp_ring(g->voicing);
-    root = apsis_scale_at(g->tonic, g->scale, (int32_t)(g->degree % 7u));
+    root = apsis_scale_at(g->tonic, g->scale, g->degree > 7u ? 7u : g->degree);
     for (i = 0u; i < voices; ++i) out[i] = (int16_t)(root + intervals[i]);
 
     inv = g->inversion;

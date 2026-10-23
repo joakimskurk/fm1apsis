@@ -6,7 +6,7 @@
 #define APSIS_STATE_VERSION 1u
 #define APSIS_SPIRAL_POINTS 36u
 #define APSIS_SPIRAL_ROUTE_MAX 30u
-#define APSIS_ATTRACTOR_STEPS 16u
+#define APSIS_ATTRACTOR_STEPS 24u
 #define APSIS_CLOCK_STEPS_MAX 24u
 #define APSIS_KEEP_SLOTS 8u
 #define APSIS_CHAIN_MAX 32u
@@ -33,7 +33,13 @@ typedef enum {
 
 typedef enum { APSIS_STRING_CLASSIC = 0, APSIS_STRING_DUAL } ApsisStringSurfaceMode;
 typedef enum { APSIS_SIDE_LEFT = 0, APSIS_SIDE_RIGHT } ApsisSide;
-typedef enum { APSIS_ANCHOR_ROOT = 0, APSIS_ANCHOR_FIFTH } ApsisStringAnchor;
+typedef enum {
+    APSIS_ANCHOR_ROOT = 0,
+    APSIS_ANCHOR_THIRD,
+    APSIS_ANCHOR_FIFTH,
+    APSIS_ANCHOR_SEVENTH,
+    APSIS_ANCHOR_NINTH
+} ApsisStringAnchor;
 typedef enum { APSIS_HARMONY_SCALE = 0, APSIS_HARMONY_CHORD, APSIS_HARMONY_CHROMATIC } ApsisStringHarmony;
 typedef enum { APSIS_STRING_CHARACTER_CLASSIC = 0 } ApsisStringCharacter;
 typedef enum { APSIS_STRING_RHYTHM_OFF = 0 } ApsisStringRhythm;
@@ -142,7 +148,7 @@ typedef struct {
     uint16_t attractor_lock_q15;
     uint16_t attractor_density_q15;
     uint16_t attractor_seed;
-    uint16_t attractor_gates;
+    uint32_t attractor_gates;
     uint16_t attractor_energy_q15[APSIS_ATTRACTOR_STEPS];
     uint16_t send_q15;
     uint8_t sound;
