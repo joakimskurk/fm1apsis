@@ -53,8 +53,10 @@ jobs:
         run: bash ci/build_apsis_target.sh
 
       - name: Gate 5 - FM-1 emulator smoke
+        shell: bash
         run: |
-          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc | tee build/evidence/emulator_smoke.txt
+          set -o pipefail
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 | tee build/evidence/emulator_smoke.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke
 
       - name: Upload Phase 1 evidence
