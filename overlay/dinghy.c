@@ -1,17 +1,21 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * M2 remains intentionally silent. Musical state/harmony/String behaviour is
- * established before DSP is allowed to shape the architecture.
+ * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock
+ * behaviour is established before DSP is allowed to shape the architecture.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
 #include "apsis_state.h"
 #include "apsis_harmony.h"
 #include "apsis_string.h"
+#include "apsis_drift.h"
+#include "apsis_clock.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_string.c"
+#include "apsis_drift.c"
+#include "apsis_clock.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
@@ -106,7 +110,7 @@ static void draw_surface(void)
     draw_text_box(0, 49, 240, &FONT_S, surface_name(surface), RGB(174, 168, 157), 1);
     draw_primary_surface();
     draw_text_box(0, 169, 240, &FONT_S, "SOURCE-LOCKED NATIVE PORT", RGB(92, 89, 83), 1);
-    draw_text_box(0, 195, 240, &FONT_S, "M2 STRING CORE  v" APP_VER, RGB(92, 89, 83), 1);
+    draw_text_box(0, 195, 240, &FONT_S, "M2 CORE MODEL  v" APP_VER, RGB(92, 89, 83), 1);
 }
 
 static void leds(void)
