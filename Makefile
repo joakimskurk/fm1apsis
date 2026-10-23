@@ -2,7 +2,7 @@ CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 SAN_CFLAGS ?= -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined
 INC = -Iapsis
-SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c
+SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_mother.c
 OBJ = $(patsubst apsis/%.c,build/%.o,$(SRC))
 SAN_OBJ = $(patsubst apsis/%.c,build/san_%.o,$(SRC))
 
@@ -24,19 +24,27 @@ build/test_apsis_core: $(OBJ) tests/test_apsis_core.c | build
 build/test_gravity_bloom: $(OBJ) tests/test_gravity_bloom.c | build
 	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_gravity_bloom.c -o $@
 
+build/test_keep_chain_mother: $(OBJ) tests/test_keep_chain_mother.c | build
+	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_keep_chain_mother.c -o $@
+
 build/san_apsis_core: $(SAN_OBJ) tests/test_apsis_core.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_apsis_core.c -o $@
 
 build/san_gravity_bloom: $(SAN_OBJ) tests/test_gravity_bloom.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_gravity_bloom.c -o $@
 
-test: build/test_apsis_core build/test_gravity_bloom
+build/san_keep_chain_mother: $(SAN_OBJ) tests/test_keep_chain_mother.c | build
+	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_keep_chain_mother.c -o $@
+
+test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mother
 	build/test_apsis_core
 	build/test_gravity_bloom
+	build/test_keep_chain_mother
 
-sanitize: build/san_apsis_core build/san_gravity_bloom
+sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_mother
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_apsis_core
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_gravity_bloom
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_keep_chain_mother
 
 clean:
 	rm -rf build
