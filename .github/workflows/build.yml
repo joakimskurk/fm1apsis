@@ -1,8 +1,7 @@
-name: APSIS FM-1 target build
+name: APSIS FM-1 release build
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
