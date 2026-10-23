@@ -18,6 +18,9 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
    apsis/apsis_bloom.h apsis/apsis_bloom.c \
+   apsis/apsis_keep.h apsis/apsis_keep.c \
+   apsis/apsis_chain.h apsis/apsis_chain.c \
+   apsis/apsis_mother.h apsis/apsis_mother.c \
    work/apsis/firmware/src/
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
