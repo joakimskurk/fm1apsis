@@ -11,6 +11,16 @@ static uint8_t apsis_keep_clamp_u8(uint32_t v, uint8_t lo, uint8_t hi)
     return (uint8_t)(v < lo ? lo : (v > hi ? hi : v));
 }
 
+static uint8_t apsis_keep_clamp_degree(int32_t v)
+{
+    return (uint8_t)(v < 0 ? 0 : (v > 7 ? 7 : v));
+}
+
+static uint16_t apsis_keep_clamp_q15(uint16_t v, uint16_t lo, uint16_t hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 static uint32_t apsis_keep_clock_mask(uint8_t n)
 {
     if (n >= 24u) return 0x00FFFFFFu;
@@ -47,8 +57,8 @@ ApsisKeepSnapshot apsis_keep_capture(const ApsisState *s)
     snap.right_anchor = s->string.right_anchor;
     snap.left_follow_gravity = s->string.left_follow_gravity ? 1u : 0u;
     snap.right_follow_gravity = s->string.right_follow_gravity ? 1u : 0u;
-    snap.left_gravity_degree = apsis_keep_clamp_u8((uint8_t)s->string.left_gravity_degree, 0u, 7u);
-    snap.right_gravity_degree = apsis_keep_clamp_u8((uint8_t)s->string.right_gravity_degree, 0u, 7u);
+    snap.left_gravity_degree = apsis_keep_clamp_degree(s->string.left_gravity_degree);
+    snap.right_gravity_degree = apsis_keep_clamp_degree(s->string.right_gravity_degree);
 
     snap.drift_amount_q15 = s->drift.amount_q15;
 
@@ -116,10 +126,10 @@ uint8_t apsis_keep_apply(ApsisState *s, const ApsisKeepSnapshot *snap,
     if (!s || !snap || !snap->valid) return 0u;
 
     if ((!o || !o->skip_continuous) && apsis_keep_lane(o, APSIS_KEEP_LANE_TENSION)) {
-        s->string.left_split_q15 = snap->left_split_q15 > APSIS_Q15_MILLI(500)
-            ? APSIS_Q15_MILLI(500) : snap->left_split_q15;
-        s->string.right_split_q15 = snap->right_split_q15 < APSIS_Q15_MILLI(500)
-            ? APSIS_Q15_MILLI(500) : snap->right_split_q15;
+        s->string.left_split_q15 = apsis_keep_clamp_q15(snap->left_split_q15,
+            APSIS_Q15_MILLI(150), APSIS_Q15_MILLI(500));
+        s->string.right_split_q15 = apsis_keep_clamp_q15(snap->right_split_q15,
+            APSIS_Q15_MILLI(500), APSIS_Q15_MILLI(850));
         s->string.split_q15 = s->string.right_split_q15;
         if (snap->surface_mode <= APSIS_STRING_DUAL) s->string.surface_mode = snap->surface_mode;
         s->string.linked = snap->linked ? 1u : 0u;
@@ -127,8 +137,8 @@ uint8_t apsis_keep_apply(ApsisState *s, const ApsisKeepSnapshot *snap,
         if (snap->right_anchor <= APSIS_ANCHOR_NINTH) s->string.right_anchor = snap->right_anchor;
         s->string.left_follow_gravity = snap->left_follow_gravity ? 1u : 0u;
         s->string.right_follow_gravity = snap->right_follow_gravity ? 1u : 0u;
-        s->string.left_gravity_degree = (int8_t)apsis_keep_clamp_u8(snap->left_gravity_degree, 0u, 7u);
-        s->string.right_gravity_degree = (int8_t)apsis_keep_clamp_u8(snap->right_gravity_degree, 0u, 7u);
+        s->string.left_gravity_degree = (int8_t)apsis_keep_clamp_degree(snap->left_gravity_degree);
+        s->string.right_gravity_degree = (int8_t)apsis_keep_clamp_degree(snap->right_gravity_degree);
     }
 
     if ((!o || !o->skip_continuous) && apsis_keep_lane(o, APSIS_KEEP_LANE_DRIFT))
