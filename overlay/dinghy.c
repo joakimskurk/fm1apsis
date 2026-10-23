@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock
- * behaviour is established before DSP is allowed to shape the architecture.
+ * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock/
+ * Spiral behaviour is established before DSP is allowed to shape architecture.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
@@ -11,11 +11,13 @@
 #include "apsis_string.h"
 #include "apsis_drift.h"
 #include "apsis_clock.h"
+#include "apsis_spiral.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_string.c"
 #include "apsis_drift.c"
 #include "apsis_clock.c"
+#include "apsis_spiral.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
@@ -98,9 +100,50 @@ static void draw_string(void)
     cv_blit(0, 92);
 }
 
+static uint8_t spiral_selected(uint8_t step)
+{
+    uint8_t i, count = apsis.spiral.route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : apsis.spiral.route_count;
+    for (i = 0u; i < count; ++i) if (apsis.spiral.route[i] == step) return 1u;
+    return 0u;
+}
+
+static void draw_spiral(void)
+{
+    /* Same 36-point Archimedean geometry and 6-o'clock outer endpoint as the
+     * browser, scaled into the FM-1's 64-pixel native surface strip. */
+    static const uint8_t px[36] = {
+        118,115,114,114,116,120,124,128,130,130,126,120,
+        114,108,106,107,112,120,128,135,138,136,130,120,
+        110,101,98,100,108,120,132,142,146,143,134,120
+    };
+    static const uint8_t py[36] = {
+        36,35,32,28,25,24,24,27,32,37,42,44,
+        43,39,32,25,18,16,17,23,32,41,49,52,
+        50,43,32,21,12,8,10,19,32,46,56,60
+    };
+    uint8_t i;
+    uint16_t linec = RGB(96, 78, 88);
+    uint16_t pointc = RGB(164, 139, 151);
+    uint16_t selected = RGB(216, 198, 171);
+    cv_begin(240, 64, C_BLACK);
+    for (i = 1u; i < 36u; ++i) cv_line(px[i - 1u], py[i - 1u], px[i], py[i], linec);
+    for (i = 0u; i < 36u; ++i) {
+        uint16_t c = spiral_selected(i) ? selected : pointc;
+        cv_rect((int32_t)px[i] - 1, (int32_t)py[i] - 1, 3, 3, c);
+        if (spiral_selected(i)) {
+            cv_rect((int32_t)px[i] - 3, (int32_t)py[i] - 3, 7, 1, c);
+            cv_rect((int32_t)px[i] - 3, (int32_t)py[i] + 3, 7, 1, c);
+            cv_rect((int32_t)px[i] - 3, (int32_t)py[i] - 2, 1, 5, c);
+            cv_rect((int32_t)px[i] + 3, (int32_t)py[i] - 2, 1, 5, c);
+        }
+    }
+    cv_blit(0, 92);
+}
+
 static void draw_primary_surface(void)
 {
     if (surface == SURF_STRING) draw_string();
+    else if (surface == SURF_SPIRAL) draw_spiral();
     else draw_orbit(surface);
 }
 
