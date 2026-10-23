@@ -24,7 +24,6 @@ static uint32_t lcg_next(uint32_t *x)
 
 static uint8_t rnd_below_q15(uint32_t rnd, uint16_t threshold_q15)
 {
-    /* rnd / 2^32 < threshold / 32767, compared without division. */
     return (uint64_t)rnd * APSIS_Q15_ONE < ((uint64_t)threshold_q15 << 32);
 }
 
@@ -49,6 +48,16 @@ static int32_t nearest_scale_index(const ApsisState *s, int32_t step)
     return best;
 }
 
+static void set_default_tail(ApsisSpiralState *sp, uint8_t from)
+{
+    uint8_t i;
+    for (i = from; i < APSIS_ATTRACTOR_STEPS; ++i) {
+        if (DEFAULT_GATE[i % 16u]) sp->attractor_gates |= 1u << i;
+        else sp->attractor_gates &= ~(1u << i);
+        sp->attractor_energy_q15[i] = DEFAULT_ENERGY[i % 16u];
+    }
+}
+
 uint8_t apsis_spiral_sanitize_route(ApsisSpiralState *sp)
 {
     uint8_t read, write = 0u, count;
@@ -58,17 +67,15 @@ uint8_t apsis_spiral_sanitize_route(ApsisSpiralState *sp)
         uint8_t v = sp->route[read];
         if (v <= 35u) sp->route[write++] = v;
     }
+    sp->route_count = write;
     while (write < APSIS_SPIRAL_ROUTE_MAX) sp->route[write++] = 0u;
-    sp->route_count = 0u;
-    for (read = 0u; read < count; ++read)
-        if (sp->route[read] <= 35u) ++sp->route_count;
     return sp->route_count;
 }
 
 uint8_t apsis_spiral_derived_sequence(const ApsisState *s,
                                       int16_t out[APSIS_SPIRAL_ROUTE_MAX])
 {
-    uint8_t i, count;
+    uint8_t i, written = 0u, count;
     if (!s || !out) return 0u;
     count = s->spiral.route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : s->spiral.route_count;
     for (i = 0u; i < count; ++i) {
@@ -76,17 +83,17 @@ uint8_t apsis_spiral_derived_sequence(const ApsisState *s,
         int32_t base;
         if (raw > 35) continue;
         if (!s->spiral.follow_frame) {
-            out[i] = (int16_t)(s->gravity.scale_lock
+            out[written++] = (int16_t)(s->gravity.scale_lock
                 ? apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u)
                 : raw);
         } else {
             base = apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u);
-            out[i] = (int16_t)apsis_scale_at(s->gravity.tonic, s->gravity.scale,
-                                             nearest_scale_index(s, base) +
-                                             (int32_t)(s->gravity.degree > 7u ? 7u : s->gravity.degree));
+            out[written++] = (int16_t)apsis_scale_at(s->gravity.tonic, s->gravity.scale,
+                                                     nearest_scale_index(s, base) +
+                                                     (int32_t)(s->gravity.degree > 7u ? 7u : s->gravity.degree));
         }
     }
-    return count;
+    return written;
 }
 
 uint8_t apsis_spiral_attractor_length(uint8_t length)
@@ -107,10 +114,9 @@ void apsis_spiral_reset_attractor(ApsisSpiralState *sp, uint8_t regenerate)
     sp->attractor_density_q15 = density;
 
     if (!regenerate) {
-        uint32_t mask = len == 24u ? 0x00FFFFFFu : ((1u << len) - 1u);
-        sp->attractor_gates &= mask;
         for (i = 0u; i < len; ++i)
             sp->attractor_energy_q15[i] = clamp_q15(sp->attractor_energy_q15[i], APSIS_Q15_MILLI(120), APSIS_Q15_ONE);
+        set_default_tail(sp, len);
         return;
     }
 
@@ -118,23 +124,15 @@ void apsis_spiral_reset_attractor(ApsisSpiralState *sp, uint8_t regenerate)
     x = sp->attractor_seed ? sp->attractor_seed : 911u;
 
     for (i = 0u; i < len; ++i) {
-        uint16_t threshold = density;
         uint16_t bias = (i % 4u == 0u) ? APSIS_Q15_MILLI(120) : ((i % 2u == 0u) ? APSIS_Q15_MILLI(40) : 0u);
-        uint32_t t = (uint32_t)threshold + bias;
-        if (t > APSIS_Q15_MILLI(940)) t = APSIS_Q15_MILLI(940);
-        if (rnd_below_q15(lcg_next(&x), (uint16_t)t)) gates |= 1u << i;
+        uint32_t threshold = (uint32_t)density + bias;
+        if (threshold > APSIS_Q15_MILLI(940)) threshold = APSIS_Q15_MILLI(940);
+        if (rnd_below_q15(lcg_next(&x), (uint16_t)threshold)) gates |= 1u << i;
     }
     if (!gates) gates = 1u;
     sp->attractor_gates = gates;
 
     for (i = 0u; i < len; ++i)
         sp->attractor_energy_q15[i] = rnd_energy_q15(lcg_next(&x));
-
-    /* Browser arrays only have active length. Fixed native capacity is reset to
-     * source defaults beyond it so a later length increase extends identically. */
-    for (; i < APSIS_ATTRACTOR_STEPS; ++i) {
-        if (DEFAULT_GATE[i % 16u]) sp->attractor_gates |= 1u << i;
-        else sp->attractor_gates &= ~(1u << i);
-        sp->attractor_energy_q15[i] = DEFAULT_ENERGY[i % 16u];
-    }
+    set_default_tail(sp, len);
 }
