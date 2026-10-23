@@ -2,9 +2,31 @@
 
 Native FM-1 port of **APSIS**, developed as a parity-first translation of the browser instrument to the physical M-VAVE FM-1.
 
-## Status
+## Start here
 
-Planning / reference freeze. No DSP implementation has been accepted yet.
+For a new ChatGPT chat or a returning contributor, read these first in order:
+
+1. `PROJECT_STATE.md` - current milestone, exact unfinished state and next action
+2. `ROADMAP.md` - operational phase/milestone sequence
+3. `DECISIONS.md` - durable architecture/product decisions
+4. `TESTING.md` - what has actually been verified
+5. `CHANGELOG.md` - milestone history
+6. relevant files under `docs/` and the active source branch
+
+The repository, not chat history, is the durable source of project state.
+
+## Current status
+
+- Phase 0 reference freeze: complete
+- Phase 1 pinned FM-1 skeleton/build/emulator pipeline: complete
+- Phase 2 pure musical/state core: complete and merged
+- Phase 3 deterministic transport: active
+- current unfinished branch: `m3-transport-core`
+- current draft PR: #4
+- DSP remains intentionally deferred until the shared transport is proven
+- physical FM-1 validation has not yet been performed
+
+See `PROJECT_STATE.md` for the exact continuation point. Do not assume the current M3 transport is merge-ready merely because earlier target/emulator gates pass.
 
 ## Core rule
 
@@ -27,35 +49,50 @@ The first five are audible source roles. GRAVITY and TUNING shape shared pitch/h
 
 ## Platform baseline
 
-The initial port should follow the proven SkurkyMello discipline:
+The port follows a pinned Dinghy discipline:
 
-- build on a **pinned Dinghy baseline**, not a floating checkout;
-- verify unchanged Dinghy host + target before applying the APSIS overlay;
-- keep audio/state/UI code testable on host before device optimisation;
-- no allocation, flash access, screen drawing or waiting inside audio render;
-- use fixed-capacity queues and voice pools;
-- measure RAM, pool and audio render time continuously;
-- preserve the updater/rescue path and use a unique FM-1 package identity;
-- do not optimise away characteristic behaviour before parity tests exist.
+- Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
+- Dinghy tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`
+- APSIS FM-1 product identity `FM-1_972`
+- verify unchanged Dinghy host + target before applying the APSIS overlay
+- keep audio/state/UI code testable on host before device optimisation
+- no allocation, flash access, screen drawing or waiting inside audio render
+- use fixed-capacity queues and voice pools
+- measure RAM, pool and audio render time continuously
+- preserve updater/rescue paths
+- do not optimise away characteristic behaviour before parity tests exist
 
-Current reference baseline candidate: Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`, the same pinned baseline currently used by the SkurkyMello FM-1 project. Final lock will be recorded in `UPSTREAM.lock.json` when implementation begins.
+The exact pin is recorded in `UPSTREAM.lock.json`.
 
 ## FM-1 timing assumption
 
-For the pinned Dinghy generation, the application audio callback runs at **44.1 kHz with 256-frame blocks**. That is about 5.80 ms of audio per callback. APSIS should target substantially less than the full deadline under worst-case load; the initial engineering target is <= ~50% of the callback period until hardware measurements justify another budget.
+For the pinned Dinghy generation, the application audio callback runs at **44.1 kHz with 256-frame blocks**, about 5.80 ms per callback. APSIS initially targets comfortably below the full deadline under worst-case load, with <= ~50% of callback time as the provisional engineering target until hardware measurements justify another budget.
 
-## Documents
+## Project documents
 
-- `docs/PORT_CONTRACT.md` — what “1:1” means and what may / may not change
-- `docs/ARCHITECTURE.md` — proposed native engine decomposition
-- `docs/UI_MAPPING.md` — FM-1 physical interaction model
-- `docs/PLAN.md` — staged implementation plan and exit gates
-- `docs/PARITY_MATRIX.md` — feature-by-feature audit checklist
+Root continuity files:
+- `PROJECT_STATE.md`
+- `ROADMAP.md`
+- `DECISIONS.md`
+- `TESTING.md`
+- `CHANGELOG.md`
+
+Detailed design/reference files:
+- `docs/PORT_CONTRACT.md` - what 1:1 means and what may / may not change
+- `docs/ARCHITECTURE.md` - native engine decomposition
+- `docs/UI_MAPPING.md` - FM-1 physical interaction model
+- `docs/PLAN.md` - detailed staged implementation plan and exit gates
+- `docs/PARITY_MATRIX.md` - feature-by-feature audit checklist
+- `docs/reference/SOURCE_LOCK.md` - frozen browser source identity/landmarks
+- `docs/reference/BEHAVIOR_MAP.md` - source-derived behaviour/default map
 
 ## Important design consequence
 
-The 240×240 screen should draw real APSIS surfaces — String, orbiting Clock, Spiral, Bloom and Gravity — in a reduced native form. It should **not** replace them with generic parameter lists as the primary interface. Parameters may live on secondary pages, but the playable surface remains the instrument.
+The 240x240 screen should draw real APSIS surfaces - String, orbiting Clock, Spiral, Bloom and Gravity - in a reduced native form. It should **not** replace them with generic parameter lists as the primary interface. Parameters may live on secondary pages, but the playable surface remains the instrument.
 
 ## Reference source
 
-The current browser `apsis.html` supplied to the project is the behavioural source of truth for this port. It is intentionally not copied into this public repository during the planning phase.
+The browser `apsis.html` supplied to the project is the behavioural source of truth for this port. It is intentionally not copied into this public repository.
+
+Frozen reference SHA-256:
+`012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
