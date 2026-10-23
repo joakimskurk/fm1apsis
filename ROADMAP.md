@@ -52,12 +52,13 @@ Merged through commit `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 - [x] implement Clock pulse/swing/subdivision/event generation
 - [x] implement transport regression test source
 - [x] add transport to desktop Makefile test/sanitizer targets
-- [~] run/fix new host tests and sanitizers
+- [x] source/core regression passes in GitHub Actions
+- [x] ASAN/UBSAN passes in GitHub Actions
 - [ ] add transport files to `ci/apply_apsis.sh`
 - [ ] add transport to `overlay/dinghy.c` single translation unit
-- [ ] run real JieLi target gate and record resource use
-- [ ] run FM-1 emulator smoke
-- [ ] finalize M3a PR and merge
+- [ ] run real JieLi target gate with transport compiled and record resource use
+- [ ] run FM-1 emulator smoke with transport compiled
+- [ ] finalize M3a PR #4 and merge
 
 Active branch: `m3-transport-core`. See `PROJECT_STATE.md` for exact continuation.
 
