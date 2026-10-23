@@ -213,8 +213,9 @@ static void test_clock(void)
     assert(apsis_clock_interval_us(&s.clock, 0u) == 416667u);
 
     s.clock.swing_q15 = APSIS_Q15_MILLI(100);
-    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 0u) - 375000) <= 2);
-    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 1u) - 458333) <= 2);
+    /* Q15 cannot encode 0.10 exactly; native timing must remain within single-digit microseconds of browser float timing. */
+    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 0u) - 375000) <= 8);
+    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 1u) - 458333) <= 8);
 
     p = apsis_clock_pulse(&s.clock, 0u, 0u);
     assert(p.main_on == 1u && p.accent == 1u && p.step_one_resync == 0u);
