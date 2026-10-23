@@ -10,7 +10,10 @@ cp -a work/dinghy work/apsis
 rm -rf work/apsis/.git work/apsis/build
 
 cp overlay/dinghy.c work/apsis/firmware/src/dinghy.c
-cp apsis/apsis_state.h apsis/apsis_state.c apsis/apsis_harmony.h apsis/apsis_harmony.c work/apsis/firmware/src/
+cp apsis/apsis_state.h apsis/apsis_state.c \
+   apsis/apsis_harmony.h apsis/apsis_harmony.c \
+   apsis/apsis_string.h apsis/apsis_string.c \
+   work/apsis/firmware/src/
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
 # Host compilation is a structural gate for the single-translation-unit FM-1 app.
