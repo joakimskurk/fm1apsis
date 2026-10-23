@@ -8,17 +8,17 @@ typedef struct {
     int32_t score;
 } BloomCandidate;
 
-static int32_t abs_i32(int32_t v) { return v < 0 ? -v : v; }
-static int16_t clamp_i16(int32_t v, int16_t lo, int16_t hi) { return (int16_t)(v < lo ? lo : (v > hi ? hi : v)); }
-static int8_t clamp_i8(int32_t v, int8_t lo, int8_t hi) { return (int8_t)(v < lo ? lo : (v > hi ? hi : v)); }
-static uint8_t clamp_u8(uint32_t v, uint8_t lo, uint8_t hi) { return (uint8_t)(v < lo ? lo : (v > hi ? hi : v)); }
+static int32_t bloom_abs_i32(int32_t v) { return v < 0 ? -v : v; }
+static int16_t bloom_clamp_i16(int32_t v, int16_t lo, int16_t hi) { return (int16_t)(v < lo ? lo : (v > hi ? hi : v)); }
+static int8_t bloom_clamp_i8(int32_t v, int8_t lo, int8_t hi) { return (int8_t)(v < lo ? lo : (v > hi ? hi : v)); }
+static uint8_t bloom_clamp_u8(uint32_t v, uint8_t lo, uint8_t hi) { return (uint8_t)(v < lo ? lo : (v > hi ? hi : v)); }
 
-static uint16_t mul_q15(uint16_t a, uint16_t b)
+static uint16_t bloom_mul_q15(uint16_t a, uint16_t b)
 {
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
-static void sort_i16(int16_t *v, uint8_t n)
+static void bloom_sort_i16(int16_t *v, uint8_t n)
 {
     uint8_t i;
     for (i = 1u; i < n; ++i) {
@@ -41,17 +41,17 @@ void apsis_bloom_harmony_from_state(const ApsisState *s, ApsisBloomHarmony *h)
     h->scale = s->gravity.scale < APSIS_SCALE_COUNT ? s->gravity.scale : APSIS_SCALE_DORIAN;
     h->degree = s->gravity.degree > 7u ? 7u : s->gravity.degree;
     h->voicing = s->gravity.voicing > 2u ? 2u : s->gravity.voicing;
-    h->voices = clamp_u8(s->gravity.voices, 3u, 5u);
+    h->voices = bloom_clamp_u8(s->gravity.voices, 3u, 5u);
     h->inversion = s->gravity.inversion >= h->voices ? (uint8_t)(h->voices - 1u) : s->gravity.inversion;
 }
 
 uint8_t apsis_bloom_voice_count(const ApsisState *s, const ApsisBloomHarmony *h)
 {
-    if (!s) return h ? clamp_u8(h->voices, 3u, 5u) : 4u;
+    if (!s) return h ? bloom_clamp_u8(h->voices, 3u, 5u) : 4u;
     if (s->bloom.depth == APSIS_BLOOM_DEPTH_TRIAD) return 3u;
     if (s->bloom.depth == APSIS_BLOOM_DEPTH_SEVENTH) return 4u;
     if (s->bloom.depth == APSIS_BLOOM_DEPTH_NINTH) return 5u;
-    return h ? clamp_u8(h->voices, 3u, 5u) : clamp_u8(s->gravity.voices, 3u, 5u);
+    return h ? bloom_clamp_u8(h->voices, 3u, 5u) : bloom_clamp_u8(s->gravity.voices, 3u, 5u);
 }
 
 uint8_t apsis_bloom_base_chord_steps(const ApsisState *s, const ApsisBloomHarmony *h,
@@ -86,9 +86,9 @@ uint8_t apsis_bloom_plan_steps(const ApsisState *s, const ApsisBloomHarmony *h,
     n = plan->count < n ? plan->count : n;
     for (i = 0u; i < n; ++i) {
         tone = (uint8_t)(plan->tone[i] % (n ? n : 1u));
-        out[i] = (int16_t)(base[tone] + clamp_i8(plan->octave[i], -5, 6) * 12);
+        out[i] = (int16_t)(base[tone] + bloom_clamp_i8(plan->octave[i], -5, 6) * 12);
     }
-    sort_i16(out, n);
+    bloom_sort_i16(out, n);
     return n;
 }
 
@@ -106,7 +106,7 @@ ApsisBloomPlan apsis_bloom_legacy_plan(const ApsisState *s, const ApsisBloomHarm
         ? (s->bloom.voicing_mode == APSIS_BLOOM_VOICING_CLOSE ? 0u :
            s->bloom.voicing_mode == APSIS_BLOOM_VOICING_OPEN ? 1u : 2u)
         : (h->voicing > 2u ? 2u : h->voicing);
-    reg = s ? clamp_i8(s->bloom.register_oct, -1, 1) : 0;
+    reg = s ? bloom_clamp_i8(s->bloom.register_oct, -1, 1) : 0;
     p.count = n;
     for (i = 0u; i < n; ++i) {
         tone = (uint8_t)((inv + i) % n);
@@ -128,15 +128,15 @@ uint16_t apsis_bloom_spread_target_q15(const ApsisState *s, const ApsisBloomHarm
     uint8_t ring = h ? (h->voicing > 2u ? 2u : h->voicing) : APSIS_GRAVITY_COLOUR;
     if (x > APSIS_Q15_ONE) x = APSIS_Q15_ONE;
     if (mode == APSIS_BLOOM_VOICING_FOLLOW) {
-        if (ring == 0u) x = mul_q15(x, APSIS_Q15_MILLI(340));
-        else if (ring == 1u) x = (uint16_t)(APSIS_Q15_MILLI(300) + mul_q15(x, APSIS_Q15_MILLI(480)));
-        else x = (uint16_t)(APSIS_Q15_MILLI(680) + mul_q15(x, APSIS_Q15_MILLI(300)));
+        if (ring == 0u) x = bloom_mul_q15(x, APSIS_Q15_MILLI(340));
+        else if (ring == 1u) x = (uint16_t)(APSIS_Q15_MILLI(300) + bloom_mul_q15(x, APSIS_Q15_MILLI(480)));
+        else x = (uint16_t)(APSIS_Q15_MILLI(680) + bloom_mul_q15(x, APSIS_Q15_MILLI(300)));
     } else if (mode == APSIS_BLOOM_VOICING_CLOSE) {
-        x = mul_q15(x, APSIS_Q15_MILLI(280));
+        x = bloom_mul_q15(x, APSIS_Q15_MILLI(280));
     } else if (mode == APSIS_BLOOM_VOICING_OPEN) {
-        x = (uint16_t)(APSIS_Q15_MILLI(380) + mul_q15(x, APSIS_Q15_MILLI(380)));
+        x = (uint16_t)(APSIS_Q15_MILLI(380) + bloom_mul_q15(x, APSIS_Q15_MILLI(380)));
     } else {
-        x = (uint16_t)(APSIS_Q15_MILLI(720) + mul_q15(x, APSIS_Q15_MILLI(280)));
+        x = (uint16_t)(APSIS_Q15_MILLI(720) + bloom_mul_q15(x, APSIS_Q15_MILLI(280)));
     }
     return x > APSIS_Q15_ONE ? APSIS_Q15_ONE : x;
 }
@@ -154,15 +154,15 @@ void apsis_bloom_voicing_reset(ApsisBloomVoicingState *v)
     }
 }
 
-static uint8_t pitch_class(int16_t step)
+static uint8_t bloom_pitch_class(int16_t step)
 {
     int16_t pc = (int16_t)(step % 12);
     if (pc < 0) pc += 12;
     return (uint8_t)pc;
 }
 
-static int32_t candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
-                              const ApsisBloomVoicingState *vs, const BloomCandidate *c)
+static int32_t bloom_candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
+                                    const ApsisBloomVoicingState *vs, const BloomCandidate *c)
 {
     int16_t base[APSIS_BLOOM_VOICES_MAX];
     uint8_t n = c->plan.count, i, pi, base_n;
@@ -172,21 +172,21 @@ static int32_t candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
     int32_t target_span = 10000 + (int32_t)(((uint32_t)spread * 24000u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
     int32_t center_milli = (int32_t)(min + max) * 500;
     int32_t base_center, desired, cost;
-    int8_t reg = s ? clamp_i8(s->bloom.register_oct, -1, 1) : 0;
+    int8_t reg = s ? bloom_clamp_i8(s->bloom.register_oct, -1, 1) : 0;
     uint8_t grav_inv = h ? (h->inversion >= n ? (uint8_t)(n - 1u) : h->inversion) : 0u;
 
     base_n = apsis_bloom_base_chord_steps(s, h, base);
     base_center = base_n ? (int32_t)(base[0] + base[base_n - 1u]) * 500 + reg * 12000 : 0;
     desired = base_center + (vs ? vs->drift_milli : 0);
-    cost = (abs_i32(span_milli - target_span) * 420 + 500) / 1000;
-    cost += (abs_i32(center_milli - desired) * 300 + 500) / 1000;
+    cost = (bloom_abs_i32(span_milli - target_span) * 420 + 500) / 1000;
+    cost += (bloom_abs_i32(center_milli - desired) * 300 + 500) / 1000;
 
     if (vs && vs->last_count) {
         for (i = 0u; i < n; ++i) {
             uint8_t denom = n > 1u ? (uint8_t)(n - 1u) : 1u;
             pi = (uint8_t)(((uint32_t)i * (vs->last_count - 1u) + denom / 2u) / denom);
             {
-                int32_t move = abs_i32((int32_t)c->steps[i] - vs->last_steps[pi]);
+                int32_t move = bloom_abs_i32((int32_t)c->steps[i] - vs->last_steps[pi]);
                 cost += move * (move > 7 ? 1180 : 720);
                 if (move > 12) cost += (move - 12) * 1800;
             }
@@ -194,7 +194,7 @@ static int32_t candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
         for (i = 0u; i < n; ++i) {
             uint8_t j;
             for (j = 0u; j < vs->last_count; ++j) {
-                if (pitch_class(c->steps[i]) == pitch_class(vs->last_steps[j])) { cost -= 1150; break; }
+                if (bloom_pitch_class(c->steps[i]) == bloom_pitch_class(vs->last_steps[j])) { cost -= 1150; break; }
             }
         }
         if (vs->last_count == n) {
@@ -212,7 +212,7 @@ static int32_t candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
     return cost;
 }
 
-static void top_insert(BloomCandidate top[5], uint8_t *count, const BloomCandidate *candidate)
+static void bloom_top_insert(BloomCandidate top[5], uint8_t *count, const BloomCandidate *candidate)
 {
     uint8_t i, pos;
     if (*count < 5u) {
@@ -232,8 +232,8 @@ static void top_insert(BloomCandidate top[5], uint8_t *count, const BloomCandida
     for (i = *count; i < 5u; ++i) top[i].score = 0x7FFFFFFF;
 }
 
-static void advance_drift(const ApsisState *s, const ApsisBloomHarmony *h,
-                          ApsisBloomVoicingState *vs, uint32_t random)
+static void bloom_advance_drift(const ApsisState *s, const ApsisBloomHarmony *h,
+                                ApsisBloomVoicingState *vs, uint32_t random)
 {
     uint16_t spread = apsis_bloom_spread_target_q15(s, h);
     int32_t amplitude = 1250 + (int32_t)(((uint32_t)spread * 2100u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
@@ -241,7 +241,7 @@ static void advance_drift(const ApsisState *s, const ApsisBloomHarmony *h,
     int32_t step;
     if (centered >= 0) step = (int32_t)(((uint64_t)centered * (uint32_t)amplitude) >> 32);
     else step = -(int32_t)(((uint64_t)(-centered) * (uint32_t)amplitude) >> 32);
-    vs->drift_milli = clamp_i16((int32_t)vs->drift_milli - vs->drift_milli / 10 + step, -11000, 11000);
+    vs->drift_milli = bloom_clamp_i16((int32_t)vs->drift_milli - vs->drift_milli / 10 + step, -11000, 11000);
 }
 
 ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomHarmony *h,
@@ -261,8 +261,8 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
     fallback = apsis_bloom_legacy_plan(s, h);
     if (!s || !vs) return fallback;
     n = apsis_bloom_voice_count(s, h);
-    reg = clamp_i8(s->bloom.register_oct, -1, 1);
-    if (advance) advance_drift(s, h, vs, walk_random);
+    reg = bloom_clamp_i8(s->bloom.register_oct, -1, 1);
+    if (advance) bloom_advance_drift(s, h, vs, walk_random);
 
     for (inv = 0u; inv < n; ++inv) {
         for (pattern = 0u; pattern < 6u; ++pattern) {
@@ -280,8 +280,8 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
                 apsis_bloom_plan_steps(s, h, &c.plan, c.steps);
                 min = c.steps[0]; max = c.steps[n - 1u];
                 if ((max - min) < 7 || (max - min) > 43) continue;
-                c.score = candidate_cost(s, h, vs, &c);
-                top_insert(top, &top_count, &c);
+                c.score = bloom_candidate_cost(s, h, vs, &c);
+                bloom_top_insert(top, &top_count, &c);
             }
         }
     }
