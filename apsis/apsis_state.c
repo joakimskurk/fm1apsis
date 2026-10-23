@@ -1,4 +1,5 @@
 #include "apsis_state.h"
+#include "apsis_gravity.h"
 
 static void apsis_zero(void *ptr, uint32_t n)
 {
@@ -9,9 +10,6 @@ static void apsis_zero(void *ptr, uint32_t n)
 void apsis_state_default(ApsisState *s)
 {
     uint32_t i;
-    /* Browser default is 16 steps. The final 8 native capacity slots repeat
-     * the first 8 browser defaults so increasing length to 24 reproduces the
-     * browser's resetSpiralAttractor(false) extension rule. */
     static const uint16_t spiral_energy[APSIS_ATTRACTOR_STEPS] = {
         APSIS_Q15_MILLI(820), APSIS_Q15_MILLI(340), APSIS_Q15_MILLI(680), APSIS_Q15_MILLI(930),
         APSIS_Q15_MILLI(280), APSIS_Q15_MILLI(760), APSIS_Q15_MILLI(420), APSIS_Q15_MILLI(220),
@@ -25,7 +23,6 @@ void apsis_state_default(ApsisState *s)
     apsis_zero(s, (uint32_t)sizeof(*s));
     s->version = APSIS_STATE_VERSION;
 
-    /* STRING — source: DEFAULTS.string in locked apsis.html */
     s->string.split_q15 = APSIS_Q15_MILLI(530);
     s->string.left_split_q15 = APSIS_Q15_MILLI(470);
     s->string.right_split_q15 = APSIS_Q15_MILLI(530);
@@ -83,7 +80,6 @@ void apsis_state_default(ApsisState *s)
     s->string.sound = 1u;
     s->string.level_q15 = APSIS_Q15_MILLI(800);
 
-    /* DRIFT */
     s->drift.amount_q15 = APSIS_Q15_MILLI(420);
     s->drift.depth_q15 = APSIS_Q15_MILLI(720);
     s->drift.width_q15 = APSIS_Q15_MILLI(640);
@@ -91,7 +87,6 @@ void apsis_state_default(ApsisState *s)
     s->drift.sound = 1u;
     s->drift.level_q15 = APSIS_Q15_MILLI(820);
 
-    /* CLOCK */
     s->clock.n = 12u;
     s->clock.bounds[0] = 3u;
     s->clock.bounds[1] = 6u;
@@ -114,7 +109,6 @@ void apsis_state_default(ApsisState *s)
     s->clock.snap_level_q15 = APSIS_Q15_MILLI(620);
     s->clock.snap_tone_hz = 4200u;
 
-    /* SPIRAL */
     s->spiral.route_count = 0u;
     s->spiral.rate = 1u;
     s->spiral.note_length_q15 = APSIS_Q15_MILLI(820);
@@ -132,12 +126,15 @@ void apsis_state_default(ApsisState *s)
     s->spiral.sound = 1u;
     s->spiral.level_q15 = APSIS_Q15_MILLI(780);
 
-    /* BLOOM */
     s->bloom.cycles = 2u;
     s->bloom.rate = 1u;
     s->bloom.trigger_step = 0u;
     s->bloom.delay_ms = 60u;
     s->bloom.voice = APSIS_BLOOM_VEIL;
+    s->bloom.depth = APSIS_BLOOM_DEPTH_FOLLOW;
+    s->bloom.voicing_mode = APSIS_BLOOM_VOICING_FOLLOW;
+    s->bloom.inversion_follow = 1u;
+    s->bloom.inversion = 0u;
     s->bloom.register_oct = 0;
     s->bloom.voicing_spread_q15 = APSIS_Q15_MILLI(480);
     s->bloom.length_ms = 1900u;
@@ -146,18 +143,19 @@ void apsis_state_default(ApsisState *s)
     s->bloom.spread_q15 = APSIS_Q15_MILLI(420);
     s->bloom.width_q15 = APSIS_Q15_MILLI(540);
     s->bloom.brightness_q15 = APSIS_Q15_MILLI(720);
-    s->bloom.tuning_follow = 1u;
-    s->bloom.tuning_reference_chord = 1u;
+    s->bloom.tuning_mode = APSIS_BLOOM_TUNING_FOLLOW;
+    s->bloom.tuning_reference = APSIS_BLOOM_REF_CHORD;
     s->bloom.tuning_amount_q15 = APSIS_Q15_ONE;
     s->bloom.send_q15 = APSIS_Q15_MILLI(580);
     s->bloom.sound = 1u;
     s->bloom.level_q15 = APSIS_Q15_MILLI(580);
 
-    /* TUNING */
     s->temper.mode = APSIS_TUNING_EQUAL;
     s->temper.strength_q15 = APSIS_Q15_ONE;
+    s->temper.send_q15 = APSIS_Q15_MILLI(420);
+    s->temper.sound = 1u;
+    s->temper.level_q15 = APSIS_Q15_MILLI(580);
 
-    /* GRAVITY */
     s->gravity.tonic = 0u;
     s->gravity.scale = APSIS_SCALE_DORIAN;
     s->gravity.degree = 0u;
@@ -170,9 +168,13 @@ void apsis_state_default(ApsisState *s)
     s->gravity.ring_play = 1u;
     s->gravity.ring_level_q15 = APSIS_Q15_MILLI(720);
     s->gravity.selected_ring = APSIS_GRAVITY_ANCHOR;
-    s->gravity.point_override_count = 0u;
+    s->gravity.selected_point_degree = 0u;
+    for (i = 0u; i < APSIS_GRAVITY_POINTS; ++i) {
+        uint8_t degree = (uint8_t)(i / APSIS_GRAVITY_RINGS);
+        uint8_t ring = (uint8_t)(i % APSIS_GRAVITY_RINGS);
+        s->gravity.points[i] = apsis_gravity_point_default(degree, ring);
+    }
 
-    /* SPACE */
     s->space.mix_q15 = APSIS_Q15_MILLI(480);
     s->space.decay_ms = 8400u;
     s->space.predelay_ms = 72u;
@@ -180,13 +182,11 @@ void apsis_state_default(ApsisState *s)
     s->space.echo_time_ms = 362u;
     s->space.echo_feedback_q15 = APSIS_Q15_MILLI(180);
 
-    /* MOTHER */
     s->mother.sync = 0u;
     s->mother.horizon = 8u;
     for (i = 0; i < 5u; ++i) s->mother.mix_q15[i] = APSIS_Q15_ONE;
     s->mother.mute_mask = 0u;
 
-    /* CHAIN */
     s->chain.meter_lock = 1u;
     s->chain.start_sync = APSIS_CHAIN_SYNC_ONE;
     s->chain.loop_sync = APSIS_CHAIN_SYNC_ONE;

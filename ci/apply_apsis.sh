@@ -12,10 +12,12 @@ rm -rf work/apsis/.git work/apsis/build
 cp overlay/dinghy.c work/apsis/firmware/src/dinghy.c
 cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_harmony.h apsis/apsis_harmony.c \
+   apsis/apsis_gravity.h apsis/apsis_gravity.c \
    apsis/apsis_string.h apsis/apsis_string.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
+   apsis/apsis_bloom.h apsis/apsis_bloom.c \
    work/apsis/firmware/src/
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 

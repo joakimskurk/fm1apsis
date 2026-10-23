@@ -10,6 +10,9 @@
 #define APSIS_CLOCK_STEPS_MAX 24u
 #define APSIS_KEEP_SLOTS 8u
 #define APSIS_CHAIN_MAX 32u
+#define APSIS_GRAVITY_DEGREES 8u
+#define APSIS_GRAVITY_RINGS 3u
+#define APSIS_GRAVITY_POINTS (APSIS_GRAVITY_DEGREES * APSIS_GRAVITY_RINGS)
 #define APSIS_Q15_ONE 32767u
 #define APSIS_Q15_MILLI(x) ((uint16_t)((((uint32_t)(x)) * 32767u + 500u) / 1000u))
 
@@ -47,8 +50,12 @@ typedef enum { APSIS_STRING_FILTER_OFF = 0 } ApsisStringFilterMode;
 typedef enum { APSIS_CLOCK_STONE = 0 } ApsisClockVoice;
 typedef enum { APSIS_SPIRAL_THREAD = 0, APSIS_SPIRAL_GLASS, APSIS_SPIRAL_REED, APSIS_SPIRAL_HALO } ApsisSpiralVoice;
 typedef enum { APSIS_BLOOM_VEIL = 0, APSIS_BLOOM_CHOIR, APSIS_BLOOM_ORGAN, APSIS_BLOOM_GLASS } ApsisBloomVoice;
+typedef enum { APSIS_BLOOM_DEPTH_FOLLOW = 0, APSIS_BLOOM_DEPTH_TRIAD, APSIS_BLOOM_DEPTH_SEVENTH, APSIS_BLOOM_DEPTH_NINTH } ApsisBloomDepth;
+typedef enum { APSIS_BLOOM_VOICING_FOLLOW = 0, APSIS_BLOOM_VOICING_CLOSE, APSIS_BLOOM_VOICING_OPEN, APSIS_BLOOM_VOICING_WIDE } ApsisBloomVoicingMode;
+typedef enum { APSIS_BLOOM_TUNING_FOLLOW = 0, APSIS_BLOOM_TUNING_EQUAL, APSIS_BLOOM_TUNING_JUST, APSIS_BLOOM_TUNING_PYTH } ApsisBloomTuningMode;
+typedef enum { APSIS_BLOOM_REF_CHORD = 0, APSIS_BLOOM_REF_TONIC } ApsisBloomTuningReference;
 typedef enum { APSIS_GRAVITY_ANCHOR = 0, APSIS_GRAVITY_COLOUR, APSIS_GRAVITY_AIR } ApsisGravityRing;
-typedef enum { APSIS_CHANGE_PULSE = 0 } ApsisChangeTiming;
+typedef enum { APSIS_CHANGE_PULSE = 0, APSIS_CHANGE_IMMEDIATE } ApsisChangeTiming;
 typedef enum { APSIS_CHAIN_SYNC_ONE = 0, APSIS_CHAIN_SYNC_PULSE } ApsisChainSync;
 
 typedef struct {
@@ -161,6 +168,10 @@ typedef struct {
     uint8_t trigger_step;
     uint16_t delay_ms;
     uint8_t voice;
+    uint8_t depth;
+    uint8_t voicing_mode;
+    uint8_t inversion_follow;
+    uint8_t inversion;
     int8_t register_oct;
     uint16_t voicing_spread_q15;
     uint16_t length_ms;
@@ -169,8 +180,8 @@ typedef struct {
     uint16_t spread_q15;
     uint16_t width_q15;
     uint16_t brightness_q15;
-    uint8_t tuning_follow;
-    uint8_t tuning_reference_chord;
+    uint8_t tuning_mode;
+    uint8_t tuning_reference;
     uint16_t tuning_amount_q15;
     uint16_t send_q15;
     uint8_t sound;
@@ -180,7 +191,20 @@ typedef struct {
 typedef struct {
     uint8_t mode;
     uint16_t strength_q15;
+    uint16_t send_q15;
+    uint8_t sound;
+    uint16_t level_q15;
 } ApsisTemperState;
+
+typedef struct {
+    uint8_t enabled;
+    int8_t offset;
+    int8_t octave;
+    uint16_t level_q15;
+    uint16_t brightness_q15;
+    uint16_t attack_ms;
+    uint16_t release_ms;
+} ApsisGravityPoint;
 
 typedef struct {
     uint8_t tonic;
@@ -195,7 +219,8 @@ typedef struct {
     uint8_t ring_play;
     uint16_t ring_level_q15;
     uint8_t selected_ring;
-    uint8_t point_override_count;
+    uint8_t selected_point_degree;
+    ApsisGravityPoint points[APSIS_GRAVITY_POINTS];
 } ApsisGravityState;
 
 typedef struct {
