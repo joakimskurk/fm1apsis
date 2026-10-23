@@ -9,11 +9,16 @@ static void apsis_zero(void *ptr, uint32_t n)
 void apsis_state_default(ApsisState *s)
 {
     uint32_t i;
+    /* Browser default is 16 steps. The final 8 native capacity slots repeat
+     * the first 8 browser defaults so increasing length to 24 reproduces the
+     * browser's resetSpiralAttractor(false) extension rule. */
     static const uint16_t spiral_energy[APSIS_ATTRACTOR_STEPS] = {
         APSIS_Q15_MILLI(820), APSIS_Q15_MILLI(340), APSIS_Q15_MILLI(680), APSIS_Q15_MILLI(930),
         APSIS_Q15_MILLI(280), APSIS_Q15_MILLI(760), APSIS_Q15_MILLI(420), APSIS_Q15_MILLI(220),
         APSIS_Q15_MILLI(880), APSIS_Q15_MILLI(310), APSIS_Q15_MILLI(640), APSIS_Q15_MILLI(790),
-        APSIS_Q15_MILLI(270), APSIS_Q15_MILLI(710), APSIS_Q15_MILLI(390), APSIS_Q15_MILLI(240)
+        APSIS_Q15_MILLI(270), APSIS_Q15_MILLI(710), APSIS_Q15_MILLI(390), APSIS_Q15_MILLI(240),
+        APSIS_Q15_MILLI(820), APSIS_Q15_MILLI(340), APSIS_Q15_MILLI(680), APSIS_Q15_MILLI(930),
+        APSIS_Q15_MILLI(280), APSIS_Q15_MILLI(760), APSIS_Q15_MILLI(420), APSIS_Q15_MILLI(220)
     };
 
     if (!s) return;
@@ -121,7 +126,7 @@ void apsis_state_default(ApsisState *s)
     s->spiral.attractor_lock_q15 = APSIS_Q15_MILLI(860);
     s->spiral.attractor_density_q15 = APSIS_Q15_MILLI(580);
     s->spiral.attractor_seed = 911u;
-    s->spiral.attractor_gates = 0x2D2Du;
+    s->spiral.attractor_gates = 0x002D2D2Du;
     for (i = 0; i < APSIS_ATTRACTOR_STEPS; ++i) s->spiral.attractor_energy_q15[i] = spiral_energy[i];
     s->spiral.send_q15 = APSIS_Q15_MILLI(620);
     s->spiral.sound = 1u;
