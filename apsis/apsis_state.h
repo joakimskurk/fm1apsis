@@ -33,7 +33,13 @@ typedef enum {
 
 typedef enum { APSIS_STRING_CLASSIC = 0, APSIS_STRING_DUAL } ApsisStringSurfaceMode;
 typedef enum { APSIS_SIDE_LEFT = 0, APSIS_SIDE_RIGHT } ApsisSide;
-typedef enum { APSIS_ANCHOR_ROOT = 0, APSIS_ANCHOR_FIFTH } ApsisStringAnchor;
+typedef enum {
+    APSIS_ANCHOR_ROOT = 0,
+    APSIS_ANCHOR_THIRD,
+    APSIS_ANCHOR_FIFTH,
+    APSIS_ANCHOR_SEVENTH,
+    APSIS_ANCHOR_NINTH
+} ApsisStringAnchor;
 typedef enum { APSIS_HARMONY_SCALE = 0, APSIS_HARMONY_CHORD, APSIS_HARMONY_CHROMATIC } ApsisStringHarmony;
 typedef enum { APSIS_STRING_CHARACTER_CLASSIC = 0 } ApsisStringCharacter;
 typedef enum { APSIS_STRING_RHYTHM_OFF = 0 } ApsisStringRhythm;
