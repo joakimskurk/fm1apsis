@@ -4,6 +4,8 @@
 #include "apsis_state.h"
 #include "apsis_harmony.h"
 #include "apsis_string.h"
+#include "apsis_drift.h"
+#include "apsis_clock.h"
 
 static int32_t iabs32(int32_t v) { return v < 0 ? -v : v; }
 
@@ -99,12 +101,11 @@ static void test_gravity(void)
     assert(steps[0] == 0 && steps[1] == 3 && steps[2] == 19 && steps[3] == 22);
 
     s.gravity.voicing = APSIS_GRAVITY_ANCHOR;
-    s.gravity.inversion = 2u; /* source clamps ANCHOR inversion to one */
+    s.gravity.inversion = 2u;
     n = apsis_gravity_chord_steps(&s.gravity, steps);
     assert(n == 4u);
     assert(steps[0] == 3 && steps[1] == 7 && steps[2] == 12 && steps[3] == 12);
 
-    /* Browser degree 7 is degree 0 one octave up, not degree 0 wrapped in place. */
     apsis_state_default(&s);
     s.gravity.degree = 7u;
     n = apsis_gravity_chord_steps(&s.gravity, steps);
@@ -125,14 +126,11 @@ static void test_string_ratio_and_mapping(void)
 {
     ApsisStringRatio r;
     int32_t mag;
-
     r = apsis_string_ratio(APSIS_STRING_SPLIT_MID_Q15);
     assert(r.raw_ratio_q16 == 65536u);
     assert(r.near_simple == 1u && r.numerator == 1u && r.denominator == 1u);
-
     r = apsis_string_ratio(APSIS_Q15_MILLI(667));
     assert(r.near_simple == 1u && r.numerator == 2u && r.denominator == 1u);
-
     mag = apsis_string_magnitude_milli(APSIS_Q15_MILLI(530), APSIS_Q15_ONE);
     assert(iabs32(mag - 2080) <= 4);
     assert(apsis_string_magnitude_milli(APSIS_Q15_MILLI(800), APSIS_Q15_ONE) >= 23995);
@@ -156,20 +154,16 @@ static void test_string_pitch(void)
     int32_t raw, target;
     apsis_state_default(&s);
     apsis_string_pitch_memory_reset(&mem);
-
     assert(apsis_string_anchor_step(&s, APSIS_SIDE_LEFT) == 0);
     assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 7);
     raw = apsis_string_raw_step_milli(&s, APSIS_SIDE_RIGHT);
     assert(iabs32(raw - 9080) <= 4);
     target = apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u);
     assert(target == 9000);
-
     s.string.quantize = 0u;
     target = apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u);
     assert(target == raw);
     assert(mem.right_valid == 0u);
-
-    /* Degree 7 carries the String anchor one octave upward as in the browser. */
     apsis_state_default(&s);
     s.gravity.degree = 7u;
     assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 19);
@@ -184,14 +178,58 @@ static void test_string_hysteresis(void)
     apsis_string_pitch_memory_reset(&mem);
     s.string.harmony = APSIS_HARMONY_CHROMATIC;
     s.string.right_anchor = APSIS_ANCHOR_ROOT;
-
     mem.right_target_step = 1;
     mem.right_valid = 1u;
-    s.string.right_split_q15 = APSIS_Q15_MILLI(522); /* raw ~1.52: browser keeps previous 1 */
+    s.string.right_split_q15 = APSIS_Q15_MILLI(522);
     assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u) == 1000);
-
-    s.string.right_split_q15 = APSIS_Q15_MILLI(523); /* raw ~1.59: crosses 0.10-semitone hysteresis */
+    s.string.right_split_q15 = APSIS_Q15_MILLI(523);
     assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u) == 2000);
+}
+
+static void test_drift(void)
+{
+    ApsisState s;
+    apsis_state_default(&s);
+    assert(apsis_drift_delta_millihz(0u) == 50u);
+    assert(apsis_drift_delta_millihz(APSIS_Q15_ONE) == 4000u);
+    assert(iabs32((int32_t)apsis_drift_delta_millihz(s.drift.amount_q15) - 994) <= 1);
+    assert(iabs32((int32_t)apsis_drift_audible_delta_millihz(&s.drift) - 587) <= 1);
+    s.drift.sound = 0u;
+    assert(apsis_drift_audible_delta_millihz(&s.drift) == 0u);
+}
+
+static void test_clock(void)
+{
+    ApsisState s;
+    ApsisClockPulse p;
+    uint8_t groups[APSIS_CLOCK_GROUPS_MAX] = {0};
+    uint8_t n;
+    apsis_state_default(&s);
+
+    n = apsis_clock_groups(&s.clock, groups);
+    assert(n == 4u);
+    assert(groups[0] == 3u && groups[1] == 3u && groups[2] == 3u && groups[3] == 3u);
+    assert(apsis_clock_base_interval_us(&s.clock) == 416667u);
+    assert(apsis_clock_interval_us(&s.clock, 0u) == 416667u);
+
+    s.clock.swing_q15 = APSIS_Q15_MILLI(100);
+    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 0u) - 375000) <= 2);
+    assert(iabs32((int32_t)apsis_clock_interval_us(&s.clock, 1u) - 458333) <= 2);
+
+    p = apsis_clock_pulse(&s.clock, 0u, 0u);
+    assert(p.main_on == 1u && p.accent == 1u && p.step_one_resync == 0u);
+    p = apsis_clock_pulse(&s.clock, 3u, 3u);
+    assert(p.main_on == 1u && p.accent == 1u);
+    p = apsis_clock_pulse(&s.clock, 2u, 2u);
+    assert(p.main_on == 1u && p.accent == 0u);
+
+    apsis_clock_set_length(&s.clock, 16u);
+    assert(s.clock.n == 16u);
+    assert((s.clock.main_mask & 0xFFFFu) == 0xFFFFu);
+    apsis_clock_set_length(&s.clock, 8u);
+    assert(s.clock.n == 8u);
+    assert((s.clock.main_mask & ~0xFFu) == 0u);
+    assert(s.clock.bounds[2] == 0u);
 }
 
 int main(void)
@@ -205,6 +243,8 @@ int main(void)
     test_string_split_link();
     test_string_pitch();
     test_string_hysteresis();
-    puts("PASS: APSIS source-derived core defaults/harmony/string");
+    test_drift();
+    test_clock();
+    puts("PASS: APSIS source-derived core defaults/harmony/string/drift/clock");
     return 0;
 }
