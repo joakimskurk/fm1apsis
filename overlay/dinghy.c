@@ -1,18 +1,20 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* APSIS for M-VAVE FM-1 — Phase 1 native shell.
+/* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * This intentionally makes no sound yet. The first target milestone is a
- * reproducible APSIS identity, source-derived state model and native surface
- * shell before DSP is allowed to shape the architecture.
+ * M2 remains intentionally silent. Musical state/harmony/String behaviour is
+ * established before DSP is allowed to shape the architecture.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
 #include "apsis_state.h"
 #include "apsis_harmony.h"
+#include "apsis_string.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
+#include "apsis_string.c"
 
 static ApsisState apsis;
+static ApsisStringPitchMemory string_pitch_memory;
 
 enum {
     SURF_MOTHER = 0,
@@ -33,7 +35,7 @@ static void app_audio(int32_t *out, uint32_t n)
 {
     (void)out;
     (void)n;
-    /* Platform supplies an already-zeroed stereo buffer. Phase 1 stays silent. */
+    /* Platform supplies an already-zeroed stereo buffer. M2 core stays silent. */
 }
 
 static const char *surface_name(uint8_t s)
@@ -47,7 +49,6 @@ static const char *surface_name(uint8_t s)
 
 static void draw_orbit(uint8_t active)
 {
-    /* 12-point CLOCK orbit: first real APSIS-native visual primitive. */
     static const uint8_t px[12] = {120, 144, 162, 168, 162, 144, 120, 96, 78, 72, 78, 96};
     static const uint8_t py[12] = {3, 8, 19, 31, 43, 54, 59, 54, 43, 31, 19, 8};
     uint32_t i;
@@ -68,13 +69,44 @@ static void draw_orbit(uint8_t active)
     cv_blit(0, 92);
 }
 
+static int32_t string_x(uint16_t split_q15)
+{
+    return 22 + (int32_t)(((uint32_t)split_q15 * 196u) / APSIS_Q15_ONE);
+}
+
+static void draw_string(void)
+{
+    int32_t left = string_x(apsis.string.left_split_q15);
+    int32_t right = string_x(apsis.string.right_split_q15);
+    const int32_t mid = string_x(APSIS_STRING_SPLIT_MID_Q15);
+    uint16_t dim = RGB(64, 62, 58);
+    uint16_t body = RGB(202, 197, 186);
+    uint16_t wire = RGB(155, 170, 174);
+
+    cv_begin(240, 64, C_BLACK);
+    cv_line(22, 31, 218, 31, dim);
+    cv_line(mid, 10, mid, 54, dim);
+    cv_line(mid, 31, left, 31, body);
+    cv_line(mid, 32, right, 32, wire);
+    cv_rect(left - 3, 27, 7, 9, body);
+    cv_rect(right - 3, 27, 7, 9, wire);
+    cv_rect(mid - 2, 29, 5, 5, RGB(168, 148, 112));
+    cv_blit(0, 92);
+}
+
+static void draw_primary_surface(void)
+{
+    if (surface == SURF_STRING) draw_string();
+    else draw_orbit(surface);
+}
+
 static void draw_surface(void)
 {
     draw_text_box(0, 12, 240, &FONT_L, "APSIS", C_WHITE, 1);
     draw_text_box(0, 49, 240, &FONT_S, surface_name(surface), RGB(174, 168, 157), 1);
-    draw_orbit(surface);
+    draw_primary_surface();
     draw_text_box(0, 169, 240, &FONT_S, "SOURCE-LOCKED NATIVE PORT", RGB(92, 89, 83), 1);
-    draw_text_box(0, 195, 240, &FONT_S, "M1 SILENT SHELL  v" APP_VER, RGB(92, 89, 83), 1);
+    draw_text_box(0, 195, 240, &FONT_S, "M2 STRING CORE  v" APP_VER, RGB(92, 89, 83), 1);
 }
 
 static void leds(void)
@@ -110,6 +142,7 @@ static void app_main(void)
 {
     uint8_t drawn = 255u;
     apsis_state_default(&apsis);
+    apsis_string_pitch_memory_reset(&string_pitch_memory);
     lcd_fill(0, 0, 240, 240, C_BLACK);
 
     for (;;) {
