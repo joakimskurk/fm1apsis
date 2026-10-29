@@ -17,14 +17,14 @@ static uint32_t fnv(uint32_t h, int32_t v)
     h ^= (x >> 24) & 255u; return h * 16777619u;
 }
 
-static void render_samples(ApsisStringDsp *dsp, uint32_t samples)
+static void render_samples(ApsisStringTransientPool *pool, uint32_t samples)
 {
     int32_t buf[512];
     while (samples) {
         uint32_t i;
         uint32_t frames = samples > 256u ? 256u : samples;
         for (i = 0u; i < frames * 2u; ++i) buf[i] = 0;
-        apsis_string_transient_render(dsp, buf, frames);
+        apsis_string_transient_render(pool, buf, frames);
         samples -= frames;
     }
 }
@@ -107,14 +107,14 @@ static int plan_contract(void)
 static int render_contract(void)
 {
     ApsisState s;
-    ApsisStringDsp a, b;
+    ApsisStringTransientPool a, b;
     int32_t xa[512], xb[512];
     uint32_t left = 61000u, peak = 0u, nonzero = 0u;
     uint32_t ha = 2166136261u, hb = 2166136261u;
 
     apsis_state_default(&s);
-    apsis_string_dsp_reset(&a);
-    apsis_string_dsp_reset(&b);
+    apsis_string_transient_pool_reset(&a);
+    apsis_string_transient_pool_reset(&b);
     CHECK(apsis_string_dsp_trigger_classic(&a, &s, 146833u, APSIS_Q15_MILLI(65),
                                            920u, (int16_t)APSIS_Q15_MILLI(300),
                                            0u, APSIS_Q15_MILLI(280)) == 8u);
@@ -150,11 +150,11 @@ static int render_contract(void)
 static int legal_burst_pool_contract(void)
 {
     ApsisState s;
-    ApsisStringDsp d;
+    ApsisStringTransientPool d;
     uint32_t trigger;
     uint8_t saw_stealing = 0u;
     apsis_state_default(&s);
-    apsis_string_dsp_reset(&d);
+    apsis_string_transient_pool_reset(&d);
 
     /* Study-126 direct String gestures debounce at 30 ms. A full normal
        Study-98 transient + root shadow consumes eight partial voices. */
