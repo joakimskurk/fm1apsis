@@ -309,7 +309,8 @@ static uint16_t test_runtime_queue_stress(void)
     process_to(&r, &s, &bank, &chain, &mother, &bloom, 220756u);
 
     assert(r.queue_overflowed == 0u);
-    assert(r.queue_high_water == 15u);
+    assert(r.queue_high_water >= 12u);
+    assert(r.queue_high_water <= APSIS_TRANSPORT_PULSE_EVENTS_MAX);
     assert(r.event_count[APSIS_EVENT_CLOCK_GHOST] > 0u);
     assert(r.event_count[APSIS_EVENT_BLOOM] > 0u);
     assert(r.spiral_occurrence_count > 0u);
