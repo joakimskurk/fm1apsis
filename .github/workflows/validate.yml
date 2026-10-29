@@ -65,14 +65,15 @@ jobs:
           set -euo pipefail
           cp build/target_report.json build/evidence/m4d-default-target-report.json
           cp build/SHA256SUMS build/evidence/m4d-default-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/m4d-default-fw-backup.fwsc
 
-          APSIS_CI_DRIFT_DSP_OFF=1 APSIS_VERSION=0.1-dev-drift-bypass bash ci/apply_apsis.sh
-          APSIS_VERSION=0.1-dev-drift-bypass bash ci/build_apsis_target.sh
+          APSIS_CI_DRIFT_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis.sh
+          APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
           cp build/target_report.json build/evidence/m4d-bypass-target-report.json
           cp build/SHA256SUMS build/evidence/m4d-bypass-SHA256SUMS
 
           set -o pipefail
-          bash ci/emulator_smoke.sh build/apsis-0.1-dev-drift-bypass.fwsc 2>&1 \
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee build/evidence/emulator_drift_bypass.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke-drift-bypass
 
@@ -104,8 +105,10 @@ jobs:
           print('PASS: M4d Drift DSP bypass is bit-identical to frozen M4c PCM/runtime')
           PY
 
+          cp build/m4d-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
           cp build/evidence/m4d-default-target-report.json build/target_report.json
           cp build/evidence/m4d-default-SHA256SUMS build/SHA256SUMS
+          rm -f build/m4d-default-fw-backup.fwsc
 
       - name: Upload Phase 1 evidence
         if: always()
