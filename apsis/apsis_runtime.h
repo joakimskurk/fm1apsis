@@ -84,6 +84,14 @@ typedef struct {
     ApsisBloomLateBinding pitch;
 } ApsisRuntimeBloomBinding;
 
+/* M4b does not add another scheduler. This is only a passive copy of the
+ * shared transport event after the M3c coordinator consumes it. Audio may use
+ * it on the following callback (never early; at most one block late). */
+typedef struct {
+    uint8_t valid;
+    ApsisTransportEvent event;
+} ApsisRuntimeStringRhythmObservation;
+
 typedef uint8_t (*ApsisRuntimeMotherApplyFn)(ApsisState *state,
                                               const ApsisMotherPendingItem *item,
                                               void *user);
@@ -102,6 +110,7 @@ typedef struct {
     uint32_t late_trace_hash;
     uint32_t event_count[APSIS_RUNTIME_EVENT_TYPES];
     uint64_t last_event_sample;
+    ApsisRuntimeStringRhythmObservation last_string_rhythm;
 
     ApsisRuntimeGravityPending gravity_pending;
 
@@ -158,10 +167,11 @@ void apsis_runtime_chain_start(ApsisRuntime *runtime, ApsisState *state,
                                ApsisChainSequence *sequence);
 void apsis_runtime_chain_stop(ApsisRuntime *runtime, ApsisChainSequence *sequence);
 
-/* Advance the silent APSIS timeline by sample frames. M3c keeps Study 126's
- * 1.20 s planning horizon but puts all target, pre-target state observation
- * and late-bind events on the same fixed-capacity sample heap. It never writes
- * audio. Generic MOTHER structural keys are applied through mother_apply. */
+/* Advance the APSIS timeline by sample frames. M3c keeps Study 126's 1.20 s
+ * planning horizon but puts all target, pre-target state observation and
+ * late-bind events on the same fixed-capacity sample heap. M4b adds only a
+ * passive consumed-String-Rhythm observation; it does not schedule audio here.
+ * Generic MOTHER structural keys are applied through mother_apply. */
 void apsis_runtime_process(ApsisRuntime *runtime,
                            ApsisState *state,
                            ApsisKeepBank *keep_bank,
