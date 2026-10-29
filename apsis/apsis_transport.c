@@ -25,17 +25,50 @@ static void apsis_transport_division(const ApsisClockState *c, uint8_t *num, uin
     *den = d;
 }
 
+/* The JieLi pi32v2 target used by Dinghy does not provide __udivdi3. APSIS
+ * still needs 64-bit sample/Q32 arithmetic, but every non-power-of-two divisor
+ * in the transport is <= 32767. Do a small allocation-free 64/16 long divide
+ * using only 32-bit operations so the exact desktop arithmetic survives on the
+ * real FM-1 target without pulling in a compiler runtime helper. */
+static uint64_t apsis_transport_u64_divmod_u16(uint64_t value, uint16_t divisor,
+                                               uint16_t *remainder)
+{
+    uint32_t hi = (uint32_t)(value >> 32);
+    uint32_t lo = (uint32_t)value;
+    uint32_t qhi = 0u, qlo = 0u, rem = 0u;
+    uint8_t i;
+    if (!divisor) {
+        if (remainder) *remainder = 0u;
+        return 0u;
+    }
+    for (i = 0u; i < 32u; ++i) {
+        rem = (rem << 1) | (hi >> 31);
+        hi <<= 1;
+        qhi <<= 1;
+        if (rem >= divisor) { rem -= divisor; qhi |= 1u; }
+    }
+    for (i = 0u; i < 32u; ++i) {
+        rem = (rem << 1) | (lo >> 31);
+        lo <<= 1;
+        qlo <<= 1;
+        if (rem >= divisor) { rem -= divisor; qlo |= 1u; }
+    }
+    if (remainder) *remainder = (uint16_t)rem;
+    return ((uint64_t)qhi << 32) | qlo;
+}
+
 static uint64_t apsis_transport_q15_mul64(uint64_t value, uint16_t q15)
 {
-    uint64_t whole = value / APSIS_Q15_ONE;
-    uint64_t rem = value - whole * APSIS_Q15_ONE;
-    return whole * q15 + (rem * q15 + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
+    uint16_t rem;
+    uint64_t whole = apsis_transport_u64_divmod_u16(value, APSIS_Q15_ONE, &rem);
+    uint64_t tail = (uint64_t)rem * q15 + APSIS_Q15_ONE / 2u;
+    return whole * q15 + apsis_transport_u64_divmod_u16(tail, APSIS_Q15_ONE, 0);
 }
 
 static uint64_t apsis_transport_ms_q32(uint32_t rate, uint32_t ms)
 {
     uint64_t whole = (uint64_t)rate * ms;
-    return ((whole << 32) + 500u) / 1000u;
+    return apsis_transport_u64_divmod_u16((whole << 32) + 500u, 1000u, 0);
 }
 
 static uint64_t apsis_transport_pair_round(uint64_t sample, uint32_t frac)
@@ -139,8 +172,8 @@ uint64_t apsis_transport_interval_q32(const ApsisClockState *c,
                                       uint32_t absolute_pulse)
 {
     uint8_t num, den;
-    uint16_t bpm, swing;
-    uint64_t numerator, divisor, base, delta;
+    uint16_t bpm, swing, divisor;
+    uint64_t numerator, base, delta;
     uint32_t rate = sample_rate ? sample_rate : APSIS_TRANSPORT_DEFAULT_RATE;
     if (!c) return ((uint64_t)18375u << 32);
     apsis_transport_division(c, &num, &den);
@@ -148,8 +181,8 @@ uint64_t apsis_transport_interval_q32(const ApsisClockState *c,
     swing = apsis_transport_swing(c->swing_q15);
     numerator = (uint64_t)rate * 60u * num;
     numerator <<= 32;
-    divisor = (uint64_t)bpm * den;
-    base = (numerator + divisor / 2u) / divisor;
+    divisor = (uint16_t)(bpm * den);
+    base = apsis_transport_u64_divmod_u16(numerator + divisor / 2u, divisor, 0);
     delta = apsis_transport_q15_mul64(base, swing);
     return (absolute_pulse & 1u) ? base + delta : base - delta;
 }
@@ -329,8 +362,10 @@ uint8_t apsis_transport_schedule_next(ApsisTransport *t,
 
     spiral_rate = apsis_transport_spiral_rate(s->spiral.attractor_rate);
     for (i = 0u; i < spiral_rate; ++i) {
-        uint64_t offset = ((interval_q32 / spiral_rate) * i) +
-            (((interval_q32 % spiral_rate) * i) / spiral_rate);
+        uint16_t rem;
+        uint64_t slice = apsis_transport_u64_divmod_u16(interval_q32, spiral_rate, &rem);
+        uint64_t offset = slice * i +
+            apsis_transport_u64_divmod_u16((uint64_t)rem * i, spiral_rate, 0);
         apsis_transport_local_add(local, &count, APSIS_EVENT_SPIRAL_TICK,
             apsis_transport_target_sample(t->next_sample, t->next_frac_q32, offset),
             interval_q32, abs, t->cycle_pos < n ? t->cycle_pos : 0u,
