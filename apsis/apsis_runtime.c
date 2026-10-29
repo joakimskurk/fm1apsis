@@ -317,6 +317,10 @@ static void runtime_commit_mother(ApsisRuntime *r, ApsisState *s,
     uint8_t i;
     if (!r || !s || !pending || !e) return;
     if (!apsis_mother_should_commit(&s->mother, pending, (int32_t)e->absolute_pulse, e->clock_step)) return;
+    /* A missing/failing dispatcher preserves the pending queue for a later
+     * Clock-1 retry. This flag describes the current commit attempt, so a
+     * previous block must not poison a later valid retry. */
+    r->mother_apply_blocked = 0u;
     if (pending->count && !apply) {
         r->mother_apply_blocked = 1u;
         return;
