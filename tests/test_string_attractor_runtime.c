@@ -76,6 +76,7 @@ static void test_inactive_context_is_bit_exact_m3c(void)
     assert(a.pending_high_water == 0u);
     assert(a.bind_count == 0u);
     assert(a.pending_overflowed == 0u);
+    assert(a.binding_overflowed == 0u);
 }
 
 static void test_random_order_precedes_spiral(void)
@@ -209,6 +210,7 @@ static ExtremeResult run_extreme(uint32_t seed)
     assert(r.scheduler_starved == 0u);
     assert(r.late_slot_overflowed == 0u);
     assert(a.pending_overflowed == 0u);
+    assert(a.binding_overflowed == 0u);
     assert(a.bind_stale_count == 0u);
     assert(a.pending_high_water < APSIS_STRING_ATTRACTOR_PENDING_CAP);
     assert(r.spiral_slot_high_water < APSIS_RUNTIME_SPIRAL_SLOTS);
@@ -275,6 +277,7 @@ static void test_start_stop_regenerates_and_cancels(void)
     assert(a.pending_high_water == 0u);
     assert(a.bind_count == 0u);
     assert(a.pending_overflowed == 0u);
+    assert(a.binding_overflowed == 0u);
 }
 
 int main(void)
