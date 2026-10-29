@@ -130,3 +130,16 @@ When Phase 4 String DSP begins, preserve the preferred old String DNA as closely
 Do **not** use Study 98 to roll back newer APSIS behaviour. In particular retain Study 126 Classic/Dual interaction, current two-coordinate/Gravity semantics, shared source-bus/Cathedral-send role, and the Study 120/124/125/126 de-click, guard and pulse-isolation fixes. Do not restore the removed broadband random-noise bow exciter merely to imitate the old version.
 
 **Why:** The user explicitly prefers the old String sound, and source comparison shows that the later BODY/WIRE redesign materially changed the sound architecture. Treating Study 98 as a narrow acoustic reference lets the FM-1 port match the preferred timbre without corrupting the newer, locked musical model.
+
+## 2026-10-29 - Native M3c uses the source desktop late-bind lead profile
+
+**Decision:** Preserve both browser lead profiles in source-parity tests, but use the Study 126 **desktop** late-bind leads as the canonical FM-1 runtime profile:
+- Spiral final pitch observation: target − 80 ms
+- Bloom occurrence observation: target − 45 ms
+- Bloom per-petal final pitch observation: voice target − 50 ms
+
+The Study 126 narrow/mobile values remain documented and tested as source facts:
+- Spiral: target − 110 ms
+- Bloom petal: target − 70 ms
+
+**Why:** Study 126 changes these values from desktop to narrow browser only to give JavaScript/WebAudio main-thread scheduling more safety margin. FM-1 has neither `innerWidth` nor browser timer jitter. The existing project rule is to preserve late-binding intent rather than incidental timer compensation. Choosing the shorter source-defined desktop lead also observes state as late as the browser safely intends, which best matches the identity-bearing “latest state shortly before note-on” behaviour. This is a timing adaptation only; all frozen-vs-re-read state semantics remain source-exact.
