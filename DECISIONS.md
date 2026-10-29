@@ -52,11 +52,9 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 
 ## 2026-10-23 - Fixed-capacity event queue
 
-**Decision:** M3 transport uses an allocation-free 256-entry min-heap queue.
+**Decision:** M3a/M3b begin with an allocation-free 256-entry min-heap queue. M3c may revise the capacity only after measured late-binding stress proves the need.
 
-**Why:** Audio-side scheduling must avoid dynamic allocation and remain deterministic on FM-1.
-
-**Status:** Capacity is provisional until later high-water stress tests prove margin.
+**Why:** Audio-side scheduling must avoid dynamic allocation and remain deterministic on FM-1, while capacity must be evidence-driven rather than guessed.
 
 ## 2026-10-23 - Browser timer jitter is not a feature
 
@@ -66,7 +64,7 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 
 ## 2026-10-23 - Late binding is mandatory
 
-**Decision:** Spiral and Bloom events keep their event time, but final pitch is resolved against the latest committed Gravity/Tuning state shortly before note-on.
+**Decision:** Spiral and Bloom events keep their event time, but final pitch is resolved against the latest source-visible Gravity/Tuning state shortly before note-on.
 
 **Why:** This interaction is identity-bearing and explicitly present in the browser architecture.
 
@@ -136,10 +134,39 @@ Do **not** use Study 98 to roll back newer APSIS behaviour. In particular retain
 **Decision:** Preserve both browser lead profiles in source-parity tests, but use the Study 126 **desktop** late-bind leads as the canonical FM-1 runtime profile:
 - Spiral final pitch observation: target − 80 ms
 - Bloom occurrence observation: target − 45 ms
-- Bloom per-petal final pitch observation: voice target − 50 ms
+- Bloom per-petal final pitch observation: voice target − 50 ms, causally clamped so it cannot precede Bloom occurrence
 
 The Study 126 narrow/mobile values remain documented and tested as source facts:
 - Spiral: target − 110 ms
 - Bloom petal: target − 70 ms
 
 **Why:** Study 126 changes these values from desktop to narrow browser only to give JavaScript/WebAudio main-thread scheduling more safety margin. FM-1 has neither `innerWidth` nor browser timer jitter. The existing project rule is to preserve late-binding intent rather than incidental timer compensation. Choosing the shorter source-defined desktop lead also observes state as late as the browser safely intends, which best matches the identity-bearing “latest state shortly before note-on” behaviour. This is a timing adaptation only; all frozen-vs-re-read state semantics remain source-exact.
+
+## 2026-10-29 - M3c raises the shared event heap to 512 after measured starvation
+
+**Decision:** The shared event queue remains one allocation-free min-heap, but its capacity is 512 entries from M3c onward. Do not restore the provisional 256-entry capacity unless the scheduling model itself changes and is re-measured.
+
+**Evidence:** A legal worst-case M3c profile at 180 BPM, 1/4 division, 4x Spiral and 4x Bloom with long unfurl caused `scheduler_starved` at 256 entries. With 512 entries the canonical 30 s stress reached 352/512; a separate 60 s max-swing 35% burst reached 357/512 with no overflow/starvation.
+
+**Why:** Study 126's ~1.20 s lookahead plus explicit pre-target and late-bind events materially raises the number of simultaneously live events. 512 is measured capacity, not speculative headroom.
+
+## 2026-10-29 - M3c late-bind pools stay at 64 entries per source
+
+**Decision:** Use fixed 64-entry Spiral and 64-entry Bloom occurrence/bind pools in M3c. Bloom petals are chained one at a time on the shared heap rather than pre-enqueuing the full 3.6 s unfurl.
+
+**Evidence:** Canonical 30 s stress reached Spiral 59/64 and Bloom 44/64. The 60 s max-swing burst reached the same 59/64 and 44/64 without overflow.
+
+**Why:** This preserves deterministic bounded memory while retaining exact target/bind samples. The stress evidence shows legal source ranges fit without dynamic allocation.
+
+## 2026-10-29 - M3c canonical deterministic trace is locked
+
+**Decision:** The canonical host replay uses seed `0x31415926` for 30 seconds under the documented worst-case profile. Current reference signatures are:
+- random-decision trace: `78771ff5`
+- late-binding/state-observation trace: `0e6fc422`
+- queue high-water: 352/512
+- Spiral slot high-water: 59/64
+- Bloom slot high-water: 44/64
+
+The same seed must replay identically; a different seed must change at least one trace hash.
+
+**Why:** M3c needs a compact, auditable long-run identity for deterministic timing/random/state-observation behavior before DSP is allowed to consume it.
