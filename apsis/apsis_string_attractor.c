@@ -101,21 +101,31 @@ static uint16_t attr_base_level(const ApsisState *s, uint16_t value_q15)
     return attr_mul_q15(attr_mul_q15(shape, amount), user);
 }
 
-void apsis_string_attractor_reset(ApsisStringAttractorRuntime *r,
+static void attr_regenerate_cells(ApsisStringAttractorRuntime *r,
                                   const ApsisState *s)
 {
     uint32_t x;
     uint8_t i, n;
     if (!r) return;
-    attr_zero(r, (uint32_t)sizeof(*r));
     r->seed = attr_seed(s);
     r->length = attr_length(s);
+    r->pos = 0u;
     n = r->length;
     x = r->seed;
+    for (i = 0u; i < APSIS_STRING_ATTRACTOR_CELLS_MAX; ++i)
+        r->cell_q15[i] = 0u;
     for (i = 0u; i < n; ++i) {
         x = x * 1664525u + 1013904223u;
         r->cell_q15[i] = attr_draw_q15(x);
     }
+}
+
+void apsis_string_attractor_reset(ApsisStringAttractorRuntime *r,
+                                  const ApsisState *s)
+{
+    if (!r) return;
+    attr_zero(r, (uint32_t)sizeof(*r));
+    attr_regenerate_cells(r, s);
 }
 
 void apsis_string_attractor_sync(ApsisStringAttractorRuntime *r,
@@ -123,7 +133,106 @@ void apsis_string_attractor_sync(ApsisStringAttractorRuntime *r,
 {
     if (!r) return;
     if (!r->length || r->seed != attr_seed(s) || r->length != attr_length(s))
-        apsis_string_attractor_reset(r, s);
+        attr_regenerate_cells(r, s);
+}
+
+void apsis_string_attractor_stop(ApsisStringAttractorRuntime *r)
+{
+    uint8_t i;
+    if (!r) return;
+    for (i = 0u; i < APSIS_STRING_ATTRACTOR_PENDING_CAP; ++i)
+        attr_zero(&r->pending[i], (uint32_t)sizeof(r->pending[i]));
+    r->binding_count = 0u;
+    r->pos = 0u;
+}
+
+void apsis_string_attractor_begin_process(ApsisStringAttractorRuntime *r)
+{
+    uint8_t i;
+    if (!r) return;
+    r->binding_count = 0u;
+    for (i = 0u; i < APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX; ++i)
+        attr_zero(&r->binding[i], (uint32_t)sizeof(r->binding[i]));
+}
+
+static void attr_update_pending_high_water(ApsisStringAttractorRuntime *r)
+{
+    uint8_t i;
+    uint16_t active = 0u;
+    if (!r) return;
+    for (i = 0u; i < APSIS_STRING_ATTRACTOR_PENDING_CAP; ++i)
+        if (r->pending[i].active) active++;
+    if (active > r->pending_high_water) r->pending_high_water = active;
+}
+
+uint8_t apsis_string_attractor_pending_alloc(ApsisStringAttractorRuntime *r,
+                                             uint8_t route,
+                                             uint8_t pos,
+                                             uint8_t both_scale,
+                                             uint16_t value_q15,
+                                             uint16_t base_level_q15,
+                                             uint64_t bind_sample,
+                                             uint64_t target_sample,
+                                             uint32_t *token_out)
+{
+    uint8_t i;
+    ApsisStringAttractorPending *p;
+    if (token_out) *token_out = 0u;
+    if (!r) return APSIS_STRING_ATTRACTOR_PENDING_CAP;
+    for (i = 0u; i < APSIS_STRING_ATTRACTOR_PENDING_CAP; ++i)
+        if (!r->pending[i].active) break;
+    if (i >= APSIS_STRING_ATTRACTOR_PENDING_CAP) {
+        r->pending_overflowed = 1u;
+        return APSIS_STRING_ATTRACTOR_PENDING_CAP;
+    }
+    p = &r->pending[i];
+    attr_zero(p, (uint32_t)sizeof(*p));
+    p->active = 1u;
+    p->route = route;
+    p->pos = pos;
+    p->both_scale = both_scale ? 1u : 0u;
+    p->value_q15 = attr_clamp_q15(value_q15);
+    p->base_level_q15 = attr_clamp_q15(base_level_q15);
+    p->token = ++r->next_token;
+    if (!p->token) p->token = ++r->next_token;
+    p->bind_sample = bind_sample;
+    p->target_sample = target_sample;
+    if (token_out) *token_out = p->token;
+    attr_update_pending_high_water(r);
+    return i;
+}
+
+uint8_t apsis_string_attractor_pending_bind(ApsisStringAttractorRuntime *r,
+                                            uint8_t slot_index,
+                                            uint32_t token,
+                                            uint64_t event_sample)
+{
+    ApsisStringAttractorPending *p;
+    ApsisStringAttractorBinding *b;
+    if (!r || slot_index >= APSIS_STRING_ATTRACTOR_PENDING_CAP) return 0u;
+    p = &r->pending[slot_index];
+    if (!p->active || p->token != token) {
+        r->bind_stale_count++;
+        return 0u;
+    }
+    if (r->binding_count >= APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX) {
+        r->pending_overflowed = 1u;
+        return 0u;
+    }
+    b = &r->binding[r->binding_count++];
+    attr_zero(b, (uint32_t)sizeof(*b));
+    b->valid = 1u;
+    b->route = p->route;
+    b->pos = p->pos;
+    b->both_scale = p->both_scale;
+    b->value_q15 = p->value_q15;
+    b->base_level_q15 = p->base_level_q15;
+    b->token = p->token;
+    b->bind_sample = event_sample;
+    b->target_sample = p->target_sample;
+    p->active = 0u;
+    r->bind_count++;
+    return 1u;
 }
 
 uint8_t apsis_string_attractor_advances_for_pulse(const ApsisState *s,
