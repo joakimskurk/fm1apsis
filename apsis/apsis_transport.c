@@ -1,89 +1,59 @@
 #include "apsis_transport.h"
 
-static uint8_t apsis_transport_clock_n(uint8_t n)
+static void apsis_transport_zero(void *ptr, uint32_t n)
 {
-    return n < 3u ? 3u : (n > 24u ? 24u : n);
+    uint8_t *p = (uint8_t *)ptr;
+    while (n--) *p++ = 0u;
 }
 
-static uint16_t apsis_transport_bpm(uint16_t bpm)
+static uint16_t apsis_transport_clamp_u16(uint16_t value, uint16_t lo, uint16_t hi)
 {
-    return bpm < 35u ? 35u : (bpm > 180u ? 180u : bpm);
+    return value < lo ? lo : (value > hi ? hi : value);
 }
 
-static uint16_t apsis_transport_swing(uint16_t swing)
+static uint8_t apsis_transport_clamp_u8(uint8_t value, uint8_t lo, uint8_t hi)
 {
-    const uint16_t max = APSIS_Q15_MILLI(350);
-    return swing > max ? max : swing;
+    return value < lo ? lo : (value > hi ? hi : value);
 }
 
-static void apsis_transport_division(const ApsisClockState *c, uint8_t *num, uint8_t *den)
-{
-    uint8_t n = c ? c->division_num : 1u;
-    uint8_t d = c ? c->division_den : 2u;
-    if (n != 1u || (d != 1u && d != 2u && d != 4u)) { n = 1u; d = 2u; }
-    *num = n;
-    *den = d;
-}
-
-/* The JieLi pi32v2 target used by Dinghy does not provide __udivdi3. APSIS
- * still needs 64-bit sample/Q32 arithmetic, but every non-power-of-two divisor
- * in the transport is <= 32767. Do a small allocation-free 64/16 long divide
- * using only 32-bit operations so the exact desktop arithmetic survives on the
- * real FM-1 target without pulling in a compiler runtime helper. */
-static uint64_t apsis_transport_u64_divmod_u16(uint64_t value, uint16_t divisor,
+/* Divide a 64-bit numerator by a 16-bit denominator without asking libgcc for
+ * a target-unavailable 64-bit division helper. This is used only outside the
+ * per-sample audio path when constructing fixed-point event intervals. */
+static uint64_t apsis_transport_u64_divmod_u16(uint64_t numerator,
+                                               uint16_t denominator,
                                                uint16_t *remainder)
 {
-    uint32_t hi = (uint32_t)(value >> 32);
-    uint32_t lo = (uint32_t)value;
-    uint32_t qhi = 0u, qlo = 0u, rem = 0u;
-    uint8_t i;
-    if (!divisor) {
+    uint64_t quotient = 0u;
+    uint32_t rem = 0u;
+    int32_t bit;
+    if (!denominator) {
         if (remainder) *remainder = 0u;
         return 0u;
     }
-    for (i = 0u; i < 32u; ++i) {
-        rem = (rem << 1) | (hi >> 31);
-        hi <<= 1;
-        qhi <<= 1;
-        if (rem >= divisor) { rem -= divisor; qhi |= 1u; }
-    }
-    for (i = 0u; i < 32u; ++i) {
-        rem = (rem << 1) | (lo >> 31);
-        lo <<= 1;
-        qlo <<= 1;
-        if (rem >= divisor) { rem -= divisor; qlo |= 1u; }
+    for (bit = 63; bit >= 0; --bit) {
+        rem = (rem << 1u) | (uint32_t)((numerator >> (uint32_t)bit) & 1u);
+        if (rem >= denominator) {
+            rem -= denominator;
+            quotient |= (uint64_t)1u << (uint32_t)bit;
+        }
     }
     if (remainder) *remainder = (uint16_t)rem;
-    return ((uint64_t)qhi << 32) | qlo;
+    return quotient;
 }
 
-static uint64_t apsis_transport_q15_mul64(uint64_t value, uint16_t q15)
+static uint64_t apsis_transport_u64_div_round_u16(uint64_t numerator,
+                                                  uint16_t denominator)
 {
-    uint16_t rem;
-    uint64_t whole = apsis_transport_u64_divmod_u16(value, APSIS_Q15_ONE, &rem);
-    uint64_t tail = (uint64_t)rem * q15 + APSIS_Q15_ONE / 2u;
-    return whole * q15 + apsis_transport_u64_divmod_u16(tail, APSIS_Q15_ONE, 0);
+    uint16_t rem = 0u;
+    uint64_t quotient = apsis_transport_u64_divmod_u16(numerator, denominator, &rem);
+    if ((uint32_t)rem * 2u >= denominator) quotient++;
+    return quotient;
 }
 
-static uint64_t apsis_transport_ms_q32(uint32_t rate, uint32_t ms)
+static uint64_t apsis_transport_ms_q32(uint32_t sample_rate, uint32_t ms)
 {
-    uint64_t whole = (uint64_t)rate * ms;
-    return apsis_transport_u64_divmod_u16((whole << 32) + 500u, 1000u, 0);
-}
-
-static uint64_t apsis_transport_pair_round(uint64_t sample, uint32_t frac)
-{
-    return sample + (frac >= 0x80000000u ? 1u : 0u);
-}
-
-static void apsis_transport_pair_add(uint64_t *sample, uint32_t *frac, uint64_t delta_q32)
-{
-    uint64_t f;
-    if (!sample || !frac) return;
-    *sample += delta_q32 >> 32;
-    f = (uint64_t)*frac + (uint32_t)delta_q32;
-    *sample += f >> 32;
-    *frac = (uint32_t)f;
+    uint64_t samples_q32 = (uint64_t)sample_rate * ms << 32;
+    return apsis_transport_u64_div_round_u16(samples_q32, 1000u);
 }
 
 static uint8_t apsis_transport_event_before(const ApsisTransportEvent *a,
@@ -94,37 +64,30 @@ static uint8_t apsis_transport_event_before(const ApsisTransportEvent *a,
     return a->serial < b->serial;
 }
 
-static uint8_t apsis_transport_queue_push(ApsisEventQueue *q, ApsisTransportEvent e)
-{
-    uint16_t pos;
-    if (!q || q->count >= APSIS_TRANSPORT_QUEUE_CAP) {
-        if (q) q->overflowed = 1u;
-        return 0u;
-    }
-    e.serial = q->next_serial++;
-    pos = q->count++;
-    q->events[pos] = e;
-    while (pos) {
-        uint16_t parent = (uint16_t)((pos - 1u) / 2u);
-        ApsisTransportEvent tmp;
-        if (!apsis_transport_event_before(&q->events[pos], &q->events[parent])) break;
-        tmp = q->events[parent]; q->events[parent] = q->events[pos]; q->events[pos] = tmp;
-        pos = parent;
-    }
-    return 1u;
-}
-
 void apsis_event_queue_reset(ApsisEventQueue *q)
 {
     if (!q) return;
-    q->count = 0u;
-    q->next_serial = 0u;
-    q->overflowed = 0u;
+    apsis_transport_zero(q, (uint32_t)sizeof(*q));
 }
 
-uint16_t apsis_event_queue_count(const ApsisEventQueue *q)
+uint8_t apsis_transport_queue_push(ApsisEventQueue *q, ApsisTransportEvent event)
 {
-    return q ? q->count : 0u;
+    uint16_t i;
+    if (!q) return 0u;
+    if (q->count >= APSIS_TRANSPORT_QUEUE_CAP) {
+        q->overflowed = 1u;
+        return 0u;
+    }
+    event.serial = q->next_serial++;
+    i = q->count++;
+    while (i) {
+        uint16_t parent = (uint16_t)((i - 1u) >> 1u);
+        if (!apsis_transport_event_before(&event, &q->events[parent])) break;
+        q->events[i] = q->events[parent];
+        i = parent;
+    }
+    q->events[i] = event;
+    return 1u;
 }
 
 const ApsisTransportEvent *apsis_event_queue_peek(const ApsisEventQueue *q)
@@ -134,69 +97,120 @@ const ApsisTransportEvent *apsis_event_queue_peek(const ApsisEventQueue *q)
 
 uint8_t apsis_event_queue_pop(ApsisEventQueue *q, ApsisTransportEvent *out)
 {
-    uint16_t pos = 0u;
+    ApsisTransportEvent root, tail;
+    uint16_t i = 0u;
     if (!q || !q->count) return 0u;
-    if (out) *out = q->events[0];
+    root = q->events[0];
     q->count--;
-    if (!q->count) return 1u;
-    q->events[0] = q->events[q->count];
-    for (;;) {
-        uint16_t left = (uint16_t)(pos * 2u + 1u), right = (uint16_t)(left + 1u), best = pos;
-        ApsisTransportEvent tmp;
-        if (left < q->count && apsis_transport_event_before(&q->events[left], &q->events[best])) best = left;
-        if (right < q->count && apsis_transport_event_before(&q->events[right], &q->events[best])) best = right;
-        if (best == pos) break;
-        tmp = q->events[pos]; q->events[pos] = q->events[best]; q->events[best] = tmp;
-        pos = best;
+    if (q->count) {
+        tail = q->events[q->count];
+        for (;;) {
+            uint16_t left = (uint16_t)(i * 2u + 1u);
+            uint16_t right = (uint16_t)(left + 1u);
+            uint16_t child;
+            if (left >= q->count) break;
+            child = left;
+            if (right < q->count &&
+                apsis_transport_event_before(&q->events[right], &q->events[left]))
+                child = right;
+            if (!apsis_transport_event_before(&q->events[child], &tail)) break;
+            q->events[i] = q->events[child];
+            i = child;
+        }
+        q->events[i] = tail;
     }
+    if (out) *out = root;
     return 1u;
 }
 
-void apsis_transport_reset(ApsisTransport *t, uint32_t sample_rate, uint64_t first_sample)
+uint8_t apsis_transport_clock_n(uint8_t n)
 {
-    if (!t) return;
-    t->sample_rate = sample_rate ? sample_rate : APSIS_TRANSPORT_DEFAULT_RATE;
-    t->next_sample = first_sample;
-    t->next_frac_q32 = 0u;
-    t->absolute_pulse = 0u;
-    t->melody_step = 0u;
-    t->cycle_pos = 0u;
-    t->running = 0u;
+    return apsis_transport_clamp_u8(n, 5u, APSIS_CLOCK_STEPS_MAX);
 }
 
-void apsis_transport_start(ApsisTransport *t) { if (t) t->running = 1u; }
-void apsis_transport_stop(ApsisTransport *t) { if (t) t->running = 0u; }
+static uint16_t apsis_transport_bpm(uint16_t bpm)
+{
+    return apsis_transport_clamp_u16(bpm, 20u, 180u);
+}
+
+static uint8_t apsis_transport_div_num(uint8_t value)
+{
+    return value == 1u || value == 2u || value == 4u ? value : 1u;
+}
+
+static uint8_t apsis_transport_div_den(uint8_t value)
+{
+    return value == 1u || value == 2u || value == 4u ? value : 2u;
+}
+
+static uint64_t apsis_transport_base_interval_q32(const ApsisClockState *c,
+                                                  uint32_t sample_rate)
+{
+    uint16_t bpm = apsis_transport_bpm(c ? c->bpm : 72u);
+    uint8_t num = apsis_transport_div_num(c ? c->division_num : 1u);
+    uint8_t den = apsis_transport_div_den(c ? c->division_den : 2u);
+    uint64_t numerator = (uint64_t)sample_rate * 60u * den << 32;
+    uint16_t denominator = (uint16_t)(bpm * num);
+    return apsis_transport_u64_div_round_u16(numerator, denominator);
+}
 
 uint64_t apsis_transport_interval_q32(const ApsisClockState *c,
                                       uint32_t sample_rate,
                                       uint32_t absolute_pulse)
 {
-    uint8_t num, den;
-    uint16_t bpm, swing, divisor;
-    uint64_t numerator, base, delta;
-    uint32_t rate = sample_rate ? sample_rate : APSIS_TRANSPORT_DEFAULT_RATE;
-    if (!c) return ((uint64_t)18375u << 32);
-    apsis_transport_division(c, &num, &den);
-    bpm = apsis_transport_bpm(c->bpm);
-    swing = apsis_transport_swing(c->swing_q15);
-    numerator = (uint64_t)rate * 60u * num;
-    numerator <<= 32;
-    divisor = (uint16_t)(bpm * den);
-    base = apsis_transport_u64_divmod_u16(numerator + divisor / 2u, divisor, 0);
-    delta = apsis_transport_q15_mul64(base, swing);
-    return (absolute_pulse & 1u) ? base + delta : base - delta;
+    uint64_t base = apsis_transport_base_interval_q32(c, sample_rate);
+    uint16_t swing = c ? c->swing_q15 : 0u;
+    uint64_t delta;
+    if (swing > APSIS_Q15_MILLI(350)) swing = APSIS_Q15_MILLI(350);
+    delta = apsis_transport_u64_div_round_u16(base * swing, APSIS_Q15_ONE);
+    return absolute_pulse & 1u ? base + delta : base - delta;
 }
 
-uint64_t apsis_transport_round_sample(uint64_t sample_q32)
+uint64_t apsis_transport_round_sample(uint64_t q32)
 {
-    return (sample_q32 >> 32) + ((uint32_t)sample_q32 >= 0x80000000u ? 1u : 0u);
+    return (q32 + 0x80000000ull) >> 32;
+}
+
+uint64_t apsis_transport_pair_round(uint64_t sample, uint32_t frac_q32)
+{
+    return sample + (frac_q32 >= 0x80000000u ? 1u : 0u);
+}
+
+static void apsis_transport_pair_add(uint64_t *sample, uint32_t *frac_q32,
+                                     uint64_t delta_q32)
+{
+    uint32_t old_frac, add_frac;
+    if (!sample || !frac_q32) return;
+    old_frac = *frac_q32;
+    add_frac = (uint32_t)delta_q32;
+    *frac_q32 = old_frac + add_frac;
+    *sample += (delta_q32 >> 32) + (*frac_q32 < old_frac ? 1u : 0u);
+}
+
+void apsis_transport_reset(ApsisTransport *t, uint32_t sample_rate,
+                           uint64_t first_sample)
+{
+    if (!t) return;
+    apsis_transport_zero(t, (uint32_t)sizeof(*t));
+    t->sample_rate = sample_rate ? sample_rate : APSIS_TRANSPORT_DEFAULT_RATE;
+    t->next_sample = first_sample;
+}
+
+void apsis_transport_start(ApsisTransport *t)
+{
+    if (t) t->running = 1u;
+}
+
+void apsis_transport_stop(ApsisTransport *t)
+{
+    if (t) t->running = 0u;
 }
 
 uint8_t apsis_transport_gravity_division(uint8_t requested_parts, uint8_t clock_n)
 {
     uint8_t n = apsis_transport_clock_n(clock_n);
-    uint8_t want = requested_parts ? requested_parts : 2u;
-    if (want <= n && n % want == 0u) return want;
+    if (requested_parts == 4u && n % 4u == 0u) return 4u;
+    if ((requested_parts == 2u || requested_parts == 4u) && n % 2u == 0u) return 2u;
     if (n & 1u) return 1u;
     if (n % 2u == 0u) return 2u;
     return 1u;
@@ -381,10 +395,14 @@ uint8_t apsis_transport_schedule_next(ApsisTransport *t,
             ? apsis_transport_mask_has(s->string.rhythm_mask, i)
             : (uint8_t)(i % every == 0u);
         if (trigger)
+            /* Browser scheduleStringRhythmBound() freezes the mode argument at
+             * planning time but re-reads pitch/levels/surface when it fires.
+             * sub_index is otherwise unused by this event type, so preserve
+             * that source distinction directly in the shared event. */
             apsis_transport_local_add(local, &count, APSIS_EVENT_STRING_RHYTHM,
                 apsis_transport_target_sample(t->next_sample, t->next_frac_q32,
                     apsis_transport_ms_q32(t->sample_rate, 26u)),
-                interval_q32, abs, i, 0u, 1u, flags);
+                interval_q32, abs, i, s->string.rhythm, 1u, flags);
     }
 
     bloom_cycles = apsis_transport_bloom_cycles(s->bloom.cycles);
