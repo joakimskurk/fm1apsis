@@ -2,7 +2,7 @@ CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 SAN_CFLAGS ?= -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined
 INC = -Iapsis
-SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_transport.c apsis/apsis_late_binding.c apsis/apsis_runtime_m3c.c
+SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_transport.c apsis/apsis_late_binding.c apsis/apsis_runtime_final.c
 OBJ = $(patsubst apsis/%.c,build/%.o,$(SRC))
 SAN_OBJ = $(patsubst apsis/%.c,build/san_%.o,$(SRC))
 
