@@ -25,6 +25,25 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_late_binding.h apsis/apsis_late_binding.c \
    apsis/apsis_runtime.h apsis/apsis_runtime.c apsis/apsis_runtime_m3c.c \
    work/apsis/firmware/src/
+
+# The checked-in overlay remains the stable UI shell. M3c swaps only the
+# generated target translation-unit tail: late binding is compiled before the
+# coordinator, and the coordinator includes the validated M3b runtime as its
+# base implementation. No second runtime object or module clock is introduced.
+python3 - <<'PY'
+from pathlib import Path
+p = Path('work/apsis/firmware/src/dinghy.c')
+s = p.read_text()
+old = '#include "apsis_runtime.c"'
+new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_m3c.c"'
+if old not in s:
+    raise SystemExit('FAIL: runtime include anchor missing from Dinghy overlay')
+s = s.replace(old, new, 1)
+s = s.replace('M3b instantiates the shared transport/runtime coordinator',
+              'M3c instantiates the shared transport/runtime coordinator', 1)
+p.write_text(s)
+PY
+
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
 # Host compilation is a structural gate for the single-translation-unit FM-1 app.
