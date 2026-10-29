@@ -66,9 +66,12 @@ Normative M4a references:
 - `docs/reference/STRING_DSP_CONTRACT.md`
 - `docs/reference/M4A_REFERENCE_AUDIO.md`
 
-### M4b - String finite transients
+### M4b - String finite transients + shared Rhythm audio
+
+Status: **implementation complete; PR #8 merge pending final documentation-head gate**.
 
 Active branch: `m4b-string-transients`, based directly on M4a merge `2ea217f09c143d30385f136e84e2b29d582987a0`.
+Validated implementation head: `0749ac86e6162fab190f343730ebc9b133c13e47` — core #170 PASS, staged #159 PASS.
 
 Normative reference:
 - `docs/reference/M4B_STRING_TRANSIENT_CONTRACT.md`
@@ -78,27 +81,48 @@ Normative reference:
 - [x] audit Study-98 `classicStringNote()` + generic `tone()` mechanics
 - [x] audit Study-126 Classic/Dual topology and Study-124/125/126 de-click overrides
 - [x] lock source hierarchy and M4b transient contract
-- [ ] fixed-capacity transient pool with explicit fade-tail safety
-- [ ] Study-98 normal 1..4 harmonic primitive
-- [ ] Study-98 pizz 1..3 harmonic primitive
-- [ ] fixed-point brightness-dependent harmonic attenuation
-- [ ] 3 ms partial staggering at sample resolution
-- [ ] 16 ms Study-126 String onset safety override
-- [ ] triangle low-pass / sine bypass behavior
-- [ ] folded Gravity-root shadow
-- [ ] deterministic pan topology
-- [ ] pool high-water/steal/drop telemetry and legal-burst stress
-- [ ] preserve idle M4a Classic/Dual hashes bit-for-bit
-- [ ] normal host + ASAN/UBSAN
+- [x] fixed-capacity transient pool with explicit fade-tail safety
+- [x] Study-98 normal 1..4 harmonic primitive
+- [x] Study-98 pizz 1..3 harmonic primitive
+- [x] fixed-point brightness-dependent harmonic attenuation
+- [x] 3 ms partial staggering at sample resolution
+- [x] 16 ms Study-126 String onset safety override
+- [x] triangle low-pass / sine bypass behavior
+- [x] folded Gravity-root shadow
+- [x] deterministic pan topology
+- [x] pool high-water/steal/drop telemetry and legal-burst stress
+- [x] preserve idle M4a Classic/Dual hashes bit-for-bit
+- [x] normal host + ASAN/UBSAN
+
+Frozen M4b1 evidence:
+- transient peak/hash 1309 / `97142d3e`
+- pool 80 logical + 32 fade-tail reserve = 112 physical slots
+- legal burst 80/112, 480 steals, 0 drops
+- BODY peak/hash 947 / `c1168570`
+- Classic-composite stress 80/108, 410 steals, 0 drops
+- `ApsisStringDsp` remains the M4a 196-byte layout; transient state is separate
 
 #### M4b2 - existing String Rhythm event becomes audible
 
-- [ ] consume existing `APSIS_EVENT_STRING_RHYTHM`; no String-private clock
-- [ ] preserve transport's pulse+26 ms event timing
-- [ ] preserve Study-126 Classic composite topology
-- [ ] preserve Dual side alternation/levels and BOW/PIZZ/MOTION mapping
-- [ ] preserve M3c queue/hash/capacity semantics
-- [ ] real JieLi target + emulator audio regression
+- [x] consume existing `APSIS_EVENT_STRING_RHYTHM`; no String-private clock/queue
+- [x] preserve transport's pulse+26 ms event timing
+- [x] freeze only planned BOW/PIZZ/MOTION mode in event metadata
+- [x] late-read String pitch/surface/levels at bind
+- [x] preserve Study-126 Classic composite topology
+- [x] preserve Dual side alternation/levels and BOW/PIZZ/MOTION mapping
+- [x] preserve M3c queue/hash/capacity semantics and 21,928-byte runtime
+- [x] full transport -> observer -> trigger -> render timing test
+- [x] real JieLi target + FM-1 emulator regression
+
+Validated M4b2 target/emulator evidence from staged #159:
+- target image 81,752 B / 581,564 B
+- RAM 42,648 B / 98,304 B
+- pool 30,720 B / 344,064 B
+- package SHA `8abc090ffa51efe93b21b4f59f2a40a9ab70a6983a2c5720633baba26fa7163b`
+- default Rhythm OFF keeps emulator bit-identical to M4a: raw PCM `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- emulator peak 317; RMS L/R 101/100; stereo delta 63; mean L/R -2/-2
+- M3c queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`
+- callback-boundary proof: source target sample 1147 first becomes audible at sample 1280, 133 samples late and never early
 
 #### Later String gate - Attractor excitation
 
@@ -125,7 +149,7 @@ No shared Space during initial dry-engine work.
 - [ ] Chain changes with audio/event engine
 - [ ] prove M3c last-moment Spiral/Bloom binding drives sounding voices unchanged
 
-Current M4a callback boundary remains explicit until Phase 5: structural changes may sound at most one 256-frame block late (~5.8 ms), never early.
+Current M4a/M4b callback boundary remains explicit until Phase 5: events/state changes may sound at most one 256-frame block late (~5.8 ms), never early.
 
 ## Phase 6 - shared Space / Cathedral
 
@@ -176,3 +200,10 @@ Current M4a callback boundary remains explicit until Phase 5: structural changes
 - [ ] release SHA-256
 
 Physical hardware is not currently available, so no Phase 12 item is verified.
+
+## Exact next action
+
+1. Gate this documentation-only final head with both `APSIS core` and `APSIS staged validation`.
+2. Update PR #8 metadata with the exact final-head evidence without moving the head.
+3. Mark PR #8 ready and squash-merge with an expected-head SHA guard.
+4. Start the next String slice from the actual M4b merge commit; Attractor remains a separate late-bind gate and must not be silently folded into M4b.
