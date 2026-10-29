@@ -147,7 +147,7 @@ static uint32_t clock_pitch_hz_milli(uint32_t hz, uint8_t pitch_centi)
     uint32_t pitch = pitch_centi;
     if (pitch < 50u) pitch = 50u;
     if (pitch > 200u) pitch = 200u;
-    return (hz * pitch * 10u + 5u) / 1u;
+    return hz * pitch * 10u;
 }
 
 static int32_t clock_sin_q30_for_hz(uint16_t hz)
@@ -176,7 +176,7 @@ static void clock_biquad_clear(ApsisClockBiquad *b)
 static void clock_biquad_lowpass(ApsisClockBiquad *b, uint16_t hz)
 {
     int64_t s = clock_sin_q30_for_hz(hz), c = clock_cos_q30_for_hz(hz);
-    int64_t alpha = (s * 10ll) / 7ll; /* Q=.35 => sin/(2Q)=sin/.7 */
+    int64_t alpha = (s * 10ll) / 7ll;
     int64_t a0 = CLOCK_Q30_ONE + alpha;
     int64_t one_minus_c = CLOCK_Q30_ONE - c;
     if (!b) return;
@@ -191,7 +191,7 @@ static void clock_biquad_lowpass(ApsisClockBiquad *b, uint16_t hz)
 static void clock_biquad_highpass(ApsisClockBiquad *b, uint16_t hz)
 {
     int64_t s = clock_sin_q30_for_hz(hz), c = clock_cos_q30_for_hz(hz);
-    int64_t alpha = s / 2ll; /* WebAudio BiquadFilter default Q = 1. */
+    int64_t alpha = s / 2ll;
     int64_t a0 = CLOCK_Q30_ONE + alpha;
     int64_t one_plus_c = CLOCK_Q30_ONE + c;
     if (!b) return;
@@ -206,7 +206,7 @@ static void clock_biquad_highpass(ApsisClockBiquad *b, uint16_t hz)
 static void clock_biquad_bandpass(ApsisClockBiquad *b, uint16_t hz)
 {
     int64_t s = clock_sin_q30_for_hz(hz), c = clock_cos_q30_for_hz(hz);
-    int64_t alpha = (s * 10ll) / 23ll; /* Q=1.15 => sin/(2Q)=sin/2.3 */
+    int64_t alpha = (s * 10ll) / 23ll;
     int64_t a0 = CLOCK_Q30_ONE + alpha;
     if (!b) return;
     b->b0_q30 = clock_norm_q30(alpha, a0);
@@ -226,15 +226,19 @@ static int32_t clock_biquad_process(ApsisClockBiquad *b, int32_t x)
           (int64_t)b->b2_q30 * b->x2 - (int64_t)b->a1_q30 * b->y1 -
           (int64_t)b->a2_q30 * b->y2;
     y = clock_sat_q15(acc >> 30);
-    b->x2 = b->x1; b->x1 = x;
-    b->y2 = b->y1; b->y1 = y;
+    b->x2 = b->x1;
+    b->x1 = x;
+    b->y2 = b->y1;
+    b->y1 = y;
     return y;
 }
 
 static uint32_t clock_noise_next(uint32_t *state)
 {
     uint32_t x = state && *state ? *state : CLOCK_NOISE_SEED;
-    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
     if (state) *state = x;
     return x;
 }
@@ -244,7 +248,8 @@ static uint16_t clock_active_count(const ApsisClockDsp *dsp)
     uint16_t n = 0u;
     uint8_t i;
     if (!dsp) return 0u;
-    for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i) if (dsp->voice[i].active) ++n;
+    for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i)
+        if (dsp->voice[i].active) ++n;
     return n;
 }
 
@@ -258,7 +263,7 @@ static ApsisClockDspVoice *clock_alloc(ApsisClockDsp *dsp)
             clock_zero(&dsp->voice[i], (uint32_t)sizeof(dsp->voice[i]));
             dsp->voice[i].active = 1u;
             dsp->trigger_count++;
-            n = (uint16_t)(clock_active_count(dsp));
+            n = clock_active_count(dsp);
             if (n > dsp->high_water) dsp->high_water = n;
             return &dsp->voice[i];
         }
@@ -486,8 +491,6 @@ void apsis_clock_collect_block(const ApsisRuntime *r, const ApsisState *s,
     end = r->cursor_sample + frames;
     if (end < r->cursor_sample) end = ~(uint64_t)0;
 
-    /* Fresh start/restart: Phase-3 has not filled its 1.2 s queue yet. Mirror
-     * only deterministic pulse-0 Clock events due in this first block. */
     if (r->transport.running && r->queue.count == 0u &&
         r->transport.absolute_pulse == 0u && r->transport.cycle_pos == 0u &&
         r->transport.next_sample == r->cursor_sample) {
@@ -503,17 +506,19 @@ void apsis_clock_collect_block(const ApsisRuntime *r, const ApsisState *s,
         }
         if (s->clock.sound && (s->clock.snap_mask & 1u)) {
             uint64_t at = r->cursor_sample + clock_samples_ms(4u);
-            if (at < end) clock_batch_add(batch,
-                clock_synthetic_event(APSIS_EVENT_CLOCK_SNAP, at, interval,
-                                      APSIS_EVENT_FLAG_STEP_ONE));
+            if (at < end)
+                clock_batch_add(batch,
+                    clock_synthetic_event(APSIS_EVENT_CLOCK_SNAP, at, interval,
+                                          APSIS_EVENT_FLAG_STEP_ONE));
         }
         if (s->clock.sound && (s->clock.inner_mask & 1u)) {
-            uint64_t half = (interval >> 1u);
+            uint64_t half = interval >> 1u;
             uint64_t off = (half + 0x80000000ull) >> 32;
             uint64_t at = r->cursor_sample + off;
-            if (at < end) clock_batch_add(batch,
-                clock_synthetic_event(APSIS_EVENT_CLOCK_INNER, at, interval,
-                                      APSIS_EVENT_FLAG_STEP_ONE));
+            if (at < end)
+                clock_batch_add(batch,
+                    clock_synthetic_event(APSIS_EVENT_CLOCK_INNER, at, interval,
+                                          APSIS_EVENT_FLAG_STEP_ONE));
         }
         return;
     }
@@ -562,8 +567,14 @@ void apsis_clock_dsp_render(ApsisClockDsp *dsp, int32_t *out, uint32_t frames)
             int32_t wave, sample;
             uint32_t gain;
             if (!v->active) continue;
-            if (v->delay_samples) { v->delay_samples--; continue; }
-            if (v->age_samples >= v->life_samples) { v->active = 0u; continue; }
+            if (v->delay_samples) {
+                v->delay_samples--;
+                continue;
+            }
+            if (v->age_samples >= v->life_samples) {
+                v->active = 0u;
+                continue;
+            }
 
             if (v->waveform == APSIS_CLOCK_DSP_NOISE) {
                 wave = (int16_t)(clock_noise_next(&v->noise_state) >> 16);
