@@ -8,7 +8,11 @@
 #include "apsis_mother.h"
 #include "apsis_bloom.h"
 #include "apsis_late_binding.h"
+#include "apsis_string_attractor.h"
 
+/* Keep this frozen at the final M3c range. M4c appends a shared-heap event but
+ * accounts for it in external String telemetry rather than growing event_count
+ * and changing the proven ApsisRuntime layout. */
 #define APSIS_RUNTIME_EVENT_TYPES ((uint8_t)APSIS_EVENT_BLOOM_BIND + 1u)
 #define APSIS_RUNTIME_LOOKAHEAD_MS 1200u
 #define APSIS_RUNTIME_GRAVITY_COMMIT_LEAD_MS 18u
@@ -150,6 +154,15 @@ void apsis_runtime_reset(ApsisRuntime *runtime, uint32_t sample_rate,
 void apsis_runtime_start(ApsisRuntime *runtime);
 void apsis_runtime_stop(ApsisRuntime *runtime);
 
+/* M4c lifecycle wrappers preserve the old runtime entry points. Study 126
+ * regenerates String S&H cells before every scheduler start and cancels its
+ * pending Attractor voice timers on Stop. */
+void apsis_runtime_start_attractor(ApsisRuntime *runtime,
+                                   ApsisState *state,
+                                   ApsisStringAttractorRuntime *attractor);
+void apsis_runtime_stop_attractor(ApsisRuntime *runtime,
+                                  ApsisStringAttractorRuntime *attractor);
+
 /* Request a Gravity candidate using current source semantics. If MOTHER ->1
  * owns structural edits, the candidate is queued there. Immediate mode applies
  * directly. Quantized mode targets the next source-derived Gravity boundary.
@@ -177,6 +190,21 @@ void apsis_runtime_process(ApsisRuntime *runtime,
                            ApsisRuntimeMotherApplyFn mother_apply,
                            void *mother_user);
 
+/* M4c shared-timeline extension. With a non-NULL Attractor runtime it performs
+ * Study-126 S&H planning before Spiral/ghost random draws and consumes only the
+ * appended shared bind event into external String state. NULL is equivalent to
+ * the frozen M3c path. */
+void apsis_runtime_process_attractor(ApsisRuntime *runtime,
+                                     ApsisState *state,
+                                     ApsisKeepBank *keep_bank,
+                                     ApsisChainSequence *chain_sequence,
+                                     ApsisMotherPending *mother_pending,
+                                     ApsisBloomVoicingState *bloom_voicing,
+                                     uint32_t frames,
+                                     ApsisRuntimeMotherApplyFn mother_apply,
+                                     void *mother_user,
+                                     ApsisStringAttractorRuntime *attractor);
+
 /* M4b audio handoff wrapper. It runs the exact M3c process above, but first
  * snapshots an already-queued STRING_RHYTHM event due inside this block. If M3c
  * actually consumes it, observation receives that event. No event is inserted,
@@ -191,6 +219,21 @@ uint8_t apsis_runtime_process_observed(ApsisRuntime *runtime,
                                       uint32_t frames,
                                       ApsisRuntimeMotherApplyFn mother_apply,
                                       void *mother_user,
+                                      ApsisRuntimeStringRhythmObservation *observation);
+
+/* Combined M4b/M4c consumer for the eventual target overlay: same passive
+ * Rhythm observation plus the external Attractor planner/bind context. */
+uint8_t apsis_runtime_process_observed_attractor(
+                                      ApsisRuntime *runtime,
+                                      ApsisState *state,
+                                      ApsisKeepBank *keep_bank,
+                                      ApsisChainSequence *chain_sequence,
+                                      ApsisMotherPending *mother_pending,
+                                      ApsisBloomVoicingState *bloom_voicing,
+                                      uint32_t frames,
+                                      ApsisRuntimeMotherApplyFn mother_apply,
+                                      void *mother_user,
+                                      ApsisStringAttractorRuntime *attractor,
                                       ApsisRuntimeStringRhythmObservation *observation);
 
 #endif
