@@ -10,7 +10,9 @@
 
 typedef enum {
     /* Numeric order is the browser tick() scheduling order for events that
-     * share one target sample. It is not a DSP voice priority. */
+     * share one target sample. It is not a DSP voice priority. M3c-only
+     * observation events are appended so existing M3b target ordering stays
+     * stable; their samples normally precede the corresponding target. */
     APSIS_EVENT_STEP_ONE_RESYNC = 0,
     APSIS_EVENT_STRING_FILTER_CLOCK,
     APSIS_EVENT_PLAYHEAD,
@@ -22,7 +24,13 @@ typedef enum {
     APSIS_EVENT_CLOCK_SNAP,
     APSIS_EVENT_CLOCK_INNER,
     APSIS_EVENT_CLOCK_GHOST,
-    APSIS_EVENT_CHAIN_PULSE
+    APSIS_EVENT_CHAIN_PULSE,
+    APSIS_EVENT_GRAVITY_COMMIT,
+    APSIS_EVENT_MOTHER_COMMIT_OBSERVE,
+    APSIS_EVENT_CHAIN_APPLY_OBSERVE,
+    APSIS_EVENT_SPIRAL_BIND,
+    APSIS_EVENT_BLOOM_OCCURRENCE,
+    APSIS_EVENT_BLOOM_BIND
 } ApsisEventType;
 
 typedef struct {
