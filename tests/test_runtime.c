@@ -198,6 +198,12 @@ static void test_chain_start_advance_and_morph(void)
     assert(chain.armed == 0u && chain.pos == 0u);
     assert(s.gravity.tonic == 3u);
     assert(r.chain_morph_active == 1u);
+
+    /* A quarter-cycle morph lasts 55,125 samples at the default clock. At
+     * 256 samples the smoothstep can legitimately quantize to the exact Q15
+     * start value, so inspect it after meaningful progress but before the
+     * one-pulse cell advances at sample 18,375. */
+    process_to(&r, &s, &bank, &chain, &mother, &bloom, 10000u);
     assert(s.string.left_split_q15 > APSIS_Q15_MILLI(400));
     assert(s.string.left_split_q15 < APSIS_Q15_MILLI(470));
 
