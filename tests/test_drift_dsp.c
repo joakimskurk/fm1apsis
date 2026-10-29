@@ -195,7 +195,8 @@ static void test_reference_render(void)
     render_reference(&h1, &p1);
     render_reference(&h2, &p2);
     assert(h1 == h2 && p1 == p2);
-    assert(p1 > 0 && p1 < 2000);
+    assert(p1 == 488);
+    assert(h1 == 0x0aec6bc2u);
     printf("PASS: M4d Drift reference peak=%ld hash=%08lx\n",
            (long)p1, (unsigned long)h1);
 }
