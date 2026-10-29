@@ -62,11 +62,9 @@ Merged through commit `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 - [x] run FM-1 emulator smoke with transport compiled
 - [x] finalize PR #4 and squash-merge
 
-Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`. Final rebased PR head passed `APSIS core` #60 and staged validation #50 through emulator.
+Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`.
 
 ### M3b - structural/runtime consumers
-
-Merged to `main` at `a61a40dc83c9b52129f7d3f920da26a9a61837d9` via PR #5.
 
 - [x] establish M3b project/source reference documentation
 - [x] instantiate shared transport/event queue in FM-1 runtime
@@ -84,30 +82,56 @@ Merged to `main` at `a61a40dc83c9b52129f7d3f920da26a9a61837d9` via PR #5.
 - [x] measure live runtime RAM footprint
 - [x] measure host stress queue high-water: 14 / 256, no overflow
 - [x] measure emulator target-RAM live queue high-water: 7 / 256, no overflow
-- [x] full M3b target/emulator implementation gate (`APSIS core` #81, staged #71)
-- [x] final documentation-head gate (`APSIS core` #84, staged #74)
-- [x] mark PR #5 ready and squash-merge
+- [x] full M3b target/emulator implementation gate
+- [x] final documentation-head gate
+- [x] squash-merge PR #5
 
-Final implementation/evidence head: `001d69a758369e2d14665ba2fd176c1fd116990b`.
-Final documentation head: `6a8a182cbd0559cc2164c78bf956fbba7e0ee919`.
+Merged to `main` at `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
 
 ### M3c - late binding and long timing trace
 
-Active branch: `m3c-late-binding`, based on M3b merge `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
+Active PR: #6, branch `m3c-late-binding`.
 
-- [~] audit exact Study 126 Spiral/Bloom late-bind state-observation points
-- [ ] document occurrence-time vs bind-time frozen/re-read state contract
-- [ ] add source-derived regression expectations before implementation
-- [ ] Spiral final pitch resolution against latest committed Gravity/Tuning
-- [ ] Bloom per-petal late pitch resolution
-- [ ] deterministic random source traceability
-- [ ] fixed-capacity event queue stress/high-water tests with late-bind events
-- [ ] long deterministic reference trace
-- [ ] full Phase 3 target/emulator validation
+- [x] audit exact Study 126 Spiral/Bloom late-bind state-observation points
+- [x] document occurrence-time vs bind-time frozen/re-read state contract
+- [x] encode source-derived regression expectations before implementation
+- [x] select/document native FM-1 late-bind lead profile
+- [x] implement Spiral final pitch resolution against current committed state/tuning
+- [x] preserve deliberate Spiral no-pending-projection behavior
+- [x] implement Bloom target-aware pending-Gravity projection
+- [x] freeze Bloom plan/register/random choice at occurrence
+- [x] implement independent per-petal late binding against current Gravity/tuning/depth
+- [x] preserve full frozen petal count across mid-unfurl DEPTH changes
+- [x] represent normal Gravity target−18 ms shared-state commit
+- [x] represent Mother target−26 ms shared-state commit
+- [x] represent Chain target−24 ms discrete apply while morph starts at target
+- [x] keep all M3c observations on one shared event heap; no per-module clocks
+- [x] restore Study 126 1.20 s planning lookahead
+- [x] correct Bloom unfurl native representation to 0..3600 ms
+- [x] correct long-running Spiral ordinal counter width
+- [x] match scheduler Stop/restart cancellation while preserving independent pending Gravity
+- [x] deterministic random/state-observation traceability
+- [x] canonical 30 s replay: queue 352/512, Spiral 59/64, Bloom 44/64, hashes locked
+- [x] prove 256-entry heap insufficient under legal M3c worst case
+- [x] raise shared heap to measured 512-entry capacity
+- [x] 60 s max-swing extreme burst: queue 357/512, Spiral 59/64, Bloom 44/64
+- [x] ASAN/UBSAN for normal, lifecycle and extreme runtime suites
+- [x] real JieLi target build on target-identical M3c firmware
+- [x] emulator boot/input/silent-audio/M3c telemetry on target-identical firmware
+- [x] target evidence: image 71,608 B; RAM 35,272 B; pool 30,720 B
+- [x] emulator evidence: live queue 28/512; late flags 0; WAV peak 0
+- [~] final documentation-head core + full staged validation
+- [ ] mark PR #6 ready and squash-merge
 
-M3c remains intentionally silent. Do not start Phase 4 DSP until M3c is merged and green.
+Normative references:
+- `docs/reference/LATE_BINDING_CONTRACT.md`
+- `docs/reference/M3C_REFERENCE_TRACE.md`
+
+M3c remains intentionally silent. **Do not start Phase 4 DSP until PR #6 is merged and green.**
 
 ## Phase 4 - five dry source engines
+
+Blocked by M3c merge.
 
 - [ ] String — Study 98 acoustic target inside Study 126 behavioural contract
 - [ ] Drift
@@ -115,14 +139,14 @@ M3c remains intentionally silent. Do not start Phase 4 DSP until M3c is merged a
 - [ ] Spiral
 - [ ] Bloom
 
-No shared Space yet. Do not begin Phase 4 until M3b/M3c transport/runtime semantics are proven.
+No shared Space yet. Initial Phase 4 work should start with one dry source at a time and preserve the now-locked Phase 3 event/state semantics.
 
-## Phase 5 - live structural behaviour / late binding integration
+## Phase 5 - live structural behaviour / sounding-source integration
 
 - [ ] integrate pending Gravity with sounding sources
 - [ ] integrate Mother held structural edits with audio engine
 - [ ] integrate Chain changes with audio/event engine
-- [ ] prove last-moment Spiral/Bloom binding
+- [ ] prove last-moment Spiral/Bloom binding drives sounding voices without changing M3c timing
 
 ## Phase 6 - shared Space / Cathedral
 
@@ -176,7 +200,7 @@ No shared Space yet. Do not begin Phase 4 until M3b/M3c transport/runtime semant
 
 - [ ] ISR timing
 - [ ] RAM/pool/stack headroom
-- [ ] queue high-water
+- [ ] queue high-water under real DSP load
 - [ ] voice-pool stress
 - [ ] UI redraw load
 - [ ] Cathedral resource tuning
@@ -190,4 +214,4 @@ No shared Space yet. Do not begin Phase 4 until M3b/M3c transport/runtime semant
 - [ ] storage power interruption
 - [ ] exact release SHA-256
 
-Physical hardware is not currently available, so no item in Phase 12 is verified.
+Physical hardware is not currently available, so no Phase 12 item is verified.
