@@ -14,9 +14,10 @@ git clone -q https://github.com/joakimeriksson/fm1-emu.git work/fm1-emu
 ( cd work/fm1-emu && cargo build -q --release -p fm1-emu )
 EMU=work/fm1-emu/target/release/fm1-emu
 
-# M3b contract: APSIS boots, accepts native surface buttons, remains silent,
-# and the live target runtime queue advances without overflowing. Locate the
-# passive telemetry block in the real target ELF rather than guessing layout.
+# M3c contract: APSIS boots, accepts native surface buttons, remains silent,
+# advances the shared target runtime without queue/slot starvation, and keeps
+# deterministic late-binding telemetry alive. Locate the passive probe in the
+# real target ELF rather than guessing layout.
 OBJDUMP="${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN not set}/common/bin/objdump"
 "$OBJDUMP" -t work/apsis/build/dinghy.elf > work/emu-smoke/target_symbols.txt
 PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found) print found }' \
@@ -26,7 +27,7 @@ PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found
 "$EMU" --fwsc "$PKG" --ms 3000 --wav work/emu-smoke/apsis.wav \
   --keys "700:SEQ,1600:HOME" \
   --snap 500 --snap 1100 --snap 2100 \
-  --dump "$PROBE_ADDR" 4 \
+  --dump "$PROBE_ADDR" 6 \
   > work/emu-smoke/run.log 2>&1
 
 python3 - <<'PY'
@@ -66,34 +67,39 @@ if sw != 2:
 vals = struct.unpack('<' + 'h' * (len(raw) // 2), raw)
 peak = max((abs(v) for v in vals), default=0)
 if peak != 0:
-    raise SystemExit(f'FAIL: M3b APSIS runtime must remain silent, peak={peak}')
+    raise SystemExit(f'FAIL: M3c APSIS runtime must remain silent, peak={peak}')
 
 log = (root / 'run.log').read_text(errors='replace')
 lines = log.splitlines()
 probe_words = None
 for i, line in enumerate(lines):
-    if line.startswith('dump ') and '(4 words)' in line:
-        for data_line in lines[i + 1:i + 4]:
+    if line.startswith('dump ') and '(6 words)' in line:
+        words = []
+        for data_line in lines[i + 1:i + 5]:
             if ':' not in data_line:
                 continue
-            words = re.findall(r'\b[0-9a-fA-F]{8}\b', data_line.split(':', 1)[1])
-            if len(words) >= 4:
-                probe_words = [int(w, 16) for w in words[:4]]
+            words.extend(re.findall(r'\b[0-9a-fA-F]{8}\b', data_line.split(':', 1)[1]))
+            if len(words) >= 6:
+                probe_words = [int(w, 16) for w in words[:6]]
                 break
         if probe_words is not None:
             break
 if probe_words is None:
     print(log)
     raise SystemExit('FAIL: runtime telemetry dump missing from emulator output')
-magic, queue_high_water, queue_overflowed, cursor_low32 = probe_words
+magic, queue_high_water, queue_overflowed, cursor_low32, late_flags, late_trace_hash = probe_words
 if magic != 0x41505349:
     raise SystemExit(f'FAIL: runtime telemetry magic {magic:#010x}')
-if not (0 < queue_high_water < 256):
-    raise SystemExit(f'FAIL: invalid live queue high-water {queue_high_water}/256')
+if not (0 < queue_high_water < 512):
+    raise SystemExit(f'FAIL: invalid live queue high-water {queue_high_water}/512')
 if queue_overflowed != 0:
     raise SystemExit(f'FAIL: live runtime queue overflow flag={queue_overflowed}')
+if late_flags != 0:
+    raise SystemExit(f'FAIL: live late-binding starvation flags={late_flags:#x}')
 if cursor_low32 == 0:
     raise SystemExit('FAIL: runtime sample cursor did not advance')
+if late_trace_hash == 0:
+    raise SystemExit('FAIL: late-binding telemetry hash is zero')
 
 report = {
     'screens': [p.name for p in shots],
@@ -102,11 +108,13 @@ report = {
     'wav_channels': ch,
     'wav_peak': peak,
     'runtime_queue_high_water': queue_high_water,
-    'runtime_queue_capacity': 256,
+    'runtime_queue_capacity': 512,
     'runtime_queue_overflowed': queue_overflowed,
+    'runtime_late_flags': late_flags,
+    'runtime_late_trace_hash': f'{late_trace_hash:08x}',
     'runtime_cursor_low32': cursor_low32,
 }
 (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, sort_keys=True))
-print('PASS: APSIS emulator boot/input/silent-audio/runtime-queue contract')
+print('PASS: APSIS emulator boot/input/silent-audio/M3c-runtime contract')
 PY
