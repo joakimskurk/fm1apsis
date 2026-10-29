@@ -61,6 +61,9 @@ typedef struct {
     uint32_t bloom_occurrence_count;
     ApsisRuntimeBloomOccurrence last_bloom;
 
+    /* Browser startChain() snapshots meter.n into chainMeter. Cell lengths,
+     * master phrase and morph-cycle length keep using that frozen n until Stop. */
+    uint8_t chain_meter_n;
     ApsisChainMorphTargets chain_morph;
     uint8_t chain_morph_active;
     uint64_t chain_morph_start_sample;
