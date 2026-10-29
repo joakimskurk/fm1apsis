@@ -36,6 +36,9 @@ build/test_runtime: $(OBJ) tests/test_runtime.c | build
 build/test_runtime_lifecycle: $(OBJ) tests/test_runtime_lifecycle.c | build
 	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_runtime_lifecycle.c -o $@
 
+build/test_runtime_extreme: $(OBJ) tests/test_runtime_extreme.c | build
+	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_runtime_extreme.c -o $@
+
 build/test_late_binding: $(OBJ) tests/test_late_binding.c | build
 	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_late_binding.c -o $@
 
@@ -57,25 +60,30 @@ build/san_runtime: $(SAN_OBJ) tests/test_runtime.c | build
 build/san_runtime_lifecycle: $(SAN_OBJ) tests/test_runtime_lifecycle.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_runtime_lifecycle.c -o $@
 
+build/san_runtime_extreme: $(SAN_OBJ) tests/test_runtime_extreme.c | build
+	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_runtime_extreme.c -o $@
+
 build/san_late_binding: $(SAN_OBJ) tests/test_late_binding.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_late_binding.c -o $@
 
-test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mother build/test_transport build/test_runtime build/test_runtime_lifecycle build/test_late_binding
+test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mother build/test_transport build/test_runtime build/test_runtime_lifecycle build/test_runtime_extreme build/test_late_binding
 	build/test_apsis_core
 	build/test_gravity_bloom
 	build/test_keep_chain_mother
 	build/test_transport
 	build/test_runtime
 	build/test_runtime_lifecycle
+	build/test_runtime_extreme
 	build/test_late_binding
 
-sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_mother build/san_transport build/san_runtime build/san_runtime_lifecycle build/san_late_binding
+sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_mother build/san_transport build/san_runtime build/san_runtime_lifecycle build/san_runtime_extreme build/san_late_binding
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_apsis_core
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_gravity_bloom
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_keep_chain_mother
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_transport
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_runtime
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_runtime_lifecycle
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_runtime_extreme
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_late_binding
 
 clean:
