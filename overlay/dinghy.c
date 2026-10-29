@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * M2 remains intentionally silent. Musical state/harmony/String/Drift/Clock/
- * Spiral/Gravity/Bloom/KEEP/CHAIN/Mother behaviour is established before DSP.
+ * M3a adds the deterministic shared transport to the real FM-1 single
+ * translation unit. Runtime consumers and DSP remain intentionally deferred.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
@@ -17,6 +17,7 @@
 #include "apsis_keep.h"
 #include "apsis_chain.h"
 #include "apsis_mother.h"
+#include "apsis_transport.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"
@@ -28,6 +29,7 @@
 #include "apsis_keep.c"
 #include "apsis_chain.c"
 #include "apsis_mother.c"
+#include "apsis_transport.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
@@ -55,7 +57,7 @@ static void app_audio(int32_t *out, uint32_t n)
 {
     (void)out;
     (void)n;
-    /* Platform supplies an already-zeroed stereo buffer. M2 core stays silent. */
+    /* Platform supplies an already-zeroed stereo buffer. M3a remains silent. */
 }
 
 static const char *surface_name(uint8_t s)

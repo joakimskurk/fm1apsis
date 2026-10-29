@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Last updated: 2026-10-23
+Last updated: 2026-10-29
 
 ## Current milestone
 
@@ -8,12 +8,12 @@ Last updated: 2026-10-23
 
 Phase 2 musical/state core is complete and merged to `main` at `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
-Unfinished work is intentionally checkpointed on:
+M3a is implemented and verified through the FM-1 emulator on:
 - branch `m3-transport-core`
-- draft PR #4: `M3a: deterministic sample-referenced transport core`
-- last transport code/test commit before handoff documentation: `17faba6bd944726c804d52e5456afaadf3e99093`
+- PR #4: `M3a: deterministic sample-referenced transport core`
+- target/emulator-verified implementation HEAD `17b073e4174d7d27144d64a455e4080b5b777ea3`
 
-A new chat should inspect the current branch HEAD and PR #4 before changing code. Documentation-only commits after the code commit are expected.
+Documentation-only commits after the verified implementation commit are expected before merge.
 
 ## Product invariant
 
@@ -61,13 +61,15 @@ M2c verification before merge:
 - pool 30,720 B / 344,064 B
 - package SHA-256 `5d318396d34cae6fd7c0fea4d175b1931ebf637194eb60bce7bf514433a94d02`
 
-## Current M3a branch state
+## M3a implementation
 
 Implemented on `m3-transport-core`:
 - `apsis/apsis_transport.h`
 - `apsis/apsis_transport.c`
 - `tests/test_transport.c`
 - transport included in root Makefile test/sanitizer build
+- transport copied into the Dinghy overlay by `ci/apply_apsis.sh`
+- transport included in the real `overlay/dinghy.c` single translation unit
 - fixed-capacity 256-entry event min-heap
 - absolute transport time as 64-bit whole samples + Q32 fractional sample
 - BPM 35..180 and 1 / 1/2 / 1/4 division semantics
@@ -108,48 +110,64 @@ Native transport should preserve musical boundary semantics, not main-thread tim
 ### Merged `main`
 Phase 2/M2c is automated-test, sanitizer, target-build and emulator-smoke verified.
 
-### Current M3a code
-The new transport source and regression suite have now passed GitHub Actions workflow **APSIS core**, including:
-- source-derived core regression: PASS
-- ASAN/UBSAN: PASS
+### M3a
+M3a is now **verified through emulator**.
 
-Evidence run: `APSIS core` run #49 on branch commit `338d8fb863fab31951f2077382c4e692ef395f6e`. Later handoff commits are documentation-only and do not change transport code.
+Verified implementation commit:
+- `17b073e4174d7d27144d64a455e4080b5b777ea3`
 
-Transport is **not yet target-validated** because it is still absent from the Dinghy overlay copy/include path. A staged build that does not compile `apsis_transport.[ch]` into `overlay/dinghy.c` does not count as target verification of M3a.
+GitHub Actions evidence:
+- `APSIS core` run #59: regression + `tests/test_transport.c` + ASAN/UBSAN PASS
+- `APSIS staged validation` run #49: every gate PASS
+  - source core + pinned upstream
+  - unchanged Dinghy host + real target
+  - APSIS overlay host shell
+  - real JieLi `FM-1_972` target package
+  - FM-1 emulator smoke
+
+M3a target evidence:
+- app image: 56,680 B / 581,564 B (20 B smaller than M2c)
+- RAM `.data + .bss`: 14,104 B / 98,304 B (no change from M2c)
+- RAM headroom: 84,200 B
+- pool: 30,720 B / 344,064 B (no change from M2c)
+- pool headroom: 313,344 B
+- package bytes: 610,110 B
+- product identity: `FM-1_972`
+- package SHA-256: `6f2b4549eef194672d4a340e8b7cb33fe1c04befe564ad7da39d3275b8f96e94`
+
+M3a emulator evidence:
+- boot/input/silent-audio contract PASS
+- stereo channels: 2
+- WAV frames: 124,928
+- WAV peak: 0, expected because M3a remains intentionally silent
+
+Important resource caveat: M3a compiles `apsis_transport.[ch]` in the real target single translation unit, but the transport/event queue is intentionally not yet consumed or instantiated by `app_audio()`. The unchanged RAM/pool figures therefore do **not** represent the eventual live 256-event queue/runtime footprint; that becomes measurable when M3b wires the shared timeline into runtime state.
 
 No physical FM-1 validation has been performed; hardware is not currently available.
 
 ## Incomplete / current risks
 
-M3a is checkpointed but **not complete or merge-ready**:
-- `apsis_transport.[ch]` is not yet copied by `ci/apply_apsis.sh`
-- transport is not yet included in the real FM-1 single-translation-unit `overlay/dinghy.c`
+M3a transport itself is target/emulator-proven. Remaining runtime work belongs to M3b/M3c:
 - transport is not yet consumed by `app_audio()`
 - Chain/Mother/Gravity/Spiral/Bloom runtime consumers are not yet wired to the shared event stream
 - no DSP/audio yet; M3 remains intentionally silent
-
-Risks to test before merge:
-- compile/symbol issues when transport joins the single translation unit
-- RAM/code cost of the 256-entry event queue
-- same-sample priority between Mother/Chain commits and late-bound Spiral/Bloom pitch
-- queue high-water under 4x Spiral plus secondary events and later bound events
+- live queue RAM/high-water cost is not measurable until the runtime queue is instantiated
+- same-sample priority between Mother/Chain commits and late-bound Spiral/Bloom pitch must be proven when consumers are wired
 - native randomness must remain explicit/deterministic rather than implicit `Math.random()`
 
 ## Exact next action
 
-1. Checkout/inspect `m3-transport-core` / draft PR #4.
-2. Read `apsis/apsis_transport.[ch]`, `tests/test_transport.c`, `Makefile`, `ci/apply_apsis.sh`, `overlay/dinghy.c` and source-lock docs.
-3. Add `apsis_transport.h/.c` to `ci/apply_apsis.sh`.
-4. Include `apsis_transport.h/.c` in `overlay/dinghy.c` so the actual single-translation-unit FM-1 build compiles the transport.
-5. Run the complete staged validation again: core, pinned upstream, unchanged Dinghy, APSIS host, real JieLi `FM-1_972` target, emulator smoke.
-6. Fix any single-TU/target issue before expanding M3 functionality.
-7. Record target image/RAM/pool deltas and package SHA in `TESTING.md` / this file.
-8. Only after every gate is green: mark PR #4 ready, finalize M3a and squash-merge.
-9. Next milestone after merge: M3b runtime consumers for Mother/Chain/Gravity/Spiral/Bloom on the shared event timeline.
+1. Commit the M3a verification documentation and ensure CI remains green on the final PR head.
+2. Mark PR #4 ready for review/finalization.
+3. Squash-merge PR #4 to `main` once required checks are green.
+4. Start M3b from updated `main`.
+5. M3b first task: instantiate the shared transport/event queue and wire structural/runtime consumers for Mother/Chain/Gravity/Spiral/Bloom without adding DSP.
+6. Measure live queue/runtime RAM and high-water once the queue is actually instantiated.
+7. Preserve late-binding semantics for Spiral/Bloom into M3c before any Phase 4 sound engine work.
 
 ## Do not regress
 
-- Do not begin DSP before deterministic transport is proven.
+- Do not begin DSP before deterministic transport is proven. M3a now satisfies that transport gate; Phase 4 DSP still waits for M3b/M3c runtime timing semantics.
 - Do not replace the shared scheduler with per-module clocks.
 - KEEP is partial musical memory, not a full preset.
 - CHAIN retains lane scopes/chance/transpose/morph/sync semantics.
