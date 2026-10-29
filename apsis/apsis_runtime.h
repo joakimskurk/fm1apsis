@@ -84,9 +84,9 @@ typedef struct {
     ApsisBloomLateBinding pitch;
 } ApsisRuntimeBloomBinding;
 
-/* M4b does not add another scheduler. This is only a passive copy of the
- * shared transport event after the M3c coordinator consumes it. Audio may use
- * it on the following callback (never early; at most one block late). */
+/* M4b does not add another scheduler. This is only a passive copy of one
+ * shared transport event when the M3c coordinator consumes it. The observation
+ * lives outside ApsisRuntime so the frozen M3c runtime layout stays unchanged. */
 typedef struct {
     uint8_t valid;
     ApsisTransportEvent event;
@@ -110,7 +110,6 @@ typedef struct {
     uint32_t late_trace_hash;
     uint32_t event_count[APSIS_RUNTIME_EVENT_TYPES];
     uint64_t last_event_sample;
-    ApsisRuntimeStringRhythmObservation last_string_rhythm;
 
     ApsisRuntimeGravityPending gravity_pending;
 
@@ -167,11 +166,7 @@ void apsis_runtime_chain_start(ApsisRuntime *runtime, ApsisState *state,
                                ApsisChainSequence *sequence);
 void apsis_runtime_chain_stop(ApsisRuntime *runtime, ApsisChainSequence *sequence);
 
-/* Advance the APSIS timeline by sample frames. M3c keeps Study 126's 1.20 s
- * planning horizon but puts all target, pre-target state observation and
- * late-bind events on the same fixed-capacity sample heap. M4b adds only a
- * passive consumed-String-Rhythm observation; it does not schedule audio here.
- * Generic MOTHER structural keys are applied through mother_apply. */
+/* Frozen M3c timeline advance. */
 void apsis_runtime_process(ApsisRuntime *runtime,
                            ApsisState *state,
                            ApsisKeepBank *keep_bank,
@@ -181,5 +176,21 @@ void apsis_runtime_process(ApsisRuntime *runtime,
                            uint32_t frames,
                            ApsisRuntimeMotherApplyFn mother_apply,
                            void *mother_user);
+
+/* M4b audio handoff wrapper. It runs the exact M3c process above, but first
+ * snapshots an already-queued STRING_RHYTHM event due inside this block. If M3c
+ * actually consumes it, observation receives that event. No event is inserted,
+ * rescheduled or removed by this wrapper. With legal Clock bounds there can be
+ * at most one String Rhythm target in a 256-frame callback. */
+uint8_t apsis_runtime_process_observed(ApsisRuntime *runtime,
+                                      ApsisState *state,
+                                      ApsisKeepBank *keep_bank,
+                                      ApsisChainSequence *chain_sequence,
+                                      ApsisMotherPending *mother_pending,
+                                      ApsisBloomVoicingState *bloom_voicing,
+                                      uint32_t frames,
+                                      ApsisRuntimeMotherApplyFn mother_apply,
+                                      void *mother_user,
+                                      ApsisRuntimeStringRhythmObservation *observation);
 
 #endif
