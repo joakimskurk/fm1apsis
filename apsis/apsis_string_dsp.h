@@ -117,6 +117,11 @@ void apsis_string_dsp_targets(const ApsisState *state,
                               uint8_t transport_running,
                               ApsisStringDspTargets *out);
 
+/* One shared state/tuning -> frequency conversion for persistent + transient
+ * String code. Public only so M4b can use the exact M4a conversion path. */
+uint32_t apsis_string_dsp_frequency_millihz(const ApsisState *state,
+                                             int32_t step_milli);
+
 /* M4b1 source-derived Study-98 classicStringNote() plan. level_q15 is already
  * source-level scaled. root_gain_q15 is zero for no shadow. pan_q15 is signed
  * -32767..32767. The plan is pure and does not allocate/modify DSP state. */
@@ -150,7 +155,12 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
                              ApsisStringPitchMemory *pitch_memory,
                              uint8_t transport_running);
 
-/* Adds dry persistent + finite transient String to an interleaved stereo Q15 buffer. */
+/* Frozen M4a sustain renderer. */
 void apsis_string_dsp_render(ApsisStringDsp *dsp, int32_t *out, uint32_t frames);
+
+/* M4b1 finite transient renderer. It is intentionally separate until M4b2
+ * connects real transport events. */
+void apsis_string_transient_render(ApsisStringDsp *dsp, int32_t *out,
+                                   uint32_t frames);
 
 #endif
