@@ -17,6 +17,8 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_string_dsp.h apsis/apsis_string_dsp.c \
    apsis/apsis_string_transient.c apsis/apsis_string_transient_pool.c \
    apsis/apsis_string_rhythm_audio.h apsis/apsis_string_rhythm_audio.c \
+   apsis/apsis_string_attractor.h apsis/apsis_string_attractor.c \
+   apsis/apsis_string_attractor_audio.h apsis/apsis_string_attractor_audio.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
@@ -27,7 +29,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_transport.h apsis/apsis_transport.c \
    apsis/apsis_late_binding.h apsis/apsis_late_binding.c \
    apsis/apsis_runtime.h apsis/apsis_runtime.c apsis/apsis_runtime_m3c.c \
-   apsis/apsis_runtime_final.c \
+   apsis/apsis_runtime_m4c.c \
    work/apsis/firmware/src/
 
 python3 - <<'PY'
@@ -59,9 +61,7 @@ if '#include "apsis_string_transient_pool.c"' not in s:
     s = s.replace(transient_anchor,
                   transient_anchor + '\n#include "apsis_string_transient_pool.c"', 1)
 
-# M4b2 binds already-consumed shared Rhythm events to the finite pool. The
-# event observer remains part of apsis_runtime_final.c; this layer adds no
-# second scheduler or queue.
+# M4b2 binds already-consumed shared Rhythm events to the finite pool.
 if '#include "apsis_string_rhythm_audio.h"' not in s:
     h2_anchor = '#include "apsis_string_dsp.h"'
     if h2_anchor not in s:
@@ -73,47 +73,76 @@ if '#include "apsis_string_rhythm_audio.c"' not in s:
         raise SystemExit('FAIL: M4b Rhythm source anchor missing')
     s = s.replace(c2_anchor, c2_anchor + '\n#include "apsis_string_rhythm_audio.c"', 1)
 
+# M4c adds external String Attractor planner/bind state and a late-bind audio
+# consumer. It still uses the same global finite transient pool.
+if '#include "apsis_string_attractor.h"' not in s:
+    ha_anchor = '#include "apsis_string_rhythm_audio.h"'
+    if ha_anchor not in s:
+        raise SystemExit('FAIL: M4c Attractor header anchor missing')
+    s = s.replace(ha_anchor, ha_anchor + '\n#include "apsis_string_attractor.h"\n#include "apsis_string_attractor_audio.h"', 1)
+if '#include "apsis_string_attractor.c"' not in s:
+    ca_anchor = '#include "apsis_string_rhythm_audio.c"'
+    if ca_anchor not in s:
+        raise SystemExit('FAIL: M4c Attractor source anchor missing')
+    s = s.replace(ca_anchor,
+                  ca_anchor + '\n#include "apsis_string_attractor.c"\n#include "apsis_string_attractor_audio.c"', 1)
+
+# runtime_m4c.c includes the frozen M3c coordinator internally and appends only
+# the external Attractor-aware scheduler/process layer. Do not include
+# runtime_final.c separately or the lifecycle symbols would be duplicated.
 old = '#include "apsis_runtime.c"'
-new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_final.c"'
+new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_m4c.c"'
 if old not in s:
     raise SystemExit('FAIL: runtime include anchor missing from Dinghy overlay')
 s = s.replace(old, new, 1)
 s = s.replace('M3b instantiates the shared transport/runtime coordinator',
-              'M4b retains the M3c shared transport/runtime coordinator', 1)
+              'M4c retains the M3c coordinator and adds String Attractor on the shared heap', 1)
 s = s.replace('static volatile uint32_t apsis_runtime_probe[4];',
               'static volatile uint32_t apsis_runtime_probe[6];', 1)
 
-# Reserve M4b transient BSS only after every M4a/M3c state object. This keeps
-# the persistent String struct at 196 bytes and avoids relocating the proven
-# runtime merely because finite voices need their own capacity.
+# Keep all M4 finite state outside the frozen ApsisRuntime layout. The
+# transient pool is shared by Rhythm + Attractor; the Attractor runtime owns
+# only its S&H cells/pending bind slots/telemetry.
 pool_anchor = 'static volatile uint32_t apsis_runtime_probe[6];'
-pool_decl = pool_anchor + '\nstatic ApsisStringTransientPool string_transient_pool;'
+pool_decl = (pool_anchor +
+             '\nstatic ApsisStringTransientPool string_transient_pool;'
+             '\nstatic ApsisStringAttractorRuntime string_attractor_runtime;')
 if pool_anchor not in s:
-    raise SystemExit('FAIL: M4b transient pool declaration anchor missing')
+    raise SystemExit('FAIL: M4c String state declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
-# Audio ordering is deliberate: render M4a sustain and all transients that were
-# already active at block start, then advance the frozen M3c timeline while
-# passively observing one due STRING_RHYTHM event, then bind that event into the
-# finite pool for the next callback. A target can therefore be at most one
-# callback late and can never sound before its shared-timeline sample.
+# Target callback ordering mirrors the validated M4c live host test:
+# 1) render sustain + finite voices already active at block start;
+# 2) advance the one shared timeline and collect Attractor bind callbacks;
+# 3) late-bind Attractor voices into the pool using the end-of-block cursor as
+#    the next render origin, so normal ~45 ms lead still reaches target exactly;
+# 4) bind the M4b Rhythm observation last, preserving its frozen next-callback
+#    (never-early) handoff policy.
 audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);'''
 audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
+        uint8_t attr_ix;
         apsis_string_dsp_render(&string_dsp, out, n);
         apsis_string_transient_render(&string_transient_pool, out, n);
-        apsis_runtime_process_observed(&apsis_runtime, &apsis, &keep_bank,
-                                       &chain_sequence, &mother_pending,
-                                       &bloom_voicing_state, n, 0, 0,
-                                       &rhythm_observation);
+        apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
+                                                 &keep_bank, &chain_sequence,
+                                                 &mother_pending,
+                                                 &bloom_voicing_state, n, 0, 0,
+                                                 &string_attractor_runtime,
+                                                 &rhythm_observation);
+        for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
+            (void)apsis_string_attractor_trigger_binding(
+                &string_transient_pool, &apsis, &string_pitch_memory,
+                &string_attractor_runtime.binding[attr_ix],
+                apsis_runtime.cursor_sample);
         if (rhythm_observation.valid)
             (void)apsis_string_rhythm_trigger_event(&string_transient_pool,
                                                     &apsis,
                                                     &string_pitch_memory,
                                                     &rhythm_observation.event);'''
 if audio_old not in s:
-    raise SystemExit('FAIL: M4b live audio handoff anchor missing')
+    raise SystemExit('FAIL: M4c live audio handoff anchor missing')
 s = s.replace(audio_old, audio_new, 1)
 
 probe_anchor = '        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;'
@@ -127,9 +156,14 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# The pool is live-referenced by app_audio(), so it no longer needs an explicit
-# retention write. Platform BSS zeroing gives the same reset state without
-# adding a 6 kB memset to the IRQ-enabled startup path.
+start_old = '    apsis_runtime_start(&apsis_runtime);'
+start_new = '    apsis_runtime_start_attractor(&apsis_runtime, &apsis, &string_attractor_runtime);'
+if start_old not in s:
+    raise SystemExit('FAIL: M4c runtime start anchor missing')
+s = s.replace(start_old, start_new, 1)
+
+# Both external String objects are live-referenced by app_audio(). Platform BSS
+# zeroing is sufficient before their explicit runtime/start initialization.
 
 p.write_text(s)
 PY
