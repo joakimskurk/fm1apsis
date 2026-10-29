@@ -5,7 +5,7 @@
 #include "apsis_state.h"
 
 #define APSIS_TRANSPORT_DEFAULT_RATE 44100u
-#define APSIS_TRANSPORT_QUEUE_CAP 256u
+#define APSIS_TRANSPORT_QUEUE_CAP 512u
 #define APSIS_TRANSPORT_PULSE_EVENTS_MAX 16u
 
 typedef enum {
