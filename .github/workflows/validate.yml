@@ -59,56 +59,60 @@ jobs:
           bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 | tee build/evidence/emulator_smoke.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke
 
-      - name: Gate 5b - Drift DSP bypass preserves frozen String PCM
+      - name: Gate 5b - Clock DSP bypass preserves frozen M4d PCM
         shell: bash
         run: |
           set -euo pipefail
-          cp build/target_report.json build/evidence/m4d-default-target-report.json
-          cp build/SHA256SUMS build/evidence/m4d-default-SHA256SUMS
-          cp build/apsis-0.1-dev.fwsc build/m4d-default-fw-backup.fwsc
+          cp build/target_report.json build/evidence/m4e-default-target-report.json
+          cp build/SHA256SUMS build/evidence/m4e-default-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/m4e-default-fw-backup.fwsc
 
-          APSIS_CI_DRIFT_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis.sh
+          APSIS_CI_CLOCK_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis.sh
           APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
-          cp build/target_report.json build/evidence/m4d-bypass-target-report.json
-          cp build/SHA256SUMS build/evidence/m4d-bypass-SHA256SUMS
+          cp build/target_report.json build/evidence/m4e-clock-bypass-target-report.json
+          cp build/SHA256SUMS build/evidence/m4e-clock-bypass-SHA256SUMS
 
           set -o pipefail
           bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
-            | tee build/evidence/emulator_drift_bypass.txt
-          cp -a work/emu-smoke build/evidence/emulator-smoke-drift-bypass
+            | tee build/evidence/emulator_clock_bypass.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-clock-bypass
 
           python3 - <<'PY'
           import json
           from pathlib import Path
           report = json.loads(Path('work/emu-smoke/report.json').read_text())
-          expected_pcm = '10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64'
+          expected_pcm = '539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7'
           if report.get('wav_raw_sha256') != expected_pcm:
               raise SystemExit(
-                  'FAIL: M4d DSP bypass changed frozen M4c PCM: '
+                  'FAIL: M4e Clock DSP bypass changed frozen M4d PCM: '
                   f"{report.get('wav_raw_sha256')} != {expected_pcm}"
               )
           if report.get('runtime_queue_high_water') != 28:
               raise SystemExit(
-                  f"FAIL: M4d bypass queue high-water {report.get('runtime_queue_high_water')} != 28"
+                  f"FAIL: M4e bypass queue high-water {report.get('runtime_queue_high_water')} != 28"
               )
           if report.get('runtime_queue_overflowed') != 0:
-              raise SystemExit('FAIL: M4d bypass runtime queue overflow')
+              raise SystemExit('FAIL: M4e bypass runtime queue overflow')
           if report.get('runtime_late_flags') != 0:
               raise SystemExit(
-                  f"FAIL: M4d bypass late flags {report.get('runtime_late_flags')}"
+                  f"FAIL: M4e bypass late flags {report.get('runtime_late_flags')}"
+              )
+          if report.get('runtime_cursor_low32') != 123648:
+              raise SystemExit(
+                  f"FAIL: M4e bypass cursor {report.get('runtime_cursor_low32')} != 123648"
               )
           if report.get('runtime_late_trace_hash') != '811c9dc5':
               raise SystemExit(
-                  'FAIL: M4d bypass late trace '
+                  'FAIL: M4e bypass late trace '
                   f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
               )
-          print('PASS: M4d Drift DSP bypass is bit-identical to frozen M4c PCM/runtime')
+          print('PASS: M4e Clock DSP bypass preserves frozen M4d PCM/runtime')
           PY
 
-          cp build/m4d-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
-          cp build/evidence/m4d-default-target-report.json build/target_report.json
-          cp build/evidence/m4d-default-SHA256SUMS build/SHA256SUMS
-          rm -f build/m4d-default-fw-backup.fwsc
+          cp build/m4e-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/m4e-default-target-report.json build/target_report.json
+          cp build/evidence/m4e-default-SHA256SUMS build/SHA256SUMS
+          rm -f build/m4e-default-fw-backup.fwsc
 
       - name: Upload Phase 1 evidence
         if: always()
