@@ -4,8 +4,8 @@ This is the short operational roadmap. Detailed parity-first phase descriptions 
 
 ## Status legend
 
-- [x] completed and merged
-- [~] active / partially implemented
+- [x] completed
+- [~] active / partially implemented / merge pending
 - [ ] not started
 
 ## Phase 0 - reference freeze
@@ -66,27 +66,37 @@ Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`. Final rebased PR
 
 ### M3b - structural/runtime consumers
 
-Active branch: `m3b-runtime-consumers`.
+Active branch: `m3b-runtime-consumers`. PR #5. Implementation/evidence is green through real target and emulator; final documentation-head check + merge remains.
 
-- [~] establish M3b project/source reference documentation
-- [ ] instantiate shared transport/event queue in FM-1 runtime
-- [ ] add runtime coordinator regression tests
-- [ ] Mother horizon + next-1 commit on shared timeline
-- [ ] Chain pulse/cell transitions on shared timeline
-- [ ] Gravity immediate vs quantized pending commit
-- [ ] Spiral attractor progression and symbolic event scheduling
-- [ ] Bloom occurrence and voice-plan scheduling
-- [ ] preserve source-derived boundary/lead semantics without browser timer jitter
-- [ ] integrate silent timeline driver into `app_audio()`
-- [ ] measure live queue/runtime RAM and queue high-water
-- [ ] full M3b target/emulator gate
+- [x] establish M3b project/source reference documentation
+- [x] instantiate shared transport/event queue in FM-1 runtime
+- [x] add runtime coordinator regression tests
+- [x] Mother horizon + next-1 commit on shared timeline
+- [x] Chain pulse/cell transitions on shared timeline
+- [x] preserve browser Chain meter snapshot after start
+- [x] Gravity immediate vs quantized pending commit
+- [x] Spiral attractor progression and symbolic event scheduling
+- [x] Bloom occurrence and voice-plan scheduling
+- [x] preserve source-derived boundary/lead semantics without browser timer jitter
+- [x] integrate silent timeline driver into `app_audio()`
+- [x] remove target-incompatible live 64-bit division helpers while preserving Q32 timing
+- [x] measure live runtime RAM footprint
+- [x] measure host stress queue high-water: 14 / 256, no overflow
+- [x] measure emulator target-RAM live queue high-water: 7 / 256, no overflow
+- [x] full M3b target/emulator implementation gate (`APSIS core` #76, staged #66)
+- [~] final documentation-head checks, mark PR #5 ready, squash-merge
+
+Verified implementation/evidence head before documentation: `fa486917d6c9a328b7cf6f37147c2669d1ae966c`.
 
 ### M3c - late binding and long timing trace
 
+Do not start until PR #5 is merged.
+
+- [ ] audit exact Study 126 Spiral/Bloom late-bind state-observation points
 - [ ] Spiral final pitch resolution against latest committed Gravity/Tuning
 - [ ] Bloom per-petal late pitch resolution
-- [ ] deterministic random source(s)
-- [ ] fixed-capacity event queue stress/high-water tests
+- [ ] deterministic random source traceability
+- [ ] fixed-capacity event queue stress/high-water tests with late-bind events
 - [ ] long deterministic reference trace
 - [ ] full Phase 3 target/emulator validation
 
