@@ -23,8 +23,8 @@ typedef struct {
     uint32_t phase;
     uint32_t phase_inc;
     uint32_t target_phase_inc;
-    int32_t gain_q15;
-    int32_t target_gain_q15;
+    int32_t gain_q23;
+    int32_t target_gain_q23;
     int32_t mix_left_q15;
     int32_t target_mix_left_q15;
     int32_t mix_right_q15;
