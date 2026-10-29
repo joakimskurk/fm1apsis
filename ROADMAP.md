@@ -28,56 +28,62 @@ Merged through `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
 ## Phase 3 - deterministic transport/runtime
 
-### M3a - shared sample-referenced event grid
-- [x] implemented, target/emulator verified and merged
+- [x] M3a shared sample-referenced event grid — merged `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
+- [x] M3b structural/runtime consumers — merged `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
+- [x] M3c late binding/long deterministic trace — merged `ec0dc0b350793572f19040efc938f00121128dc6`
 
-Merged at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`.
-
-### M3b - structural/runtime consumers
-- [x] implemented, target/emulator verified and merged
-
-Merged at `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
-
-### M3c - late binding and long deterministic trace
-- [x] exact Study-126 occurrence/bind contract
-- [x] Spiral/Bloom late binding and shared pre-target state observations
-- [x] one allocation-free shared scheduler, 512 entries proven by stress
-- [x] deterministic replay and 60 s max-swing capacity stress
-- [x] lifecycle parity
-- [x] core + ASAN/UBSAN
-- [x] real JieLi target
-- [x] FM-1 emulator
-- [x] final documentation-head gate
-- [x] PR #6 squash-merged
-
-Merged to `main` at `ec0dc0b350793572f19040efc938f00121128dc6`.
-Final pre-merge head `4fa7d25920523b9e5d8591ae6185e1b5f910c083` passed core #123 and staged #113.
+M3c final pre-merge head `4fa7d25920523b9e5d8591ae6185e1b5f910c083` passed core #123 and staged #113.
 
 ## Phase 4 - five dry source engines
 
-Active branch: `m4-string-dsp`, based directly on the M3c merge.
+Active branch: `m4-string-dsp`, PR #7, based directly on the M3c merge.
 
 ### M4a - String persistent dry core
 
 - [x] lock Study-98 acoustic / Study-126 behavioural DSP contract
-- [~] pure fixed-point Foundation + Classic sustain renderer
-- [ ] source-derived target tests
-- [ ] smoothing / continuity / bounded-Q15 / long-render tests
-- [ ] ASAN/UBSAN
-- [ ] document native dry Dual strategy
-- [ ] integrate proven String DSP into FM-1 single translation unit
-- [ ] update emulator gate for controlled nonzero String audio
-- [ ] real JieLi target resource/timing measurement
+- [x] resolve Dual authority: Study-126 BODY/WIRE because Study 98 predates Dual
+- [x] fixed-point Study-98 Foundation pair
+- [x] fixed-point Study-98 Classic sine/Drift pair
+- [x] Study-126 Dual BODY/WIRE oscillator/filter/pan path
+- [x] source-derived target vectors
+- [x] smoothing / continuity / bounded-Q15 / long-render tests
+- [x] deterministic Classic/Dual audio hashes
+- [x] ASAN/UBSAN
+- [x] target-safe single-TU namespacing
+- [x] real JieLi compile/link gate
+- [x] live String renderer in `app_audio()`
+- [x] controlled non-zero stereo FM-1 emulator audio
+- [x] preserve M3c queue/late-binding telemetry under audio load
+- [x] record target image/RAM/pool and first audible WAV reference
+- [~] exact final documentation-head core + staged gate
+- [ ] squash-merge PR #7
 
-M4a starts with the persistent sustain only. Pluck/rhythm/Attractor transients are deliberately deferred until the sustain core is proven.
+First audible implementation head `839bc7b65695b7fa81a6336995537d374b8a3e1b` passed staged #126:
+- target image 75,700 B
+- RAM 35,464 B
+- pool 30,720 B
+- package SHA `eb11271d26bb56a60d1883aae5eedb1c76300596d0803fceed3a69ae9a5aec0d`
+- emulator peak 317, RMS L/R 101/100, stereo delta 63
+- raw PCM SHA `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- M3c queue 28/512, overflow 0, late flags 0, late trace `811c9dc5`
 
-Normative String DSP references:
+Normative references:
 - `docs/reference/STRING_TIMBRE_REFERENCE.md`
 - `docs/reference/STRING_DSP_CONTRACT.md`
+- `docs/reference/M4A_REFERENCE_AUDIO.md`
+
+M4a remains the persistent sustain only. The first reference audio is intentionally frozen before transient work.
+
+### Next String slice after M4a merge
+
+- [ ] Study-98 `classicStringNote()` transient engine
+- [ ] optional Gravity-root shadow
+- [ ] String Rhythm excitation/modes
+- [ ] Attractor excitation
+- [ ] preserve Study-126 transient teardown/pulse-isolation safety
 
 ### Remaining dry engines
 
-- [ ] String transient/rhythm/Attractor follow-up
 - [ ] Drift
 - [ ] Clock
 - [ ] Spiral
@@ -87,10 +93,13 @@ No shared Space during initial dry-engine work.
 
 ## Phase 5 - live structural behaviour / sounding-source integration
 
+- [ ] sample-exact state application to sounding sources
 - [ ] pending Gravity with sounding sources
 - [ ] Mother held edits with audio engine
 - [ ] Chain changes with audio/event engine
 - [ ] prove M3c last-moment Spiral/Bloom binding drives sounding voices unchanged
+
+Current M4a block boundary is explicit: structural changes may sound at most one 256-frame block late (~5.8 ms), never early.
 
 ## Phase 6 - shared Space / Cathedral
 
@@ -124,7 +133,8 @@ No shared Space during initial dry-engine work.
 
 ## Phase 11 - FM-1 optimisation
 
-- [ ] ISR timing under real DSP load
+- [ ] real ISR timing under DSP load
+- [ ] bit-identical reduction of proven-safe 64-bit String per-sample intermediates
 - [ ] RAM/pool/stack headroom
 - [ ] queue and voice-pool stress
 - [ ] UI redraw load
