@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * M3b instantiates the shared transport/runtime coordinator in the real FM-1
- * single translation unit. The audio ISR advances structural time only; DSP
- * remains intentionally deferred until Phase 3 timing semantics are proven.
+ * M4a keeps the proven M3c shared runtime and adds only the first dry source:
+ * persistent String sustain. No transient engines or shared Space are active.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
@@ -11,6 +10,7 @@
 #include "apsis_harmony.h"
 #include "apsis_gravity.h"
 #include "apsis_string.h"
+#include "apsis_string_dsp.h"
 #include "apsis_drift.h"
 #include "apsis_clock.h"
 #include "apsis_spiral.h"
@@ -24,6 +24,7 @@
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"
 #include "apsis_string.c"
+#include "apsis_string_dsp.c"
 #include "apsis_drift.c"
 #include "apsis_clock.c"
 #include "apsis_spiral.c"
@@ -36,15 +37,16 @@
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
+static ApsisStringDsp string_dsp;
 static ApsisBloomVoicingState bloom_voicing_state;
 static ApsisKeepBank keep_bank;
 static ApsisChainSequence chain_sequence;
 static ApsisMotherPending mother_pending;
 static ApsisRuntime apsis_runtime;
 static volatile uint8_t runtime_ready;
-/* Four-word target/emulator telemetry block. It is deliberately passive:
- * magic, live queue high-water, overflow flag, low 32 bits of sample cursor.
- * CI locates this symbol in the target ELF and reads it after emulator smoke. */
+/* Four-word base telemetry. ci/apply_apsis.sh extends this to the six-word
+ * M3c/M4 block in the generated target: magic, queue high-water, overflow,
+ * sample cursor, late flags and late trace hash. */
 static volatile uint32_t apsis_runtime_probe[4];
 
 enum {
@@ -64,11 +66,17 @@ static uint8_t surface = SURF_MOTHER;
 
 static void app_audio(int32_t *out, uint32_t n)
 {
-    (void)out;
-    /* Dinghy enables IRQs before app_main(), so the ISR can run while the
-     * static runtime is being initialized. runtime_ready stays zero until all
-     * state is initialized; the output buffer is already zeroed by Dinghy. */
+    /* Dinghy enables IRQs before app_main(), so the ISR can run while static
+     * state is being initialized. out is already zeroed and is stereo Q15.
+     *
+     * M4a deliberately renders from the state visible at block start, then
+     * advances M3c structural time for that block. A state change occurring
+     * inside a 256-frame callback can therefore sound at most one callback
+     * late, never early. Sample-exact structural-to-audio handoff is Phase 5. */
     if (runtime_ready) {
+        apsis_string_dsp_update(&string_dsp, &apsis, &string_pitch_memory,
+                                apsis_runtime.transport.running);
+        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);
         apsis_runtime_probe[0] = 0x41505349u; /* "APSI" */
@@ -185,7 +193,7 @@ static void draw_surface(void)
     draw_text_box(0, 49, 240, &FONT_S, surface_name(surface), RGB(174, 168, 157), 1);
     draw_primary_surface();
     draw_text_box(0, 169, 240, &FONT_S, "SOURCE-LOCKED NATIVE PORT", RGB(92, 89, 83), 1);
-    draw_text_box(0, 195, 240, &FONT_S, "M3 SILENT RUNTIME  v" APP_VER, RGB(92, 89, 83), 1);
+    draw_text_box(0, 195, 240, &FONT_S, "M4 STRING DRY CORE  v" APP_VER, RGB(92, 89, 83), 1);
 }
 
 static void leds(void)
@@ -227,6 +235,7 @@ static void app_main(void)
     apsis_runtime_probe[3] = 0u;
     apsis_state_default(&apsis);
     apsis_string_pitch_memory_reset(&string_pitch_memory);
+    apsis_string_dsp_reset(&string_dsp);
     apsis_bloom_voicing_reset(&bloom_voicing_state);
     apsis_keep_bank_reset(&keep_bank);
     apsis_chain_sequence_reset(&chain_sequence);
