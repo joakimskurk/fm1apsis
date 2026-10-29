@@ -89,6 +89,7 @@ typedef struct {
     uint32_t duration_samples;
     uint32_t decay_step_q16;
     uint32_t env_phase_q16;
+    uint32_t attack_step_q16;
     uint32_t serial;
     int32_t lowpass_q15;
     int32_t steal_gain_q15;
@@ -97,6 +98,7 @@ typedef struct {
     uint16_t mix_right_q15;
     uint16_t lowpass_alpha_q15;
     uint16_t attack_left_samples;
+    uint16_t body_hold_left_samples;
     uint16_t steal_left_samples;
     uint8_t waveform;
     uint8_t active;
@@ -148,6 +150,31 @@ uint8_t apsis_string_dsp_trigger_classic(ApsisStringTransientPool *pool,
                                          uint8_t pizz,
                                          uint16_t root_gain_q15);
 
+/* Same Study-98 partial primitive with an additional event-relative start
+ * offset. M4b2 uses this for the Study-126 Classic composite's +4 ms WIRE leg. */
+uint8_t apsis_string_dsp_trigger_classic_offset(ApsisStringTransientPool *pool,
+                                                const ApsisState *state,
+                                                uint32_t base_freq_millihz,
+                                                uint16_t level_q15,
+                                                uint32_t duration_ms,
+                                                int16_t pan_q15,
+                                                uint8_t pizz,
+                                                uint16_t root_gain_q15,
+                                                uint32_t start_offset_samples);
+
+/* Native Study-126 BODY/bowed voice. The oscillator identity is the same
+ * seven-harmonic BODY waveform already accepted for M4a sustain. The finite
+ * envelope uses source attack/release/brightness/pan inputs and no noise layer. */
+uint8_t apsis_string_dsp_trigger_body(ApsisStringTransientPool *pool,
+                                      const ApsisState *state,
+                                      uint32_t base_freq_millihz,
+                                      uint16_t level_q15,
+                                      uint32_t duration_ms,
+                                      int16_t pan_q15,
+                                      uint16_t brightness_q15,
+                                      uint32_t attack_ms,
+                                      uint32_t start_offset_samples);
+
 uint16_t apsis_string_dsp_transient_logical_active(const ApsisStringTransientPool *pool);
 uint16_t apsis_string_dsp_transient_physical_active(const ApsisStringTransientPool *pool);
 
@@ -160,8 +187,8 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
 /* Frozen M4a sustain renderer. */
 void apsis_string_dsp_render(ApsisStringDsp *dsp, int32_t *out, uint32_t frames);
 
-/* M4b1 finite transient renderer. It is intentionally separate until M4b2
- * connects real transport events. */
+/* M4b finite transient renderer: Study-98 Classic/pizz plus native Study-126
+ * BODY voices share one global 80+32 pool/steal ceiling. */
 void apsis_string_transient_render(ApsisStringTransientPool *pool, int32_t *out,
                                    uint32_t frames);
 
