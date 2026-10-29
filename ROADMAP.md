@@ -10,150 +10,94 @@ This is the short operational roadmap. Detailed parity-first phase descriptions 
 
 ## Phase 0 - reference freeze
 
-- [x] lock `apsis.html` hash/size/line landmarks
-- [x] behavioural map
-- [x] parity matrix
-- [x] port contract and UI mapping
-- [x] verify 2026-10-29 attached `index.html` is the same frozen source modulo LF/CRLF
+- [x] lock Study 126 behavioural source
+- [x] behavioural map / parity matrix / port contract
+- [x] verify attached current `index.html` is the same source modulo LF/CRLF
 - [x] lock Study 98 as String acoustic reference only
 
 ## Phase 1 - pinned FM-1 skeleton
 
-- [x] pin Dinghy baseline
-- [x] unchanged host baseline
-- [x] unchanged real target baseline
-- [x] APSIS product identity `FM-1_972`
-- [x] host overlay
-- [x] CI staged validation
-- [x] emulator smoke
+- [x] pinned Dinghy baseline and APSIS identity `FM-1_972`
+- [x] host / real target / emulator validation pipeline
 
 ## Phase 2 - pure musical/state core
 
-- [x] defaults/versioned state
-- [x] scales/tuning
-- [x] Gravity model/helpers
-- [x] String pitch model
-- [x] Drift model
-- [x] Clock model
-- [x] Spiral route/attractor model
-- [x] Bloom harmony/voice-leading
-- [x] KEEP
-- [x] CHAIN
-- [x] MOTHER
+- [x] defaults/state, tuning, Gravity, String, Drift, Clock, Spiral, Bloom, KEEP, CHAIN, MOTHER
 
-Merged through commit `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
+Merged through `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
-## Phase 3 - deterministic transport
+## Phase 3 - deterministic transport/runtime
 
 ### M3a - shared sample-referenced event grid
+- [x] implemented, target/emulator verified and merged
 
-- [x] audit central browser `tick()` and Gravity boundary rules
-- [x] correct native String timing-state representation gaps found by audit
-- [x] fixed-capacity event queue design
-- [x] long-running sample + Q32 fractional timeline design
-- [x] implement Clock pulse/swing/subdivision/event generation
-- [x] implement transport regression test source
-- [x] add transport to desktop Makefile test/sanitizer targets
-- [x] source/core regression passes in GitHub Actions
-- [x] ASAN/UBSAN passes in GitHub Actions
-- [x] add transport files to `ci/apply_apsis.sh`
-- [x] add transport to `overlay/dinghy.c` single translation unit
-- [x] run real JieLi target gate with transport compiled and record resource use
-- [x] run FM-1 emulator smoke with transport compiled
-- [x] finalize PR #4 and squash-merge
-
-Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`.
+Merged at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`.
 
 ### M3b - structural/runtime consumers
+- [x] implemented, target/emulator verified and merged
 
-- [x] establish M3b project/source reference documentation
-- [x] instantiate shared transport/event queue in FM-1 runtime
-- [x] add runtime coordinator regression tests
-- [x] Mother horizon + next-1 commit on shared timeline
-- [x] Mother blocked-dispatcher retry/recovery without losing pending state
-- [x] Chain pulse/cell transitions on shared timeline
-- [x] preserve browser Chain meter snapshot after start
-- [x] Gravity immediate vs quantized pending commit
-- [x] Spiral attractor progression and symbolic event scheduling
-- [x] Bloom occurrence and voice-plan scheduling
-- [x] preserve source-derived boundary/lead semantics without browser timer jitter
-- [x] integrate silent timeline driver into `app_audio()`
-- [x] remove target-incompatible live 64-bit division helpers while preserving Q32 timing
-- [x] measure live runtime RAM footprint
-- [x] measure host stress queue high-water: 14 / 256, no overflow
-- [x] measure emulator target-RAM live queue high-water: 7 / 256, no overflow
-- [x] full M3b target/emulator implementation gate
+Merged at `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
+
+### M3c - late binding and long deterministic trace
+- [x] exact Study-126 occurrence/bind contract
+- [x] Spiral/Bloom late binding and shared pre-target state observations
+- [x] one allocation-free shared scheduler, 512 entries proven by stress
+- [x] deterministic replay and 60 s max-swing capacity stress
+- [x] lifecycle parity
+- [x] core + ASAN/UBSAN
+- [x] real JieLi target
+- [x] FM-1 emulator
 - [x] final documentation-head gate
-- [x] squash-merge PR #5
+- [x] PR #6 squash-merged
 
-Merged to `main` at `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
-
-### M3c - late binding and long timing trace
-
-Active PR: #6, branch `m3c-late-binding`.
-
-- [x] audit exact Study 126 Spiral/Bloom late-bind state-observation points
-- [x] document occurrence-time vs bind-time frozen/re-read state contract
-- [x] encode source-derived regression expectations before implementation
-- [x] select/document native FM-1 late-bind lead profile
-- [x] implement Spiral final pitch resolution against current committed state/tuning
-- [x] preserve deliberate Spiral no-pending-projection behavior
-- [x] implement Bloom target-aware pending-Gravity projection
-- [x] freeze Bloom plan/register/random choice at occurrence
-- [x] implement independent per-petal late binding against current Gravity/tuning/depth
-- [x] preserve full frozen petal count across mid-unfurl DEPTH changes
-- [x] represent normal Gravity target−18 ms shared-state commit
-- [x] represent Mother target−26 ms shared-state commit
-- [x] represent Chain target−24 ms discrete apply while morph starts at target
-- [x] keep all M3c observations on one shared event heap; no per-module clocks
-- [x] restore Study 126 1.20 s planning lookahead
-- [x] correct Bloom unfurl native representation to 0..3600 ms
-- [x] correct long-running Spiral ordinal counter width
-- [x] match scheduler Stop/restart cancellation while preserving independent pending Gravity
-- [x] deterministic random/state-observation traceability
-- [x] canonical 30 s replay: queue 352/512, Spiral 59/64, Bloom 44/64, hashes locked
-- [x] prove 256-entry heap insufficient under legal M3c worst case
-- [x] raise shared heap to measured 512-entry capacity
-- [x] 60 s max-swing extreme burst: queue 357/512, Spiral 59/64, Bloom 44/64
-- [x] ASAN/UBSAN for normal, lifecycle and extreme runtime suites
-- [x] real JieLi target build on target-identical M3c firmware
-- [x] emulator boot/input/silent-audio/M3c telemetry on target-identical firmware
-- [x] target evidence: image 71,608 B; RAM 35,272 B; pool 30,720 B
-- [x] emulator evidence: live queue 28/512; late flags 0; WAV peak 0
-- [~] final documentation-head core + full staged validation
-- [ ] mark PR #6 ready and squash-merge
-
-Normative references:
-- `docs/reference/LATE_BINDING_CONTRACT.md`
-- `docs/reference/M3C_REFERENCE_TRACE.md`
-
-M3c remains intentionally silent. **Do not start Phase 4 DSP until PR #6 is merged and green.**
+Merged to `main` at `ec0dc0b350793572f19040efc938f00121128dc6`.
+Final pre-merge head `4fa7d25920523b9e5d8591ae6185e1b5f910c083` passed core #123 and staged #113.
 
 ## Phase 4 - five dry source engines
 
-Blocked by M3c merge.
+Active branch: `m4-string-dsp`, based directly on the M3c merge.
 
-- [ ] String — Study 98 acoustic target inside Study 126 behavioural contract
+### M4a - String persistent dry core
+
+- [x] lock Study-98 acoustic / Study-126 behavioural DSP contract
+- [~] pure fixed-point Foundation + Classic sustain renderer
+- [ ] source-derived target tests
+- [ ] smoothing / continuity / bounded-Q15 / long-render tests
+- [ ] ASAN/UBSAN
+- [ ] document native dry Dual strategy
+- [ ] integrate proven String DSP into FM-1 single translation unit
+- [ ] update emulator gate for controlled nonzero String audio
+- [ ] real JieLi target resource/timing measurement
+
+M4a starts with the persistent sustain only. Pluck/rhythm/Attractor transients are deliberately deferred until the sustain core is proven.
+
+Normative String DSP references:
+- `docs/reference/STRING_TIMBRE_REFERENCE.md`
+- `docs/reference/STRING_DSP_CONTRACT.md`
+
+### Remaining dry engines
+
+- [ ] String transient/rhythm/Attractor follow-up
 - [ ] Drift
 - [ ] Clock
 - [ ] Spiral
 - [ ] Bloom
 
-No shared Space yet. Initial Phase 4 work should start with one dry source at a time and preserve the now-locked Phase 3 event/state semantics.
+No shared Space during initial dry-engine work.
 
 ## Phase 5 - live structural behaviour / sounding-source integration
 
-- [ ] integrate pending Gravity with sounding sources
-- [ ] integrate Mother held structural edits with audio engine
-- [ ] integrate Chain changes with audio/event engine
-- [ ] prove last-moment Spiral/Bloom binding drives sounding voices without changing M3c timing
+- [ ] pending Gravity with sounding sources
+- [ ] Mother held edits with audio engine
+- [ ] Chain changes with audio/event engine
+- [ ] prove M3c last-moment Spiral/Bloom binding drives sounding voices unchanged
 
 ## Phase 6 - shared Space / Cathedral
 
 - [ ] prototype compact modulated FDN
 - [ ] prototype nested allpass/Schroeder candidate
 - [ ] compare diffusion/metallicity/decay/CPU/memory
-- [ ] implement one shared room with five per-source sends
+- [ ] one shared room with five per-source sends
 
 ## Phase 7 - persistent KEEP / CHAIN storage
 
@@ -163,47 +107,28 @@ No shared Space yet. Initial Phase 4 work should start with one dry source at a 
 - [ ] two-slot/journal recovery
 - [ ] power-loss/corruption tests
 
-## Phase 8 - native APSIS visual surfaces
+## Phase 8 - native visual surfaces
 
-- [ ] MOTHER
-- [ ] GRAVITY
-- [ ] STRING
-- [ ] CLOCK
-- [ ] SPIRAL
-- [ ] BLOOM
-- [ ] DRIFT/TUNING
-- [ ] CHAIN
-- [ ] KEEP
-- [ ] SPACE secondary page
+- [ ] MOTHER / GRAVITY / STRING / CLOCK / SPIRAL / BLOOM / DRIFT-TUNING / CHAIN / KEEP / SPACE
 
-## Phase 9 - physical FM-1 interaction parity
+## Phase 9 - physical interaction parity
 
-- [ ] Clock direct key grid
-- [ ] Gravity eight-point play
-- [ ] String key surface + encoder slide
-- [ ] Spiral route editing
-- [ ] Bloom petal/core/grow native gesture
-- [ ] KEEP / CHAIN / MOTHER physical mappings
+- [ ] direct FM-1 mappings for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER
 
 ## Phase 10 - String Motion and advanced interactive parity
 
-- [ ] arm on next Clock 1
-- [ ] 1/2/4/8-cycle capture
-- [ ] Classic/Dual and BODY/WIRE/BOTH ownership
-- [ ] frozen pitch context
-- [ ] overdub preservation
-- [ ] manual override
-- [ ] String/Spiral attractor editors
-- [ ] Gravity point editor
+- [ ] Clock-quantized capture
+- [ ] Classic/Dual ownership and frozen pitch context
+- [ ] overdub/manual override
+- [ ] String/Spiral attractor and Gravity point editors
 
 ## Phase 11 - FM-1 optimisation
 
-- [ ] ISR timing
+- [ ] ISR timing under real DSP load
 - [ ] RAM/pool/stack headroom
-- [ ] queue high-water under real DSP load
-- [ ] voice-pool stress
+- [ ] queue and voice-pool stress
 - [ ] UI redraw load
-- [ ] Cathedral resource tuning
+- [ ] Cathedral tuning
 
 ## Phase 12 - hardware validation/release
 
@@ -212,6 +137,6 @@ No shared Space yet. Initial Phase 4 work should start with one dry source at a 
 - [ ] controls/LEDs/display
 - [ ] worst-case audio stress
 - [ ] storage power interruption
-- [ ] exact release SHA-256
+- [ ] release SHA-256
 
 Physical hardware is not currently available, so no Phase 12 item is verified.
