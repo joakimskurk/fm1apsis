@@ -67,6 +67,16 @@ s = s.replace('M3b instantiates the shared transport/runtime coordinator',
               'M4b retains the M3c shared transport/runtime coordinator', 1)
 s = s.replace('static volatile uint32_t apsis_runtime_probe[4];',
               'static volatile uint32_t apsis_runtime_probe[6];', 1)
+
+# Reserve M4b transient BSS only after every M4a/M3c state object. This keeps
+# the persistent String struct at 196 bytes and avoids relocating the proven
+# runtime merely because finite voices need their own capacity.
+pool_anchor = 'static volatile uint32_t apsis_runtime_probe[6];'
+pool_decl = pool_anchor + '\nstatic ApsisStringTransientPool string_transient_pool;'
+if pool_anchor not in s:
+    raise SystemExit('FAIL: M4b transient pool declaration anchor missing')
+s = s.replace(pool_anchor, pool_decl, 1)
+
 probe_anchor = '        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;'
 probe_extra = probe_anchor + '\n        apsis_runtime_probe[4] = (uint32_t)apsis_runtime.late_slot_overflowed | ((uint32_t)apsis_runtime.scheduler_starved << 1);\n        apsis_runtime_probe[5] = apsis_runtime.late_trace_hash;'
 if probe_anchor not in s:
@@ -77,6 +87,16 @@ init_extra = init_anchor + '\n    apsis_runtime_probe[4] = 0u;\n    apsis_runtim
 if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
+
+# BSS is already zeroed by the platform. A single ordered volatile write after
+# runtime readiness keeps the not-yet-live pool in the target image without
+# changing the pre-ready initialization path or rendering it in app_audio().
+ready_anchor = '    runtime_ready = 1u;'
+ready_extra = ready_anchor + '\n    *(volatile uint32_t *)&string_transient_pool.transient_next_serial = 0u;'
+if ready_anchor not in s:
+    raise SystemExit('FAIL: M4b transient pool retention anchor missing')
+s = s.replace(ready_anchor, ready_extra, 1)
+
 p.write_text(s)
 PY
 
