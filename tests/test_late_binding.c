@@ -221,6 +221,37 @@ static void test_bloom_petals_reread_tuning_but_not_plan_register(void)
     assert(b.tuning_deviation_milli != a.tuning_deviation_milli);
 }
 
+static void test_bloom_depth_change_preserves_frozen_petal_count(void)
+{
+    ApsisState s;
+    ApsisBloomPlan plan = {0};
+    ApsisBloomLateBinding b;
+
+    apsis_state_default(&s);
+    s.gravity.tonic = 0u;
+    s.gravity.scale = APSIS_SCALE_DORIAN;
+    s.gravity.degree = 0u;
+    s.gravity.voicing = APSIS_GRAVITY_COLOUR;
+    s.bloom.depth = APSIS_BLOOM_DEPTH_TRIAD;
+    s.bloom.tuning_mode = APSIS_BLOOM_TUNING_EQUAL;
+
+    /* This represents a five-petal occurrence chosen before DEPTH changed to
+     * TRIAD. Study 126 keeps all five safePlan entries and reduces their tone
+     * ordinals modulo the current three-tone base chord. */
+    plan.count = 5u;
+    plan.tone[0] = 0u;
+    plan.tone[1] = 1u;
+    plan.tone[2] = 2u;
+    plan.tone[3] = 3u;
+    plan.tone[4] = 4u;
+    plan.octave[4] = 1;
+
+    assert(apsis_late_bloom_resolve(&s, &plan, 4u, 0, 5000u, 44100u, &b) == 1u);
+    assert(b.valid == 1u);
+    assert(b.voice_index == 4u); /* must not clamp/delete petals 3 and 4 */
+    assert(b.step == 15);       /* tone 4 -> 4 % 3 == 1, Dorian 3rd + octave */
+}
+
 int main(void)
 {
     test_source_lead_constants();
@@ -230,6 +261,7 @@ int main(void)
     test_spiral_has_no_pending_gravity_projection();
     test_bloom_petals_reread_target_harmony_with_frozen_plan();
     test_bloom_petals_reread_tuning_but_not_plan_register();
+    test_bloom_depth_change_preserves_frozen_petal_count();
     puts("PASS: APSIS Study 126 late-binding contract");
     return 0;
 }
