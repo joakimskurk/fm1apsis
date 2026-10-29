@@ -159,7 +159,7 @@ Physical FM-1: **not tested**.
 
 Branch: `m3b-runtime-consumers`.
 PR: #5.
-Final implementation/evidence head before documentation: `fa486917d6c9a328b7cf6f37147c2669d1ae966c`.
+Final implementation/evidence head before final documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`.
 
 Status: **implementation verified through emulator; merge pending final documentation-head checks**.
 
@@ -170,6 +170,7 @@ Implemented:
 - deterministic same-sample structural event consumption
 - Gravity immediate vs quantized pending commit
 - Mother horizon / next-1 commit on the shared timeline
+- Mother dispatcher failure preserves pending state and can recover on a later Clock-1 retry
 - Chain start/loop/cell/chance/transpose/morph runtime progression
 - Chain meter-length snapshot parity with browser `startChain()`
 - Spiral attractor progression and symbolic occurrence capture
@@ -185,6 +186,7 @@ Desktop/runtime coverage includes:
 - event consumption and same-sample priority
 - quantized Gravity invisibility before commit and visibility at commit
 - Mother commit before dependent Bloom observation
+- Mother blocked-dispatcher retry/recovery without losing pending state
 - Chain start sync, advance, loop and morph behaviour
 - frozen Chain meter length after start
 - Spiral symbolic occurrence progression
@@ -193,7 +195,7 @@ Desktop/runtime coverage includes:
 
 ### M3b desktop/sanitizer evidence
 
-GitHub Actions `APSIS core` run #76 on `fa486917d6c9a328b7cf6f37147c2669d1ae966c`:
+GitHub Actions `APSIS core` run #81 on `001d69a758369e2d14665ba2fd176c1fd116990b`:
 - all root regression suites: PASS
 - `tests/test_runtime.c`: PASS
 - host `sizeof(ApsisRuntime)`: 8,456 B
@@ -204,7 +206,7 @@ GitHub Actions `APSIS core` run #76 on `fa486917d6c9a328b7cf6f37147c2669d1ae966c
 
 ### M3b staged target/emulator evidence
 
-GitHub Actions `APSIS staged validation` run #66 on the same head:
+GitHub Actions `APSIS staged validation` run #71 on the same head:
 - source core and pinned upstream: PASS
 - unchanged Dinghy host and target: PASS
 - APSIS overlay and host shell: PASS
@@ -214,9 +216,9 @@ GitHub Actions `APSIS staged validation` run #66 on the same head:
 - development firmware artifact upload: PASS
 
 Target evidence:
-- app image: 66,384 B / 581,564 B
-- image delta vs M3a: **+9,704 B**
-- image headroom: 515,180 B
+- app image: 66,428 B / 581,564 B
+- image delta vs M3a: **+9,748 B**
+- image headroom: 515,136 B
 - RAM `.data + .bss`: 22,552 B / 98,304 B
 - RAM delta vs M3a: **+8,448 B**
 - RAM headroom: 75,752 B
@@ -226,7 +228,7 @@ Target evidence:
 - package: `apsis-0.1-dev.fwsc`
 - package bytes: 610,110 B
 - product: `FM-1_972`
-- package SHA-256: `819402c1105eceac1a6cbc7031bb2e2c6dabb8b82f444cfb3b6a80f29963f9dd`
+- package SHA-256: `16ff1f412649bfb392ddc7fbfabd03bb405d0a86fca96a0d37d0b60b4f19c819`
 
 Resource interpretation:
 - the +8,448 B target RAM delta closely matches the 8,456 B host runtime object; this is now a measurement of the **live** transport/runtime/heap footprint, unlike M3a's compile-only 0 B delta
