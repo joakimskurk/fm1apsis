@@ -38,6 +38,8 @@ M3c frozen runtime: 21,928 B; 512-event shared heap; no module-private clocks.
 
 ### M4a - String persistent dry core
 
+Merged to `main` as `2ea217f09c143d30385f136e84e2b29d582987a0` via PR #7.
+
 - [x] Study-98 Foundation + Classic sustain
 - [x] Study-126 Dual BODY/WIRE preservation
 - [x] fixed-point 44.1 kHz stereo Q15 renderer
@@ -45,106 +47,86 @@ M3c frozen runtime: 21,928 B; 512-event shared heap; no module-private clocks.
 - [x] target-safe single-TU build
 - [x] live `app_audio()` integration
 - [x] real JieLi target + FM-1 emulator audio
-- [x] preserve M3c telemetry under audio load
-- [x] squash-merge PR #7
 
-Merged to `main` as `2ea217f09c143d30385f136e84e2b29d582987a0`.
-
-Frozen M4a evidence:
-- Classic host peak/hash 1477 / `b20610c1`
-- Dual host L/R 823/787 / `10d23cf4`
-- raw PCM `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
-
-Normative references:
-- `docs/reference/STRING_TIMBRE_REFERENCE.md`
-- `docs/reference/STRING_DSP_CONTRACT.md`
-- `docs/reference/M4A_REFERENCE_AUDIO.md`
+Frozen host: Classic 1477 / `b20610c1`; Dual 823/787 / `10d23cf4`.
+Frozen PCM: `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`.
 
 ### M4b - String finite transients + shared Rhythm audio
+
+Merged to `main` as `c96c00debf9a67948f1e874e36b090999dacadb9` via PR #8.
 
 - [x] fixed 80 logical +32 fade-tail finite pool
 - [x] Study-98 normal/pizz harmonic primitive
 - [x] Study-126 BODY finite primitive and Classic composite
-- [x] shared `APSIS_EVENT_STRING_RHYTHM` consumption; no private scheduler
-- [x] freeze BOW/PIZZ/MOTION only; late-read pitch/surface/levels
+- [x] shared `APSIS_EVENT_STRING_RHYTHM`; no private scheduler
+- [x] late-read pitch/surface/levels with frozen planned mode
 - [x] callback-boundary proof: never early, <1 block late
-- [x] normal + ASAN/UBSAN
-- [x] real JieLi target + emulator regression
-- [x] squash-merge PR #8
+- [x] target/emulator regression
 
-Merged to `main` as `c96c00debf9a67948f1e874e36b090999dacadb9`.
-Final pre-merge documentation head `264a32e8…` passed core #174 + staged #163.
-
-Frozen M4b evidence:
-- transient peak/hash 1309 / `97142d3e`
-- BODY peak/hash 947 / `c1168570`
-- legal burst 80/112, 480 steals, 0 drops
-- Classic composite 80/108, 410 steals, 0 drops
-- target image 81,752 B; RAM 42,648 B; pool 30,720 B
-- default Rhythm OFF remains exact M4a PCM `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
-
-Normative reference:
-- `docs/reference/M4B_STRING_TRANSIENT_CONTRACT.md`
+Frozen finite refs: transient 1309 / `97142d3e`; BODY 947 / `c1168570`.
 
 ### M4c - String Attractor excitation
 
-Status: **implementation complete; PR #9 awaiting final documentation-head double gate**.
+Merged to `main` as `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc` via PR #9.
+Final pre-merge head `fe53bf265882369e2c8c1e38899e9cc655301dd6` passed core #202 + staged #191.
 
-Active branch: `m4c-string-attractor`, based directly on M4b merge `c96c00debf9a67948f1e874e36b090999dacadb9`.
-Validated implementation head: `e2171caac10eb402e97a6d566eff71a27544e3fc` — core #198 PASS, staged #187 PASS.
+- [x] seeded S&H planner with 0.5/1/2/4/8 rates
+- [x] LEFT/RIGHT/ALTERNATE/BOTH planning-time routing
+- [x] Attractor random order before Spiral/ghost
+- [x] shared target−45 ms bind event; no private queue
+- [x] 64 pending slots, six bind outputs; worst legal 60 s stress
+- [x] late-read pitch/levels/brightness/Foundation
+- [x] BODY/WIRE/Classic finite topology + right octave accent
+- [x] exact target-sample pool delay
+- [x] default OFF path bit-identical to M4b
+- [x] real JieLi target + emulator
+
+Frozen M4c stress: heap 415/512, pending 60/64, random `b7a9a395`, late `e777a771`.
+Frozen target: image 85,564 B; RAM 44,680 B; package `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`.
+
+### M4d - persistent Drift dry engine
+
+Status: **implementation complete; PR #10 awaiting final documentation-head double gate**.
+
+Active branch: `m4d-drift`, based directly on M4c merge `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`.
+Validated implementation head: `0b2a351b17adfa7556c217f24af8a08c1c708d2c` — core #210 PASS, staged #199 PASS.
 
 Normative reference:
-- `docs/reference/M4C_STRING_ATTRACTOR_CONTRACT.md`
+- `docs/reference/M4D_DRIFT_CONTRACT.md`
 
-#### M4c1 - state + shared silent planner
+- [x] source-resolve Study-126 missing persistent Drift wiring as an explicit parity disposition
+- [x] restore identity-bearing two-sine field around live tuned Gravity root
+- [x] source nonlinear 0.05..4.00 Hz delta law
+- [x] depth floor 0.15 + source-level scaling of separation
+- [x] `.013 * level` per-voice gain
+- [x] historical `STEREO WIDTH` law ±0.34×width with equal-power pan
+- [x] 25 ms pitch/gain/pan smoothing without low-gain integer shortcut
+- [x] separate fixed persistent DSP state; no event/queue/random changes
+- [x] deterministic host reference + normal/ASAN/UBSAN
+- [x] live JieLi target integration
+- [x] default Drift-on emulator reference
+- [x] CI-only Drift-DSP bypass proves exact M4c target/package/PCM/runtime
+- [ ] exact final documentation-head double gate and PR #10 squash-merge
 
-- [x] explicit LEFT/RIGHT/ALTERNATE/BOTH target state; default ALTERNATE
-- [x] source-seeded 16-cell-max S&H runtime
-- [x] exact reset/resync/lock/mutation semantics
-- [x] rates 0.5/1/2/4/8 on shared Phase-3 timeline
-- [x] Attractor random draws before Spiral/ghost
-- [x] FILTER-only advance; SUSTAIN no draw/event
-- [x] appended shared `STRING_ATTRACTOR_BIND` event
-- [x] external runtime preserves `sizeof(ApsisRuntime)=21,928 B`
-- [x] fixed pending/binding capacities from measured legal stress
-- [x] OFF/null path remains byte/hash-equivalent to frozen M3c/M4b
+Frozen host Drift reference: peak **488**, hash **`0aec6bc2`**.
 
-Frozen M4c1 stress evidence:
-- shared heap 415/512
-- pending sides 60/64
-- binding output max 6 in deliberate 512-frame stress; normal 256-frame startup <=4
-- advances/mutations/binds 1470 / 1470 / 2884
-- random trace `b7a9a395`; late trace `e777a771`
-- zero overflow/starvation
-- normal + ASAN/UBSAN agree
-
-#### M4c2 - target−45 ms late bind + finite excitation
-
-- [x] freeze planning-time surface/route/value/position/base level
-- [x] late-read sound/pitch/source-level/side-level/brightness/Foundation
-- [x] BODY 720 ms / -0.30 / 30 ms attack / no audible root shadow
-- [x] WIRE 420 ms / +0.30 / ×0.92 / Foundation root 0.05
-- [x] preserve actual Study-126 WIRE brightness behavior (unused `opts.brightness` does not alter pizz)
-- [x] Classic BODY + WIRE composite with +4 ms WIRE leg
-- [x] right `norm>0.52` octave sine accent, including Classic +10 ms total offset
-- [x] one shared 80+32 finite pool; no second audio pool
-- [x] full plan -> bind -> pool-delay target proof
-- [x] live target integration with frozen M4b default-path bypass until first Attractor activation
-- [x] real JieLi target + emulator regression
-
-Implementation-head evidence from core #198 / staged #187:
-- full-chain target 36,750; bind-block end 34,816; remaining exact delay 1,934 samples
-- target image 85,564 / 581,564 B
-- RAM 44,680 / 98,304 B
+Implementation-head default M4d target/emulator:
+- image 86,544 / 581,564 B
+- RAM 44,760 / 98,304 B
 - pool 30,720 / 344,064 B
-- package SHA `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`
-- emulator peak 317; RMS 101/100; stereo delta 63; mean -2/-2
-- M3c queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
-- default Attractor OFF raw PCM restored exactly to `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- package SHA `394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`
+- emulator peak 433; RMS 135/135; stereo delta 125; mean -3/-3
+- raw PCM `539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`
+- runtime queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Gate 5b bypass removes only `ApsisDriftDsp` while preserving all old Drift state/cross-couplings and the same target identity:
+- image 85,564 B; RAM 44,680 B; pool 30,720 B
+- package SHA exactly M4c `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`
+- PCM exactly M4c `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- runtime telemetry exactly frozen M4c.
 
 ### Remaining dry engines
 
-- [ ] Drift
 - [ ] Clock
 - [ ] Spiral
 - [ ] Bloom
@@ -213,8 +195,7 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-1. Finish M4c documentation-only final head (`ROADMAP.md`, `PROJECT_STATE.md`, `TESTING.md`, M4c contract).
-2. Gate that exact head with both `APSIS core` and `APSIS staged validation`.
-3. Update PR #9 metadata with exact final-head evidence without moving the head.
-4. Mark PR #9 ready and squash-merge with an expected-head SHA guard.
-5. Start the next dry source engine from the actual M4c merge commit; current roadmap order is Drift unless a later explicit decision changes it.
+1. Gate this exact M4d documentation-only final head with both `APSIS core` and `APSIS staged validation`.
+2. If both are green, update PR #10 metadata with the exact final-head evidence without moving the head.
+3. Mark PR #10 ready and squash-merge with an `expected_head_sha` guard.
+4. Start the Clock dry-engine slice from the actual M4d merge commit.

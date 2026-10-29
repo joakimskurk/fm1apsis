@@ -2,7 +2,7 @@ CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 SAN_CFLAGS ?= -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined
 INC = -Iapsis
-SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_string_transient_pool.c apsis/apsis_string_rhythm_audio.c apsis/apsis_string_attractor.c apsis/apsis_string_attractor_audio.c apsis/apsis_drift.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_transport.c apsis/apsis_late_binding.c apsis/apsis_runtime_m4c.c
+SRC = apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_string_transient_pool.c apsis/apsis_string_rhythm_audio.c apsis/apsis_string_attractor.c apsis/apsis_string_attractor_audio.c apsis/apsis_drift.c apsis/apsis_drift_dsp.c apsis/apsis_clock.c apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_transport.c apsis/apsis_late_binding.c apsis/apsis_runtime_m4c.c
 OBJ = $(patsubst apsis/%.c,build/%.o,$(SRC))
 SAN_OBJ = $(patsubst apsis/%.c,build/san_%.o,$(SRC))
 
@@ -56,6 +56,8 @@ build/test_string_attractor_audio: $(OBJ) tests/test_string_attractor_audio.c | 
 	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_string_attractor_audio.c -o $@
 build/test_string_attractor_live: $(OBJ) tests/test_string_attractor_live.c | build
 	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_string_attractor_live.c -o $@
+build/test_drift_dsp: $(OBJ) tests/test_drift_dsp.c | build
+	$(CC) $(CFLAGS) $(INC) $(OBJ) tests/test_drift_dsp.c -o $@
 
 build/san_apsis_core: $(SAN_OBJ) tests/test_apsis_core.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_apsis_core.c -o $@
@@ -95,8 +97,10 @@ build/san_string_attractor_audio: $(SAN_OBJ) tests/test_string_attractor_audio.c
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_string_attractor_audio.c -o $@
 build/san_string_attractor_live: $(SAN_OBJ) tests/test_string_attractor_live.c | build
 	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_string_attractor_live.c -o $@
+build/san_drift_dsp: $(SAN_OBJ) tests/test_drift_dsp.c | build
+	$(CC) $(SAN_CFLAGS) $(INC) $(SAN_OBJ) tests/test_drift_dsp.c -o $@
 
-test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mother build/test_transport build/test_runtime build/test_runtime_lifecycle build/test_runtime_extreme build/test_late_binding build/test_string_dsp build/test_string_transient build/test_m4a_audio_freeze build/test_string_rhythm_observer build/test_string_body_transient build/test_string_rhythm_audio build/test_string_rhythm_live build/test_string_attractor build/test_string_attractor_runtime build/test_string_attractor_audio build/test_string_attractor_live
+test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mother build/test_transport build/test_runtime build/test_runtime_lifecycle build/test_runtime_extreme build/test_late_binding build/test_string_dsp build/test_string_transient build/test_m4a_audio_freeze build/test_string_rhythm_observer build/test_string_body_transient build/test_string_rhythm_audio build/test_string_rhythm_live build/test_string_attractor build/test_string_attractor_runtime build/test_string_attractor_audio build/test_string_attractor_live build/test_drift_dsp
 	build/test_apsis_core
 	build/test_gravity_bloom
 	build/test_keep_chain_mother
@@ -116,8 +120,9 @@ test: build/test_apsis_core build/test_gravity_bloom build/test_keep_chain_mothe
 	build/test_string_attractor_runtime
 	build/test_string_attractor_audio
 	build/test_string_attractor_live
+	build/test_drift_dsp
 
-sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_mother build/san_transport build/san_runtime build/san_runtime_lifecycle build/san_runtime_extreme build/san_late_binding build/san_string_dsp build/san_string_transient build/san_m4a_audio_freeze build/san_string_rhythm_observer build/san_string_body_transient build/san_string_rhythm_audio build/san_string_rhythm_live build/san_string_attractor build/san_string_attractor_runtime build/san_string_attractor_audio build/san_string_attractor_live
+sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_mother build/san_transport build/san_runtime build/san_runtime_lifecycle build/san_runtime_extreme build/san_late_binding build/san_string_dsp build/san_string_transient build/san_m4a_audio_freeze build/san_string_rhythm_observer build/san_string_body_transient build/san_string_rhythm_audio build/san_string_rhythm_live build/san_string_attractor build/san_string_attractor_runtime build/san_string_attractor_audio build/san_string_attractor_live build/san_drift_dsp
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_apsis_core
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_gravity_bloom
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_keep_chain_mother
@@ -137,6 +142,7 @@ sanitize: build/san_apsis_core build/san_gravity_bloom build/san_keep_chain_moth
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_string_attractor_runtime
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_string_attractor_audio
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_string_attractor_live
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 build/san_drift_dsp
 
 clean:
 	rm -rf build

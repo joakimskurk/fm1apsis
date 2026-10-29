@@ -20,6 +20,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_string_attractor.h apsis/apsis_string_attractor.c \
    apsis/apsis_string_attractor_audio.h apsis/apsis_string_attractor_audio.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
+   apsis/apsis_drift_dsp.h apsis/apsis_drift_dsp.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
    apsis/apsis_bloom.h apsis/apsis_bloom.c \
@@ -34,8 +35,10 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
 
 python3 - <<'PY'
 from pathlib import Path
+import os
 p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
+drift_dsp_enabled = os.environ.get('APSIS_CI_DRIFT_DSP_OFF') != '1'
 
 # Older checked-in overlays did not yet include M4a. Keep the generator
 # backwards-safe, but never duplicate a .c include once the live M4a overlay
@@ -87,6 +90,21 @@ if '#include "apsis_string_attractor.c"' not in s:
     s = s.replace(ca_anchor,
                   ca_anchor + '\n#include "apsis_string_attractor.c"\n#include "apsis_string_attractor_audio.c"', 1)
 
+# M4d restores the identity-bearing persistent Drift pair as a separate dry
+# source. Gate 5b can deliberately omit only this new DSP layer while retaining
+# the exact M4c state/runtime path, proving the prior String PCM is untouched.
+if drift_dsp_enabled:
+    if '#include "apsis_drift_dsp.h"' not in s:
+        hd_anchor = '#include "apsis_drift.h"'
+        if hd_anchor not in s:
+            raise SystemExit('FAIL: M4d Drift header anchor missing')
+        s = s.replace(hd_anchor, hd_anchor + '\n#include "apsis_drift_dsp.h"', 1)
+    if '#include "apsis_drift_dsp.c"' not in s:
+        cd_anchor = '#include "apsis_drift.c"'
+        if cd_anchor not in s:
+            raise SystemExit('FAIL: M4d Drift source anchor missing')
+        s = s.replace(cd_anchor, cd_anchor + '\n#include "apsis_drift_dsp.c"', 1)
+
 # runtime_m4c.c includes the frozen M3c coordinator internally and appends only
 # the external Attractor-aware scheduler/process layer. Do not include
 # runtime_final.c separately or the lifecycle symbols would be duplicated.
@@ -96,9 +114,17 @@ if old not in s:
     raise SystemExit('FAIL: runtime include anchor missing from Dinghy overlay')
 s = s.replace(old, new, 1)
 s = s.replace('M3b instantiates the shared transport/runtime coordinator',
-              'M4c retains the M3c coordinator and adds String Attractor on the shared heap', 1)
+              'M4d retains the M4c shared coordinator and adds persistent Drift audio', 1)
 s = s.replace('static volatile uint32_t apsis_runtime_probe[4];',
               'static volatile uint32_t apsis_runtime_probe[6];', 1)
+
+# Keep persistent Drift state separate from frozen String/runtime layouts.
+if drift_dsp_enabled:
+    drift_state_anchor = 'static ApsisStringDsp string_dsp;'
+    if drift_state_anchor not in s:
+        raise SystemExit('FAIL: M4d Drift state declaration anchor missing')
+    s = s.replace(drift_state_anchor,
+                  drift_state_anchor + '\nstatic ApsisDriftDsp drift_dsp;', 1)
 
 # Keep all M4 finite state outside the frozen ApsisRuntime layout. The
 # transient pool is shared by Rhythm + Attractor; the Attractor runtime owns
@@ -111,20 +137,19 @@ if pool_anchor not in s:
     raise SystemExit('FAIL: M4c String state declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
-# Target callback ordering mirrors the validated M4c live host test once the
-# Attractor has actually been entered. Before first activation, however, the
-# external runtime is still BSS-zero (length==0) and FILTER mode is OFF, so use
-# the exact frozen M4b/M3c observer path. This avoids doing Attractor-only work
-# in the default target smoke and preserves the established PCM startup phase.
-# Once cells have been initialized, keep using the M4c consumer even if mode is
-# later turned OFF: already-planned target-45 ms bind events must still fire.
+# Shared M4c callback tail. Drift contributes no events and cannot perturb
+# random order, queue occupancy or late-binding traces.
 audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);'''
+drift_lines = '''        apsis_drift_dsp_update(&drift_dsp, &apsis,
+                               apsis_runtime.transport.running);
+''' if drift_dsp_enabled else ''
+drift_render = '        apsis_drift_dsp_render(&drift_dsp, out, n);\n' if drift_dsp_enabled else ''
 audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
         uint8_t attr_ix;
-        apsis_string_dsp_render(&string_dsp, out, n);
-        apsis_string_transient_render(&string_transient_pool, out, n);
+''' + drift_lines + '''        apsis_string_dsp_render(&string_dsp, out, n);
+''' + drift_render + '''        apsis_string_transient_render(&string_transient_pool, out, n);
         if (string_attractor_runtime.length ||
             apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
             apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
@@ -150,7 +175,7 @@ audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
                                                     &string_pitch_memory,
                                                     &rhythm_observation.event);'''
 if audio_old not in s:
-    raise SystemExit('FAIL: M4c live audio handoff anchor missing')
+    raise SystemExit('FAIL: M4d live audio handoff anchor missing')
 s = s.replace(audio_old, audio_new, 1)
 
 probe_anchor = '        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;'
@@ -164,16 +189,12 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# First boot needs no eager 2 kB Attractor memset: static BSS is already zero
-# and the first actual Attractor plan calls sync(), which deterministically
-# generates cells from the current seed before any S&H advance. Generic
-# stop/restart tests continue to use apsis_runtime_start_attractor().
+# First boot needs no eager Attractor or Drift memset: static BSS is already
+# zero. The first Drift audio update initializes pitch at target while gain
+# rises with the source 25 ms time constant.
 start_anchor = '    apsis_runtime_start(&apsis_runtime);'
 if start_anchor not in s:
     raise SystemExit('FAIL: runtime start anchor missing')
-
-# Both external String objects are live-referenced by app_audio(). Platform BSS
-# zeroing is sufficient before their first use.
 
 p.write_text(s)
 PY
@@ -182,4 +203,4 @@ python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
 ( cd work/apsis && APP_VER="$VERSION" bash tests/run_host.sh ) 2>&1 | tee build/evidence/apsis_host.log
 
-printf 'PASS: APSIS overlay + host shell\n'
+printf 'PASS: APSIS overlay + host shell%s\n' "${APSIS_CI_DRIFT_DSP_OFF:+ (Drift DSP bypass)}"
