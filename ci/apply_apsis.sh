@@ -111,13 +111,13 @@ if pool_anchor not in s:
     raise SystemExit('FAIL: M4c String state declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
-# Target callback ordering mirrors the validated M4c live host test:
-# 1) render sustain + finite voices already active at block start;
-# 2) advance the one shared timeline and collect Attractor bind callbacks;
-# 3) late-bind Attractor voices into the pool using the end-of-block cursor as
-#    the next render origin, so normal ~45 ms lead still reaches target exactly;
-# 4) bind the M4b Rhythm observation last, preserving its frozen next-callback
-#    (never-early) handoff policy.
+# Target callback ordering mirrors the validated M4c live host test once the
+# Attractor has actually been entered. Before first activation, however, the
+# external runtime is still BSS-zero (length==0) and FILTER mode is OFF, so use
+# the exact frozen M4b/M3c observer path. This avoids doing Attractor-only work
+# in the default target smoke and preserves the established PCM startup phase.
+# Once cells have been initialized, keep using the M4c consumer even if mode is
+# later turned OFF: already-planned target-45 ms bind events must still fire.
 audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);'''
@@ -125,12 +125,20 @@ audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
         uint8_t attr_ix;
         apsis_string_dsp_render(&string_dsp, out, n);
         apsis_string_transient_render(&string_transient_pool, out, n);
-        apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
-                                                 &keep_bank, &chain_sequence,
-                                                 &mother_pending,
-                                                 &bloom_voicing_state, n, 0, 0,
-                                                 &string_attractor_runtime,
-                                                 &rhythm_observation);
+        if (string_attractor_runtime.length ||
+            apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
+            apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
+                                                     &keep_bank, &chain_sequence,
+                                                     &mother_pending,
+                                                     &bloom_voicing_state, n, 0, 0,
+                                                     &string_attractor_runtime,
+                                                     &rhythm_observation);
+        } else {
+            apsis_runtime_process_observed(&apsis_runtime, &apsis, &keep_bank,
+                                           &chain_sequence, &mother_pending,
+                                           &bloom_voicing_state, n, 0, 0,
+                                           &rhythm_observation);
+        }
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string_attractor_trigger_binding(
                 &string_transient_pool, &apsis, &string_pitch_memory,
@@ -156,14 +164,16 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-start_old = '    apsis_runtime_start(&apsis_runtime);'
-start_new = '    apsis_runtime_start_attractor(&apsis_runtime, &apsis, &string_attractor_runtime);'
-if start_old not in s:
-    raise SystemExit('FAIL: M4c runtime start anchor missing')
-s = s.replace(start_old, start_new, 1)
+# First boot needs no eager 2 kB Attractor memset: static BSS is already zero
+# and the first actual Attractor plan calls sync(), which deterministically
+# generates cells from the current seed before any S&H advance. Generic
+# stop/restart tests continue to use apsis_runtime_start_attractor().
+start_anchor = '    apsis_runtime_start(&apsis_runtime);'
+if start_anchor not in s:
+    raise SystemExit('FAIL: runtime start anchor missing')
 
 # Both external String objects are live-referenced by app_audio(). Platform BSS
-# zeroing is sufficient before their explicit runtime/start initialization.
+# zeroing is sufficient before their first use.
 
 p.write_text(s)
 PY
