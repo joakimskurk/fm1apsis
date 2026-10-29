@@ -179,10 +179,6 @@ Shared Rhythm verification:
 - passive observer preserves 21,928-byte M3c runtime
 - first reference target 1147 becomes audible at 1280: 133 samples late, never early
 
-Validated implementation head `0749ac86e6162fab190f343730ebc9b133c13e47`:
-- core #170 PASS including `test_string_rhythm_live`
-- staged #159 PASS all five gates
-
 Target #159:
 - image 81,752 B
 - RAM 42,648 B
@@ -197,139 +193,176 @@ Default emulator:
 
 ## Phase 4 / M4c — String Attractor excitation
 
-Branch `m4c-string-attractor`; PR #9.
-Base: M4b merge `c96c00debf9a67948f1e874e36b090999dacadb9`.
-Validated implementation head: `e2171caac10eb402e97a6d566eff71a27544e3fc`.
+Merged as `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc` via PR #9.
+Final pre-merge head `fe53bf265882369e2c8c1e38899e9cc655301dd6`; final gates core #202 + staged #191 PASS.
 
-Status: **implementation verified through real target + emulator; merge pending exact final documentation-head gate**.
+Status: **verified through target + emulator and merged**.
 
 Normative reference:
 - `docs/reference/M4C_STRING_ATTRACTOR_CONTRACT.md`
 
-### M4c1 planner/runtime verification
-
-Verified source behavior:
+Verified planner/runtime behavior:
 - explicit LEFT/RIGHT/ALTERNATE/BOTH target, default ALTERNATE
 - deterministic local seeded LCG; no shared draw on reset
-- step-one resync resets cursor, not cells
-- legal 0.5/1/2/4/8 rates
-- 0.5 targets pulse + half-pulse on shared heap
+- legal 0.5/1/2/4/8 rates on the shared Phase-3 timeline
 - FILTER-only advances/mutates; SUSTAIN draws/schedules nothing
-- active RNG order Attractor -> Spiral -> ghost
-- inactive/default path consumes no new draw/event
+- active random order Attractor -> Spiral -> Clock ghost
 - planning freezes surface/route/value/position/gate/base level
-- `STRING_ATTRACTOR_BIND` appended to shared heap
+- `STRING_ATTRACTOR_BIND` is shared-heap, not a private scheduler
 - external Attractor runtime preserves `sizeof(ApsisRuntime)=21,928 B`
 
-Runtime lifecycle:
-- transport start can deterministically regenerate cells from seed
-- mid-run seed/length reset does not cancel already-planned binds
-- stop cancels pending Attractor binds
-- target implementation keeps BSS-zero lazy initialization until first actual Attractor activation so the default startup/audio path remains frozen M4b
-
 Worst legal 60-second shared-timeline stress:
-- 180 BPM, 1/4, max swing
-- rate 0.5, BOTH, all gates, maximal mutation load
-- concurrent Rhythm, Spiral rate4, Bloom and Clock
-- deliberate 512-frame blocks
-- queue **415/512**
-- pending sides **60/64**
-- completed-bind output bound **6**; normal 256-frame startup <=4
-- advances 1470
-- mutations 1470
-- binds 2884
+- shared heap 415/512
+- pending sides 60/64
+- completed-bind output bound 6 in deliberate 512-frame stress
+- advances/mutations/binds 1470 / 1470 / 2884
 - random `b7a9a395`
 - late `e777a771`
 - zero pending/binding/queue/Spiral/Bloom overflow/starvation
-- deterministic repeat matches; normal + ASAN/UBSAN agree
+- deterministic repeat; normal + ASAN/UBSAN agree
 
-### M4c2 acoustic/late-bind verification
-
-Verified planning-vs-bind contract:
-- route/value/position/base level stay frozen
-- String sound/pitch/source level/side level/actual consumed brightness/Foundation late-read at bind
-- mute at bind skips voice
-- live pitch/side-level edits before bind alter sounding voice
-- live surface/target edits do not reroute already-planned occurrence
-
-Audible topology tests:
-- left BODY: 720 ms, pan -0.30, attack 30 ms, current brightness−0.04, no audible root shadow
-- right WIRE: 420 ms, pan +0.30, ×0.92, Foundation root .05, current base String brightness
+Acoustic/late-bind verification:
+- left BODY: 720 ms, pan -0.30, attack 30 ms, no audible root shadow
+- right WIRE: 420 ms, pan +0.30, ×0.92, Foundation root .05
 - Classic: BODY ×.66 at target; WIRE ×.78 at +4 ms
-- right frozen `norm>.52`: sine 2×, input ×.15 before WIRE ×.92, +6 ms, 176.4 ms, pan +.216, 16 ms onset
-- Classic accent total offset +10 ms
+- right `norm>.52` octave accent preserved
 - all finite audio shares M4b's 80+32 pool
 
-`tests/test_string_attractor_audio.c` passes normal + sanitizer.
+Full shared-timeline handoff:
+- target 36,750
+- bind callback ends 34,816
+- remaining exact pool delay 1,934 samples
+- first voice-age sample is target sample itself
 
-Full shared-timeline handoff `tests/test_string_attractor_live.c`:
-- frozen target 36,750
-- bind callback consumed in block ending 34,816
-- remaining start delay 1,934 samples
-- voice age remains 0 until target
-- first age increment occurs on target sample
-- planned LEFT remains LEFT after live state changes to Classic/RIGHT while pitch/level are late-read
-- normal + ASAN/UBSAN pass
-
-### Implementation-head gates
-
-Core #198 on `e2171caac10eb402e97a6d566eff71a27544e3fc`:
-- PASS normal suite
-- PASS ASAN/UBSAN
-- all frozen M3/M4a/M4b references unchanged
-
-Staged #187 on the same head:
-- Gate 1 source/core PASS
-- Gate 2 unchanged Dinghy host/target PASS
-- Gate 3 APSIS overlay/host PASS
-- Gate 4 real JieLi target/package PASS
-- Gate 5 FM-1 emulator smoke PASS
-
-Target #187:
-- image **85,564 / 581,564 B**
-- RAM **44,680 / 98,304 B**
-- pool **30,720 / 344,064 B**
-- package bytes 610,110 B
+Final M4c target:
+- image 85,564 / 581,564 B
+- RAM 44,680 / 98,304 B
+- pool 30,720 / 344,064 B
 - package SHA `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`
 - product `FM-1_972`
 
-Default emulator #187:
+Final M4c emulator:
 - Attractor OFF
 - frames 124,928
 - peak 317
 - RMS L/R 101/100
 - stereo delta 63
 - mean L/R -2/-2
-- raw PCM **bit-identical** to frozen M4a/M4b:
-  `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- raw PCM `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`
+
+## Phase 4 / M4d — persistent dry Drift
+
+Branch `m4d-drift`; PR #10.
+Base: M4c merge `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`.
+Validated implementation head: `0b2a351b17adfa7556c217f24af8a08c1c708d2c`.
+
+Status: **implementation verified through real target + emulator; merge pending exact final documentation-head gate**.
+
+Normative reference:
+- `docs/reference/M4D_DRIFT_CONTRACT.md`
+
+### Source disposition
+
+Study 126 still defines the identity-bearing Drift field through `beatDelta()` / `beatPair()` and auditions it through `probeBeat()`, but the transport path no longer instantiates that pair as an independent persistent `beat` source. Existing Drift state is also cross-coupled into already-frozen String/Spiral behavior.
+
+The project port contract explicitly requires DRIFT as its own paired beating field around the Gravity root. M4d therefore repairs the missing persistent wiring while preserving the old cross-couplings for a separately scoped later decision.
+
+### Host DSP verification
+
+Native `ApsisDriftDsp`:
+- two persistent sine voices around the live tuned Gravity root
+- base delta `0.05 + 3.95 * amount^1.65` Hz
+- audible separation scales by `max(0.15, depth)` and source level
+- per-voice gain `.013 * level`
+- historical `STEREO WIDTH` law `-0.34*width / +0.34*width`
+- equal-power pan
+- 25 ms pitch/gain/pan smoothing
+- gain smoothing uses fractional internal precision
+- fixed 44.1 kHz stereo Q15, allocation-free and no target `libm`
+- no event, private queue, scheduler or RNG changes
+
+`tests/test_drift_dsp.c` proves the amount endpoints, default symmetric pair, mute/depth law, Equal/Just/Pythagorean carrier movement, tuning strength, width center/full behavior and deterministic 25 ms smoothing.
+
+Frozen 2-second default Drift reference:
+- peak **488 Q15**
+- hash **`0aec6bc2`**
+- normal + ASAN/UBSAN agree
+
+### Implementation-head gates
+
+Core #210 on `0b2a351b17adfa7556c217f24af8a08c1c708d2c`:
+- PASS normal suite
+- PASS ASAN/UBSAN
+- all frozen M3/M4a/M4b/M4c references unchanged
+
+Staged #199 on the same head:
+- Gate 1 source/core PASS
+- Gate 2 unchanged Dinghy host/target PASS
+- Gate 3 APSIS overlay/host PASS
+- Gate 4 real JieLi target/package PASS
+- Gate 5 default FM-1 emulator PASS
+- Gate 5b dedicated Drift-DSP bypass PASS
+
+Default M4d target:
+- image **86,544 / 581,564 B**
+- RAM **44,760 / 98,304 B**
+- pool **30,720 / 344,064 B**
+- package bytes 610,110 B
+- package SHA `394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`
+- product `FM-1_972`
+
+Cost versus M4c:
+- +980 B app image
+- +80 B RAM
+- +0 B pool
+
+Default Drift-on emulator:
+- frames 124,928
+- peak **433**
+- RMS L/R **135/135**
+- stereo delta **125**
+- mean L/R **-3/-3**
+- raw PCM **`539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`**
 - queue 28/512
 - overflow 0
 - late flags 0
 - cursor 123,648
 - late trace `811c9dc5`
 
-### Rejected PCM regression and fix
+The PCM change is expected because Drift is ON by default; the frozen scheduling/runtime telemetry remains unchanged.
 
-The first fully integrated M4c target head `592cf49409f0d76fc98263882f28d04a3cec9209` passed target/emulator structure but changed the default raw PCM hash while Attractor was OFF. Peak/RMS/stereo values were unchanged, but bit identity was lost, so that head was rejected.
+### Exact M4c bypass gate
 
-The accepted head `e2171caa…` keeps the external Attractor runtime BSS-zero and uses the exact frozen M4b observer/startup path until first actual Attractor activation. First active planning performs deterministic lazy cell sync. This restored the immutable PCM hash exactly; the baseline was not relaxed.
+Muting Drift state itself is not a clean isolation test because old String/Spiral code already consumes Drift state. Gate 5b instead rebuilds the same `0.1-dev` target with only `ApsisDriftDsp` omitted.
 
-### M4c verification interpretation
+Bypass target/emulator:
+- image **85,564 B**
+- RAM **44,680 B**
+- pool **30,720 B**
+- package SHA **`c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`**
+- raw PCM **`10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`**
+- peak 317; RMS 101/100; stereo delta 63; mean -2/-2
+- queue 28/512; overflow 0; late flags 0; late trace `811c9dc5`
+
+Both the package SHA and PCM SHA exactly equal the frozen final M4c references. This proves the M4d target delta is isolated to the new persistent Drift DSP layer.
+
+### M4d verification interpretation
 
 Verified through level 5:
-- planner/state semantics
-- shared scheduling/random order
-- capacity
-- late binding
-- target-delayed finite audio topology
-- single-TU JieLi target linkage/budgets
-- default emulator regression transparency
+- source-derived Drift identity/laws under the explicit wiring-defect disposition
+- fixed-point persistent DSP
+- smoothing and stereo law
+- target linkage/budgets
+- default Drift-on emulator audio
+- exact pre-M4d target/PCM preservation when the new Drift DSP layer is omitted
+- unchanged shared runtime telemetry
 
 Not verified:
 - physical FM-1 listening
 - hardware controls/UI
 - real ISR-cycle margin
-- audible dynamic String filter S&H path
+- shared Space/Cathedral
 
 Before merge, gate the exact final documentation head with both workflows. Do not create a later checkbox-only commit merely to record those final runs; record them in PR metadata and merge with an expected-head guard.
 
