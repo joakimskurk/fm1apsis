@@ -24,19 +24,20 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_transport.h apsis/apsis_transport.c \
    apsis/apsis_late_binding.h apsis/apsis_late_binding.c \
    apsis/apsis_runtime.h apsis/apsis_runtime.c apsis/apsis_runtime_m3c.c \
+   apsis/apsis_runtime_final.c \
    work/apsis/firmware/src/
 
 # The checked-in overlay remains the stable UI shell. M3c swaps only the
 # generated target translation-unit tail: late binding is compiled before the
-# coordinator, and the coordinator includes the validated M3b runtime as its
-# base implementation. No second runtime object or module clock is introduced.
+# final coordinator/lifecycle wrapper, which includes the validated M3b runtime
+# as its base implementation. No second runtime object or module clock exists.
 # The passive emulator probe is extended here as M3c-only validation telemetry.
 python3 - <<'PY'
 from pathlib import Path
 p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
 old = '#include "apsis_runtime.c"'
-new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_m3c.c"'
+new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_final.c"'
 if old not in s:
     raise SystemExit('FAIL: runtime include anchor missing from Dinghy overlay')
 s = s.replace(old, new, 1)
