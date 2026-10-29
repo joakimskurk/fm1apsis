@@ -4,7 +4,7 @@ Last updated: 2026-10-29
 
 ## Current milestone
 
-**Phase 3 / M3b - implementation complete and verified through emulator; final documentation-head merge gate is active.**
+**Phase 3 / M3c - late binding and long deterministic timing trace.**
 
 Phase 2 musical/state core is merged to `main` at `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
@@ -12,11 +12,15 @@ M3a deterministic transport is complete and squash-merged to `main` at:
 - merge commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
 - PR #4: `M3a: deterministic sample-referenced transport core`
 
-M3b work lives on:
-- branch `m3b-runtime-consumers`
+M3b structural/runtime consumers are complete and squash-merged to `main` at:
+- merge commit `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
 - PR #5: `M3b: structural runtime consumers`
-- base: merged M3a commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
-- final implementation/evidence head before documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`
+- final implementation/evidence head `001d69a758369e2d14665ba2fd176c1fd116990b`
+- final documentation head `6a8a182cbd0559cc2164c78bf956fbba7e0ee919`
+
+Active work now lives on:
+- branch `m3c-late-binding`
+- base: merged M3b commit `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
 
 ## Product invariant
 
@@ -100,10 +104,11 @@ Silent structural/runtime consumers:
 - target-safe Q32/runtime arithmetic without pi32v2 `__udivdi3`
 - live target-RAM queue telemetry in the emulator gate
 
-M3b final implementation/evidence head before documentation:
-- `001d69a758369e2d14665ba2fd176c1fd116990b`
-- `APSIS core` run #81: PASS, including ASAN/UBSAN
-- `APSIS staged validation` run #71: PASS through real target and emulator
+M3b final verification:
+- `APSIS core` #81 on implementation head: PASS, including ASAN/UBSAN
+- `APSIS staged validation` #71 on implementation head: PASS through real target and emulator
+- `APSIS core` #84 on final documentation head: PASS
+- `APSIS staged validation` #74 on final documentation head: PASS through real target and emulator
 
 M3b target evidence:
 - app image: 66,428 B / 581,564 B
@@ -146,40 +151,46 @@ Browser lead timers express late-binding intent, not timing jitter to reproduce 
 
 Native transport must preserve the musical boundary/state-observation semantics on one sample-referenced timeline.
 
-## M3b status
+## Current M3c goal
 
-All required M3b implementation work is complete and verified through emulator. The only remaining M3b work is repository hygiene around the final documentation commit(s):
-- rerun core and staged validation on the final documentation head;
-- confirm PR #5 still targets current `main` cleanly;
-- mark PR #5 ready;
-- squash-merge PR #5.
+M3c completes deterministic transport semantics before any DSP begins. It must turn the symbolic Spiral/Bloom occurrences created in M3b into explicit late-bind events that observe the correct latest committed Gravity/Tuning state at the same source-derived moments as Study 126.
 
-Do **not** begin M3c code until this merge gate is complete.
+Required work:
+- audit the exact Study 126 Spiral occurrence, late-pitch rebind and narrow/desktop lead behaviour;
+- audit the exact Study 126 Bloom occurrence and per-voice late-pitch binding behaviour;
+- define which state is frozen at occurrence time versus re-read at late-bind time;
+- encode those observations as source-derived regression expectations **before** implementation;
+- add explicit late-bind event/state representation without adding per-module clocks;
+- make random decisions traceable and deterministic across a long reference run;
+- extend queue stress/high-water validation for the new late-bind events;
+- produce a long deterministic timing/state trace;
+- run the complete core + sanitizer + real target + emulator gate.
 
-## Next milestone: M3c
+M3c remains allocation-free and intentionally silent. It must not start String, Drift, Clock, Spiral or Bloom DSP.
 
-M3c is the final deterministic-transport stage before DSP. Its scope is:
-- Spiral final pitch resolution against the latest committed Gravity/Tuning at the source-derived late-bind boundary;
-- Bloom per-petal final pitch resolution at the source-derived late-bind boundary;
-- make random decisions explicitly traceable/deterministic across the long reference trace;
-- extend queue stress/high-water validation for the added late-bind events;
-- create a long deterministic reference trace covering state observation/order over many cycles;
-- run the complete real target/emulator Phase 3 gate.
+## Current risks to prove
 
-M3c remains silent. Phase 4 DSP is blocked until M3c is complete and green.
+- Spiral must not freeze pitch/harmony too early if Study 126 re-reads committed state near trigger time;
+- Bloom occurrence state and each petal's final pitch may have different observation times;
+- same-sample Mother/Gravity commits must be visible to whichever late-bind event comes after them in source semantics;
+- late-bind events must not create unbounded queue growth;
+- deterministic random decisions must remain replayable without changing source probabilities/order;
+- `app_audio()` must remain silent through all M3c work.
 
 ## Exact next action
 
-1. Run `APSIS core` and the complete staged target/emulator validation on the final documentation head.
-2. Verify PR #5 is mergeable against current `main` and no new base commits require rebase/reconstruction.
-3. Mark PR #5 ready and squash-merge it with the verified HEAD lock.
-4. Create the M3c work branch from the resulting `main` merge commit.
-5. Before implementing M3c, audit Study 126's exact Spiral/Bloom late-binding state-observation points and encode those as regression expectations.
-6. Only then implement late binding and the long deterministic trace. Do not start DSP.
+1. Read the locked Study 126 source around the central `tick()` plus the Spiral and Bloom trigger/bind functions.
+2. Write down an explicit source-derived late-binding contract: occurrence time, bind time, what is frozen, what is re-read, and desktop/narrow timing differences.
+3. Add that contract to repo documentation and add regression expectations/tests that fail against the current M3b symbolic-only runtime.
+4. Only after the expectations exist, implement the smallest allocation-free M3c late-bind representation on the shared event heap.
+5. Keep `app_audio()` output silent.
+6. Run root tests + ASAN/UBSAN, then the complete real target/emulator gate.
+7. Record queue/resource deltas and long deterministic trace evidence before M3c can merge.
+8. Phase 4 DSP remains blocked until M3c is merged and green.
 
 ## Do not regress
 
-- Do not begin DSP during M3b/M3c.
+- Do not begin DSP during M3c.
 - Do not replace the shared scheduler with per-module clocks.
 - KEEP is partial musical memory, not a full preset.
 - CHAIN retains lane scopes/chance/transpose/morph/sync semantics.
