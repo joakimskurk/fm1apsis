@@ -1,26 +1,135 @@
 /* M4c String Attractor runtime layer.
  *
- * Keep the already-validated M3c/M4b coordinator physically unchanged. This
- * translation unit includes it under internal aliases, then exposes the frozen
- * public entry points unchanged plus an explicit Attractor-aware extension.
- * Only that extension changes planning order / shared-heap consumers.
+ * This repeats the tiny final M3c lifecycle/Rhythm wrapper while including the
+ * validated M3c coordinator itself unchanged. The original public
+ * apsis_runtime_process() therefore remains the exact M3c implementation; only
+ * explicit M4c entry points use the Attractor-aware schedule/consumer path.
  */
-#define apsis_runtime_start apsis_runtime_start_m4c_base
-#define apsis_runtime_stop apsis_runtime_stop_m4c_base
-#define apsis_runtime_process apsis_runtime_process_m4c_base
-#define apsis_runtime_process_observed apsis_runtime_process_observed_m4c_base
-#define m3c_schedule_next_pulse m3c_schedule_next_pulse_m4c_base
-#include "apsis_runtime_final.c"
-#undef m3c_schedule_next_pulse
-#undef apsis_runtime_process_observed
-#undef apsis_runtime_process
-#undef apsis_runtime_stop
+#define apsis_runtime_start apsis_runtime_start_m3c_base
+#define apsis_runtime_stop apsis_runtime_stop_m3c_base
+#include "apsis_runtime_m3c.c"
 #undef apsis_runtime_start
+#undef apsis_runtime_stop
 
 #define M4C_ATTRACTOR_BIND_LEAD_MS 45u
 #define M4C_ATTRACTOR_MAX_BINDS_PER_PULSE 4u
 #define M4C_PULSE_RESERVE (M3C_PULSE_RESERVE + M4C_ATTRACTOR_MAX_BINDS_PER_PULSE)
 
+/* Frozen final-M3c lifecycle helpers, kept byte-for-byte in behavior. */
+static void final_clear_late_slots(ApsisRuntime *r)
+{
+    uint8_t i;
+    if (!r) return;
+    for (i = 0u; i < APSIS_RUNTIME_SPIRAL_SLOTS; ++i)
+        runtime_zero(&r->spiral_slots[i], (uint32_t)sizeof(r->spiral_slots[i]));
+    for (i = 0u; i < APSIS_RUNTIME_BLOOM_SLOTS; ++i)
+        runtime_zero(&r->bloom_slots[i], (uint32_t)sizeof(r->bloom_slots[i]));
+}
+
+static void final_requeue_pending_gravity(ApsisRuntime *r)
+{
+    ApsisTransportEvent e;
+    uint64_t commit;
+    if (!r || !r->gravity_pending.active) return;
+    commit = m3c_sub_ms(r->gravity_pending.target_sample,
+                        r->transport.sample_rate,
+                        APSIS_RUNTIME_GRAVITY_COMMIT_LEAD_MS);
+    if (commit < r->cursor_sample) commit = r->cursor_sample;
+    e = m3c_event(APSIS_EVENT_GRAVITY_COMMIT, commit,
+                  r->gravity_pending.target_sample);
+    e.absolute_pulse = r->gravity_pending.token;
+    if (!m3c_queue_push(r, e)) r->late_slot_overflowed = 1u;
+}
+
+void apsis_runtime_start(ApsisRuntime *r)
+{
+    uint32_t rate;
+    if (!r || r->transport.running) return;
+    rate = r->transport.sample_rate ? r->transport.sample_rate
+                                    : APSIS_TRANSPORT_DEFAULT_RATE;
+    apsis_transport_reset(&r->transport, rate, r->cursor_sample);
+    apsis_event_queue_reset(&r->queue);
+    final_clear_late_slots(r);
+    r->spiral_attractor_pos = 0u;
+    r->spiral_step = 0u;
+    r->chain_morph_active = 0u;
+    r->scheduler_starved = 0u;
+    final_requeue_pending_gravity(r);
+    apsis_transport_start(&r->transport);
+}
+
+void apsis_runtime_stop(ApsisRuntime *r)
+{
+    if (!r || !r->transport.running) return;
+    apsis_transport_stop(&r->transport);
+    apsis_event_queue_reset(&r->queue);
+    final_clear_late_slots(r);
+    r->spiral_attractor_pos = 0u;
+    r->spiral_step = 0u;
+    r->last_spiral.valid = 0u;
+    r->last_spiral_bind.valid = 0u;
+    r->last_bloom_bind.valid = 0u;
+    r->chain_morph_active = 0u;
+    r->scheduler_starved = 0u;
+    final_requeue_pending_gravity(r);
+}
+
+static uint8_t final_due_string_rhythm(const ApsisRuntime *r, uint64_t end,
+                                       ApsisTransportEvent *out)
+{
+    uint16_t i;
+    uint8_t found = 0u;
+    if (!r || !out) return 0u;
+    for (i = 0u; i < r->queue.count; ++i) {
+        const ApsisTransportEvent *e = &r->queue.events[i];
+        if (e->type != APSIS_EVENT_STRING_RHYTHM || e->sample >= end) continue;
+        if (!found || m3c_event_before(e, out)) {
+            *out = *e;
+            found = 1u;
+        }
+    }
+    return found;
+}
+
+uint8_t apsis_runtime_process_observed(ApsisRuntime *r,
+                                      ApsisState *s,
+                                      ApsisKeepBank *bank,
+                                      ApsisChainSequence *chain,
+                                      ApsisMotherPending *mother_pending,
+                                      ApsisBloomVoicingState *bloom_voicing,
+                                      uint32_t frames,
+                                      ApsisRuntimeMotherApplyFn mother_apply,
+                                      void *mother_user,
+                                      ApsisRuntimeStringRhythmObservation *observation)
+{
+    ApsisTransportEvent due;
+    uint32_t before = 0u;
+    uint64_t end = 0u;
+    uint8_t have_due = 0u;
+
+    if (observation) runtime_zero(observation, (uint32_t)sizeof(*observation));
+    if (r && frames) {
+        before = r->event_count[APSIS_EVENT_STRING_RHYTHM];
+        end = r->cursor_sample + frames;
+        if (end < r->cursor_sample) end = ~(uint64_t)0;
+        have_due = final_due_string_rhythm(r, end, &due);
+    }
+
+    apsis_runtime_process(r, s, bank, chain, mother_pending, bloom_voicing,
+                          frames, mother_apply, mother_user);
+
+    if (r && have_due &&
+        r->event_count[APSIS_EVENT_STRING_RHYTHM] != before) {
+        if (observation) {
+            observation->valid = 1u;
+            observation->event = due;
+        }
+        return 1u;
+    }
+    return 0u;
+}
+
+/* M4c shared-heap extension. */
 static uint32_t m4c_attractor_random(void *user, uint32_t tag)
 {
     return m3c_random((ApsisRuntime *)user, tag);
@@ -132,23 +241,21 @@ static uint8_t m4c_schedule_next_pulse(ApsisRuntime *r, ApsisState *s,
     ApsisStringAttractorDecision attractor[2];
     uint64_t attractor_target[2];
     uint32_t first_serial, end_serial, ghost = 0u;
-    uint8_t added, attr_count, clock_step;
+    uint8_t added, attr_count, clock_step, current_step;
     if (!r || !s || !r->transport.running) return 0u;
 
-    /* A NULL/inactive/skipped Attractor context uses the frozen M3c function
-     * byte-for-byte, including queue reserve and random trace behavior. */
-    if (!a || !apsis_string_attractor_advances_for_pulse(s,
-            r->transport.cycle_pos < runtime_clock_n(s->clock.n)
-                ? r->transport.cycle_pos : 0u))
-        return m3c_schedule_next_pulse_m4c_base(r, s);
+    current_step = r->transport.cycle_pos < runtime_clock_n(s->clock.n)
+        ? r->transport.cycle_pos : 0u;
+    /* NULL/inactive/skipped pulses take the exact frozen M3c function. */
+    if (!a || !apsis_string_attractor_advances_for_pulse(s, current_step))
+        return m3c_schedule_next_pulse(r, s);
 
     if ((uint32_t)r->queue.count + M4C_PULSE_RESERVE > APSIS_TRANSPORT_QUEUE_CAP) {
         r->scheduler_starved = 1u;
         return 0u;
     }
 
-    /* Study 126 planning order: String Attractor first, then Spiral, then the
-     * occasional Clock ghost near the end of tick(). */
+    /* Study 126 order: String Attractor, Spiral, then Clock ghost. */
     m4c_attractor_targets(r, s, attractor_target, &clock_step);
     attr_count = apsis_string_attractor_plan_pulse(a, s, clock_step,
                                                     attractor_target,
@@ -168,44 +275,19 @@ static uint8_t m4c_schedule_next_pulse(ApsisRuntime *r, ApsisState *s,
     return added;
 }
 
-void apsis_runtime_start(ApsisRuntime *r)
-{
-    apsis_runtime_start_m4c_base(r);
-}
-
-void apsis_runtime_stop(ApsisRuntime *r)
-{
-    apsis_runtime_stop_m4c_base(r);
-}
-
 void apsis_runtime_start_attractor(ApsisRuntime *r,
                                    ApsisState *s,
                                    ApsisStringAttractorRuntime *a)
 {
     if (a) apsis_string_attractor_reset(a, s);
-    apsis_runtime_start_m4c_base(r);
+    apsis_runtime_start(r);
 }
 
 void apsis_runtime_stop_attractor(ApsisRuntime *r,
                                   ApsisStringAttractorRuntime *a)
 {
     if (a) apsis_string_attractor_stop(a);
-    apsis_runtime_stop_m4c_base(r);
-}
-
-void apsis_runtime_process(ApsisRuntime *r,
-                           ApsisState *s,
-                           ApsisKeepBank *bank,
-                           ApsisChainSequence *chain,
-                           ApsisMotherPending *mother_pending,
-                           ApsisBloomVoicingState *bloom_voicing,
-                           uint32_t frames,
-                           ApsisRuntimeMotherApplyFn mother_apply,
-                           void *mother_user)
-{
-    apsis_runtime_process_m4c_base(r, s, bank, chain, mother_pending,
-                                   bloom_voicing, frames, mother_apply,
-                                   mother_user);
+    apsis_runtime_stop(r);
 }
 
 void apsis_runtime_process_attractor(ApsisRuntime *r,
@@ -221,9 +303,8 @@ void apsis_runtime_process_attractor(ApsisRuntime *r,
 {
     uint64_t end, horizon, lookahead;
     if (!a) {
-        apsis_runtime_process_m4c_base(r, s, bank, chain, mother_pending,
-                                       bloom_voicing, frames, mother_apply,
-                                       mother_user);
+        apsis_runtime_process(r, s, bank, chain, mother_pending,
+                              bloom_voicing, frames, mother_apply, mother_user);
         return;
     }
     if (!r || !s || !frames) return;
@@ -287,23 +368,6 @@ void apsis_runtime_process_attractor(ApsisRuntime *r,
     runtime_apply_chain_morph(r, s, end);
     runtime_update_high_water(r);
     r->cursor_sample = end;
-}
-
-uint8_t apsis_runtime_process_observed(ApsisRuntime *r,
-                                      ApsisState *s,
-                                      ApsisKeepBank *bank,
-                                      ApsisChainSequence *chain,
-                                      ApsisMotherPending *mother_pending,
-                                      ApsisBloomVoicingState *bloom_voicing,
-                                      uint32_t frames,
-                                      ApsisRuntimeMotherApplyFn mother_apply,
-                                      void *mother_user,
-                                      ApsisRuntimeStringRhythmObservation *observation)
-{
-    return apsis_runtime_process_observed_m4c_base(r, s, bank, chain,
-                                                   mother_pending, bloom_voicing,
-                                                   frames, mother_apply,
-                                                   mother_user, observation);
 }
 
 uint8_t apsis_runtime_process_observed_attractor(
