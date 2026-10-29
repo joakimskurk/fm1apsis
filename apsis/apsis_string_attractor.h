@@ -6,10 +6,11 @@
 
 #define APSIS_STRING_ATTRACTOR_CELLS_MAX 16u
 #define APSIS_STRING_ATTRACTOR_DECISIONS_MAX 2u
-/* Provisional until the M4c1 shared-horizon stress gate measures the real
- * simultaneous planned-but-not-bound high-water. The final contract must lock
- * a measured value plus explicit safety margin, not this initial ceiling. */
-#define APSIS_STRING_ATTRACTOR_PENDING_CAP 80u
+/* M4c1 worst legal 1.20 s horizon measured 60 simultaneous planned-but-not-
+ * bound sides at 180 BPM, 1/4 division, max swing, rate 0.5, BOTH, all gates,
+ * full excitation and concurrent Spiral/Bloom/Clock stress. Lock 64 slots:
+ * measured high-water + four side-bind slots of deterministic margin. */
+#define APSIS_STRING_ATTRACTOR_PENDING_CAP 64u
 /* Legal worst case at callback startup: rate 0.5 + BOTH collapses pulse and
  * half-pulse target-45 ms binds onto sample zero (4 side binds). With the
  * deliberate 512-frame stress callback, the next short-swing pulse bind also
