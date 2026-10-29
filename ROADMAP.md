@@ -14,6 +14,8 @@ This is the short operational roadmap. Detailed parity-first phase descriptions 
 - [x] behavioural map
 - [x] parity matrix
 - [x] port contract and UI mapping
+- [x] verify 2026-10-29 attached `index.html` is the same frozen source modulo LF/CRLF
+- [x] lock Study 98 as String acoustic reference only
 
 ## Phase 1 - pinned FM-1 skeleton
 
@@ -58,20 +60,26 @@ Merged through commit `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 - [x] add transport to `overlay/dinghy.c` single translation unit
 - [x] run real JieLi target gate with transport compiled and record resource use
 - [x] run FM-1 emulator smoke with transport compiled
-- [~] finalize M3a PR #4 and merge
+- [x] finalize PR #4 and squash-merge
 
-Active branch: `m3-transport-core`. Target/emulator-verified implementation commit: `17b073e4174d7d27144d64a455e4080b5b777ea3`. See `PROJECT_STATE.md` for exact continuation.
+Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`. Final rebased PR head passed `APSIS core` #60 and staged validation #50 through emulator.
 
 ### M3b - structural/runtime consumers
 
+Active branch: `m3b-runtime-consumers`.
+
+- [~] establish M3b project/source reference documentation
 - [ ] instantiate shared transport/event queue in FM-1 runtime
+- [ ] add runtime coordinator regression tests
 - [ ] Mother horizon + next-1 commit on shared timeline
 - [ ] Chain pulse/cell transitions on shared timeline
 - [ ] Gravity immediate vs quantized pending commit
 - [ ] Spiral attractor progression and symbolic event scheduling
 - [ ] Bloom occurrence and voice-plan scheduling
 - [ ] preserve source-derived boundary/lead semantics without browser timer jitter
+- [ ] integrate silent timeline driver into `app_audio()`
 - [ ] measure live queue/runtime RAM and queue high-water
+- [ ] full M3b target/emulator gate
 
 ### M3c - late binding and long timing trace
 
@@ -84,13 +92,13 @@ Active branch: `m3-transport-core`. Target/emulator-verified implementation comm
 
 ## Phase 4 - five dry source engines
 
-- [ ] String
+- [ ] String — Study 98 acoustic target inside Study 126 behavioural contract
 - [ ] Drift
 - [ ] Clock
 - [ ] Spiral
 - [ ] Bloom
 
-No shared Space yet.
+No shared Space yet. Do not begin Phase 4 until M3b/M3c transport/runtime semantics are proven.
 
 ## Phase 5 - live structural behaviour / late binding integration
 
