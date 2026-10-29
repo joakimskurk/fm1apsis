@@ -4,187 +4,210 @@ Last updated: 2026-10-29
 
 ## Current milestone
 
-**Phase 3 / M3b - implementation complete and verified through emulator; final documentation-head merge gate is active.**
+**Phase 3 / M3c — late binding and deterministic timing trace. Implementation complete; final documentation-head merge gate pending.**
 
-Phase 2 musical/state core is merged to `main` at `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
+Merged foundation:
+- Phase 2 musical/state core: `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`
+- M3a deterministic transport: `fe2911c43fd69e63839220482e50bb10c7a2e4c2` via PR #4
+- M3b structural/runtime consumers: `a61a40dc83c9b52129f7d3f920da26a9a61837d9` via PR #5
 
-M3a deterministic transport is complete and squash-merged to `main` at:
-- merge commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
-- PR #4: `M3a: deterministic sample-referenced transport core`
+Active work:
+- branch: `m3c-late-binding`
+- PR: #6 `M3c: late binding and deterministic reference trace`
+- base: M3b merge `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
+- last code/test implementation head before status docs: `05ddbe2c4bed26b91d9d5701aa0965aa2bba90d2`
 
-M3b work lives on:
-- branch `m3b-runtime-consumers`
-- PR #5: `M3b: structural runtime consumers`
-- base: merged M3a commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
-- final implementation/evidence head before documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`
+Phase 4 DSP is still blocked until PR #6 is green on its final documentation head and merged.
 
-## Product invariant
+## Product/source invariant
 
-APSIS must remain a distinct instrument and as close to a 1:1 port of browser `apsis.html` as practical. Adapt physical interaction to FM-1, but do not simplify APSIS into a generic synth/groovebox or collapse identity-bearing systems.
+APSIS must remain a distinct parity-first instrument. Adapt physical interaction to FM-1, but do not collapse the source architecture into a generic synth/groovebox.
 
-Locked browser reference:
-- `apsis.html`
+Behavioural authority:
 - Study 126 · String Pulse Isolation
+- locked `apsis.html`
 - SHA-256 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
-- 606,747 bytes / 5,742 lines in the locked CRLF form
-- user-supplied `index.html` on 2026-10-29 is this exact source with LF line endings
-- see `docs/reference/SOURCE_LOCK.md` and `docs/reference/BEHAVIOR_MAP.md`
 
-String-specific acoustic reference:
-- attached `old_index.html`
+String acoustic reference for future Phase 4 only:
 - Study 98 · Performance Architecture
 - raw LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
-- acoustic/timbre authority for future String DSP only
-- current Study 126 remains the behavioural/state/timing/routing authority
-- see `docs/reference/STRING_TIMBRE_REFERENCE.md` and `DECISIONS.md`
+- never use Study 98 to roll back Study 126 state/timing/routing behavior
 
-Pinned FM-1 baseline:
+FM-1 baseline:
 - Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
 - tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`
-- APSIS product identity `FM-1_972`
+- product identity `FM-1_972`
 
-## What is complete
+## Completed through M3b
 
-### Phase 1
-Pinned Dinghy build skeleton, APSIS overlay/identity, host build, real JieLi target build, emulator smoke and CI validation pipeline.
+Phase 2 provides the pure shared musical/state graph: scales/tuning, Gravity, String pitch model, Drift, Clock, Spiral, Bloom, KEEP, CHAIN and MOTHER.
 
-### Phase 2
-Pure musical/state core:
-- versioned defaults/state
-- scales/tuning
-- Gravity point model and voicing helpers
-- String position/ratio/pitch model
-- Drift delta model
-- Clock structure/grouping and swing interval law
-- Spiral route/derived sequence and deterministic attractor state
-- Bloom harmony and voice-leading planner
-- KEEP partial musical-memory semantics
-- CHAIN cell/lane/morph semantics
-- MOTHER pending queue/horizon semantics
+M3a provides one sample-referenced shared transport with whole-sample + Q32 fractional time and the source-derived Clock/event grid.
 
-### Phase 3 / M3a
-Deterministic shared transport:
-- fixed-capacity 256-entry event min-heap
-- absolute transport time as 64-bit whole samples + Q32 fractional sample
-- BPM 35..180 and 1 / 1/2 / 1/4 division semantics
-- alternating source-derived swing law
-- 3..24 pulse Clock cycles
-- events for step-one resync, String filter clock, playhead, Mother, Clock main/accent, Spiral subdivisions, String rhythm, Bloom, snap, inner/between, ghost and Chain
-- Gravity cycle division normalization and future boundary prediction
-- deterministic injected ghost random value for tests
-- long-running sample-counter tests
-- transport compiled in the real FM-1 single translation unit
+M3b provides the allocation-free runtime coordinator, shared transport/heap instantiation in the real FM-1 single translation unit, Gravity/Mother/Chain structural progression, symbolic Spiral/Bloom occurrences and a silent `app_audio()` timeline driver.
 
-M3a final evidence:
-- final rebased PR head `cb0319185a483ff2972aae104da6b2a86c202add`
-- `APSIS core` #60: PASS
-- `APSIS staged validation` #50: PASS through real target and emulator
-- app image: 56,680 B
-- RAM `.data + .bss`: 14,104 B
-- pool: 30,720 B
-- package SHA-256 `6f2b4549eef194672d4a340e8b7cb33fe1c04befe564ad7da39d3275b8f96e94`
+M3b final target evidence:
+- image 66,428 B
+- RAM 22,552 B
+- pool 30,720 B
+- live emulator queue 7/256
+- WAV peak 0
 
-### Phase 3 / M3b
-Silent structural/runtime consumers:
-- dedicated allocation-free `apsis_runtime.[ch]` coordinator
-- live transport + 256-event heap instantiated in the real FM-1 overlay
-- `app_audio()` drives only the deterministic sample timeline and remains silent
-- Mother horizon / next-1 commit on the shared timeline
-- Mother blocked-dispatcher state preserves pending edits and recovers on a later Clock-1 retry
-- Chain start/loop/cell/chance/transpose/morph progression
-- browser-parity Chain meter snapshot at Chain start
-- Gravity immediate/quantized pending commit on the correct boundary
-- Spiral attractor progression and symbolic occurrence capture
-- Bloom occurrence and voicing-plan capture
-- deterministic same-sample ordering and deterministic random source
-- target-safe Q32/runtime arithmetic without pi32v2 `__udivdi3`
-- live target-RAM queue telemetry in the emulator gate
+## M3c source contract now implemented
 
-M3b final implementation/evidence head before documentation:
-- `001d69a758369e2d14665ba2fd176c1fd116990b`
-- `APSIS core` run #81: PASS, including ASAN/UBSAN
-- `APSIS staged validation` run #71: PASS through real target and emulator
+Normative audit: `docs/reference/LATE_BINDING_CONTRACT.md`.
 
-M3b target evidence:
-- app image: 66,428 B / 581,564 B
-- image delta vs M3a: +9,748 B
-- RAM `.data + .bss`: 22,552 B / 98,304 B
-- RAM delta vs M3a: +8,448 B
-- pool: 30,720 B / 344,064 B
-- pool delta vs M3a: 0 B
-- package bytes: 610,110 B
-- package SHA-256 `16ff1f412649bfb392ddc7fbfabd03bb405d0a86fca96a0d37d0b60b4f19c819`
+### Spiral
 
-M3b queue/runtime evidence:
-- host `sizeof(ApsisRuntime)`: 8,456 B
-- host stress queue high-water: 14 / 256, no overflow
-- emulator target-RAM live queue high-water: **7 / 256**
-- emulator target-RAM overflow flag: **0**
-- emulator runtime cursor: **123,648** low-32 sample value after smoke
-- emulator WAV peak: 0, required because M3b is intentionally silent
+Occurrence freezes musical identity such as route ordinal, trigger cell and energy. Final pitch is resolved later against the current derived sequence, current committed Gravity/frame, current register and current tuning.
 
-## Browser timing facts already audited
+Native FM-1 bind lead:
+- 80 ms before target
 
-Browser `tick()` schedules about 1.2 seconds ahead. Logical pulse order:
-1. optional step-one resync
-2. String Clock/filter event
-3. playhead / String Motion pulse
-4. Mother pulse / possible commit
-5. main Clock percussion
-6. Spiral subdivisions/events
-7. String rhythm
-8. Bloom occurrence
-9. snap / between / ghost
-10. counters advance
-11. Chain pulse / possible cell transition
+Study 126 narrow-browser 110 ms remains a source fact in tests, but is browser safety margin rather than native musical behavior.
 
-Browser lead timers express late-binding intent, not timing jitter to reproduce literally:
-- Spiral late pitch rebind ~80 ms desktop / 110 ms narrow UI
-- Bloom occurrence 45 ms; individual Bloom voice bind ~50/70 ms
-- Mother pulse 26 ms
-- Chain pulse 24 ms
+Important asymmetry:
+- Spiral **does not** project normal pending Gravity.
+- A Gravity change affects Spiral only if shared state has actually committed before the bind observation.
 
-Native transport must preserve the musical boundary/state-observation semantics on one sample-referenced timeline.
+### Bloom
 
-## M3b status
+Occurrence callback:
+- target − 45 ms
 
-All required M3b implementation work is complete and verified through emulator. The only remaining M3b work is repository hygiene around the final documentation commit(s):
-- rerun core and staged validation on the final documentation head;
-- confirm PR #5 still targets current `main` cleanly;
-- mark PR #5 ready;
-- squash-merge PR #5.
+Occurrence freezes the voicing plan, including register/octave offsets and random choice, plus occurrence timing/shape data.
 
-Do **not** begin M3c code until this merge gate is complete.
+Per-petal final observation:
+- nominal voice target − 50 ms on FM-1
+- causally clamped to `max(occurrence, voiceTarget − 50 ms)` because Study 126 cannot create petal timers before occurrence
 
-## Next milestone: M3c
+At every petal bind Bloom rereads target-aware Gravity and current tuning/depth while preserving every occurrence-frozen plan entry. If DEPTH changes mid-unfurl, a five-petal plan is not truncated; frozen tone ordinals are remapped modulo the new base-chord size as Study 126 does.
 
-M3c is the final deterministic-transport stage before DSP. Its scope is:
-- Spiral final pitch resolution against the latest committed Gravity/Tuning at the source-derived late-bind boundary;
-- Bloom per-petal final pitch resolution at the source-derived late-bind boundary;
-- make random decisions explicitly traceable/deterministic across the long reference trace;
-- extend queue stress/high-water validation for the added late-bind events;
-- create a long deterministic reference trace covering state observation/order over many cycles;
-- run the complete real target/emulator Phase 3 gate.
+Bloom ordinary pending Gravity projection:
+- only degree/ring may be projected
+- pending target must be at or before requested petal target plus Study 126's 0.5 ms tolerance
+- Mother-held state is never projected before Mother actually commits
 
-M3c remains silent. Phase 4 DSP is blocked until M3c is complete and green.
+### Shared-state pre-target observations
+
+Study 126 mutates the shared state graph in timer callbacks before the audio target. M3c therefore represents these as explicit events on the same heap:
+- normal quantized Gravity commit: target − 18 ms
+- Mother structural commit: Clock target − 26 ms
+- Chain discrete apply: Clock target − 24 ms
+- Chain continuous morph still begins at its target
+
+These are shared-timeline events, not additional clocks.
+
+## M3c implementation architecture
+
+M3c remains allocation-free and silent.
+
+Key files:
+- `apsis/apsis_late_binding.[ch]`
+- `apsis/apsis_runtime_m3c.c`
+- `apsis/apsis_runtime_final.c`
+- `tests/test_late_binding.c`
+- `tests/test_runtime.c`
+- `tests/test_runtime_lifecycle.c`
+- `tests/test_runtime_extreme.c`
+- `docs/reference/LATE_BINDING_CONTRACT.md`
+- `docs/reference/M3C_REFERENCE_TRACE.md`
+
+Architecture:
+- one shared min-heap; no per-module clocks
+- Study 126 ~1.20 s planning lookahead
+- 512 fixed heap entries
+- 64 fixed Spiral late-bind slots
+- 64 fixed Bloom occurrence/bind slots
+- Bloom petals are chained one at a time on the same heap, avoiding a multi-second full-petal queue explosion
+- `spiral_step` is 32-bit so routes with lengths not dividing 256 do not phase-jump after long runs
+- target-safe arithmetic avoids pi32v2-unavailable `__udivdi3`
+
+Lifecycle parity:
+- Stop cancels future scheduler/Spiral/Bloom/Chain/Mother shared-heap work and resets Spiral planning state
+- ordinary already-pending quantized Gravity remains independent, matching Study 126's separate `framePendingTimer`
+- restart begins a fresh shared transport at the current native sample cursor
+
+## Capacity and deterministic reference evidence
+
+The original 256-entry queue was not retained blindly: legal M3c worst-case stress set `scheduler_starved`. Capacity was raised to 512 from measured evidence.
+
+Canonical 30 s host replay, seed `0x31415926`:
+- `sizeof(ApsisRuntime)`: 21,928 B
+- queue high-water: **352/512**
+- Spiral slots: **59/64**
+- Bloom slots: **44/64**
+- queue overflow: 0
+- scheduler starvation: 0
+- late-slot overflow: 0
+- random trace: **`78771ff5`**
+- late-binding trace: **`0e6fc422`**
+- identical seed replay is identical; a different seed changes the trace
+
+60 s extreme burst with 180 BPM, 1/4 division, 35% swing, 4x Spiral, all gates, 4x Bloom and 3.6 s unfurl:
+- queue high-water: **357/512**
+- Spiral slots: **59/64**
+- Bloom slots: **44/64**
+- no queue/starvation/slot overflow
+- normal and ASAN/UBSAN both PASS
+
+## M3c real-target/emulator evidence already obtained
+
+A target-identical M3c implementation has passed the full staged gate. This evidence predates only documentation/extreme-test wiring; target firmware sources are unchanged by those host-only additions.
+
+Target:
+- app image: **71,608 B / 581,564 B**
+- RAM `.data + .bss`: **35,272 B / 98,304 B**
+- RAM headroom: **63,032 B**
+- pool: **30,720 B / 344,064 B**
+- pool headroom: **313,344 B**
+- package bytes: **610,110 B**
+- identity: `FM-1_972`
+- package SHA-256: `854f3fd315f1d489017cf1c9dfca2d8b59107281ba9deefd27d0067518fcf491`
+
+Emulator:
+- boot/input/M3c runtime contract: PASS
+- live queue high-water: **28/512**
+- queue overflow: **0**
+- late-bind/starvation flags: **0**
+- runtime cursor low 32 bits: **123,648**
+- late trace: **`811c9dc5`**
+- stereo WAV frames: 124,928
+- WAV peak: **0** as required for M3c
+
+Physical FM-1 remains **not tested**.
+
+## Verification status
+
+M3c currently has:
+- source contract: COMPLETE
+- implementation: COMPLETE
+- desktop regression: PASS
+- deterministic replay: PASS
+- extreme capacity stress: PASS
+- ASAN/UBSAN: PASS
+- real JieLi target build: PASS on target-identical implementation
+- FM-1 emulator: PASS on target-identical implementation
+- final documentation-head core/staged gate: PENDING
+- physical FM-1: NOT TESTED
 
 ## Exact next action
 
-1. Run `APSIS core` and the complete staged target/emulator validation on the final documentation head.
-2. Verify PR #5 is mergeable against current `main` and no new base commits require rebase/reconstruction.
-3. Mark PR #5 ready and squash-merge it with the verified HEAD lock.
-4. Create the M3c work branch from the resulting `main` merge commit.
-5. Before implementing M3c, audit Study 126's exact Spiral/Bloom late-binding state-observation points and encode those as regression expectations.
-6. Only then implement late binding and the long deterministic trace. Do not start DSP.
+1. Finish documentation/status updates on PR #6 without changing runtime behavior.
+2. Run `APSIS core` and full `APSIS staged validation` on that exact final documentation head.
+3. Confirm `main` has not moved/rebase if required.
+4. Compare PR #6 to `main` for unrelated files.
+5. If both final gates are green, mark PR #6 ready and squash-merge.
+6. Only then open Phase 4 / dry DSP work. First DSP priority remains String, using Study 98 as acoustic target inside the Study 126 behavioral contract.
 
 ## Do not regress
 
-- Do not begin DSP during M3b/M3c.
-- Do not replace the shared scheduler with per-module clocks.
-- KEEP is partial musical memory, not a full preset.
+- No DSP before M3c merge.
+- No per-module clocks.
+- KEEP remains partial musical memory, not a full preset.
 - CHAIN retains lane scopes/chance/transpose/morph/sync semantics.
-- Mother mixer/master remain live while `->1` holds structural edits.
-- Spiral and Bloom retain late binding against committed Gravity/Tuning.
-- `stepOneResync` is OFF by default.
-- Shared Cathedral/SPACE comes later as one shared room with per-source sends.
-- String future DSP uses Study 98 as an acoustic target only; Study 126 remains the current behavioural authority.
+- Mother mixer/master remain live while structural edits can be held.
+- Preserve the deliberate Spiral/Bloom pending-Gravity asymmetry.
+- `stepOneResync` remains OFF by default.
+- Shared Cathedral/SPACE remains a later one-room/five-send design.
+- Do not call physical hardware behavior verified without real FM-1 evidence.

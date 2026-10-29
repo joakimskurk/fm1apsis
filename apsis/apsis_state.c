@@ -135,8 +135,7 @@ void apsis_state_default(ApsisState *s)
     s->bloom.voicing_spread_q15 = APSIS_Q15_MILLI(480);
     s->bloom.length_ms = 1900u;
     s->bloom.attack_ms = 18u;
-    s->bloom.unfurl_q15 = APSIS_Q15_MILLI(420);
-    s->bloom.spread_q15 = APSIS_Q15_MILLI(420);
+    s->bloom.unfurl_ms = 420u;
     s->bloom.width_q15 = APSIS_Q15_MILLI(540);
     s->bloom.brightness_q15 = APSIS_Q15_MILLI(720);
     s->bloom.tuning_mode = APSIS_BLOOM_TUNING_FOLLOW;
