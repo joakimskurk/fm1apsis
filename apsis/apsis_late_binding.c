@@ -26,12 +26,30 @@ static uint8_t late_pc(int32_t step)
     return (uint8_t)pc;
 }
 
+static void late_sort_i16(int16_t *v, uint8_t n)
+{
+    uint8_t i;
+    for (i = 1u; i < n; ++i) {
+        int16_t x = v[i];
+        uint8_t j = i;
+        while (j && v[j - 1u] > x) {
+            v[j] = v[j - 1u];
+            --j;
+        }
+        v[j] = x;
+    }
+}
+
+/* The pi32v2 target does not provide __udivdi3. Split the conversion into a
+ * whole-kHz term plus a sub-kHz remainder so every division stays 32-bit. */
 static uint64_t late_ms_samples(uint32_t sample_rate, uint32_t ms)
 {
-    uint64_t product;
+    uint32_t whole_khz, rem_hz, rem_samples;
     if (!sample_rate) sample_rate = 44100u;
-    product = (uint64_t)sample_rate * ms;
-    return (product + 500u) / 1000u;
+    whole_khz = sample_rate / 1000u;
+    rem_hz = sample_rate % 1000u;
+    rem_samples = (rem_hz * ms + 500u) / 1000u;
+    return (uint64_t)whole_khz * ms + rem_samples;
 }
 
 static uint64_t late_sub_saturate(uint64_t sample, uint64_t delta)
@@ -78,6 +96,30 @@ static uint16_t late_bloom_tuning_strength(const ApsisState *s)
         ? (s->temper.strength_q15 > APSIS_Q15_ONE ? APSIS_Q15_ONE : s->temper.strength_q15)
         : APSIS_Q15_ONE;
     return late_q15_mul(base, amount);
+}
+
+/* Study 126 bloomPlanStepsFor() maps every occurrence-frozen plan entry onto
+ * the current base chord, reducing its tone ordinal modulo the current chord
+ * size, and only then sorts the complete result. A later DEPTH change may
+ * change the base chord size but must never delete already-planned petals. */
+static uint8_t late_bloom_frozen_plan_steps(const ApsisState *s,
+                                            const ApsisBloomHarmony *h,
+                                            const ApsisBloomPlan *plan,
+                                            int16_t out[APSIS_BLOOM_VOICES_MAX])
+{
+    int16_t base[APSIS_BLOOM_VOICES_MAX];
+    uint8_t base_n, count, i;
+    if (!s || !plan || !plan->count || !out) return 0u;
+    base_n = apsis_bloom_base_chord_steps(s, h, base);
+    if (!base_n) return 0u;
+    count = plan->count > APSIS_BLOOM_VOICES_MAX ? APSIS_BLOOM_VOICES_MAX : plan->count;
+    for (i = 0u; i < count; ++i) {
+        uint8_t tone = (uint8_t)(plan->tone[i] % base_n);
+        int8_t octave = plan->octave[i] < -5 ? -5 : (plan->octave[i] > 6 ? 6 : plan->octave[i]);
+        out[i] = (int16_t)(base[tone] + octave * 12);
+    }
+    late_sort_i16(out, count);
+    return count;
 }
 
 ApsisBloomHarmony apsis_late_bloom_harmony_at(const ApsisState *s,
@@ -147,7 +189,7 @@ uint8_t apsis_late_bloom_resolve(const ApsisState *s,
     if (!s || !frozen_plan || !frozen_plan->count) return 0u;
 
     h = apsis_late_bloom_harmony_at(s, pending, voice_target_sample, sample_rate);
-    n = apsis_bloom_plan_steps(s, &h, frozen_plan, steps);
+    n = late_bloom_frozen_plan_steps(s, &h, frozen_plan, steps);
     if (!n) return 0u;
     i = voice_index >= n ? (uint8_t)(n - 1u) : voice_index;
     mode = late_bloom_tuning_mode(s);
