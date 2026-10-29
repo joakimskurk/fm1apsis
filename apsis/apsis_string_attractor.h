@@ -10,7 +10,11 @@
  * simultaneous planned-but-not-bound high-water. The final contract must lock
  * a measured value plus explicit safety margin, not this initial ceiling. */
 #define APSIS_STRING_ATTRACTOR_PENDING_CAP 80u
-#define APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX 2u
+/* Legal worst case at callback startup: rate 0.5 + BOTH collapses pulse and
+ * half-pulse target-45 ms binds onto sample zero (4 side binds). With the
+ * deliberate 512-frame stress callback, the next short-swing pulse bind also
+ * lands in the same block (+2), so six is the derived callback-output bound. */
+#define APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX 6u
 
 #define APSIS_STRING_ATTRACTOR_ROUTE_LEFT    (1u << 0)
 #define APSIS_STRING_ATTRACTOR_ROUTE_RIGHT   (1u << 1)
@@ -57,9 +61,11 @@ typedef struct {
     uint32_t bind_stale_count;
     uint16_t pending_high_water;
     uint8_t pending_overflowed;
+    uint8_t binding_overflowed;
 
-    /* Per-process output. At legal Clock bounds at most one S&H target can
-     * reach bind time in a 256-frame block, but BOTH can yield two side binds. */
+    /* Per-process output. Normal 256-frame callbacks need at most four binds
+     * at startup; the six-entry bound also covers the explicit 512-frame M4c
+     * stress callback without conflating this output buffer with pending slots. */
     uint8_t binding_count;
     ApsisStringAttractorBinding binding[APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX];
 } ApsisStringAttractorRuntime;
