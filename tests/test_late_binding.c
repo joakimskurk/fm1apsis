@@ -33,9 +33,16 @@ static void test_bloom_target_projects_only_pending_degree_ring(void)
     pending.ring = APSIS_GRAVITY_AIR;
     pending.target_sample = 1000u;
 
-    h = apsis_late_bloom_harmony_at(&s, &pending, 999u, 44100u);
+    /* Study 126 uses p.at <= when + 0.0005. At 44.1 kHz the integer native
+     * tolerance is 22 samples: 23 samples early is not visible, 22 is. */
+    h = apsis_late_bloom_harmony_at(&s, &pending, 977u, 44100u);
     assert(h.tonic == 5u && h.scale == APSIS_SCALE_LYDIAN);
     assert(h.degree == 1u && h.voicing == APSIS_GRAVITY_ANCHOR);
+    assert(h.inversion == 2u && h.voices == 5u);
+
+    h = apsis_late_bloom_harmony_at(&s, &pending, 978u, 44100u);
+    assert(h.degree == 6u && h.voicing == APSIS_GRAVITY_AIR);
+    assert(h.tonic == 5u && h.scale == APSIS_SCALE_LYDIAN);
     assert(h.inversion == 2u && h.voices == 5u);
 
     h = apsis_late_bloom_harmony_at(&s, &pending, 1000u, 44100u);
@@ -43,7 +50,6 @@ static void test_bloom_target_projects_only_pending_degree_ring(void)
     assert(h.tonic == 5u && h.scale == APSIS_SCALE_LYDIAN);
     assert(h.inversion == 2u && h.voices == 5u);
 
-    /* Study 126 allows +0.5 ms target tolerance for framePending projection. */
     pending.target_sample = 1022u;
     h = apsis_late_bloom_harmony_at(&s, &pending, 1000u, 44100u);
     assert(h.degree == 6u && h.voicing == APSIS_GRAVITY_AIR);
