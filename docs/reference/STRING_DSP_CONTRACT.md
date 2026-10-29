@@ -5,8 +5,9 @@ This is the normative source contract for Phase 4 String DSP on FM-1.
 ## Authority hierarchy
 
 1. **Study 126 is behavioural authority.** State, Classic/Dual interaction, Gravity, String geometry, quantisation, transport, Motion/Attractor, routing and all later de-click/pulse-isolation fixes remain source truth.
-2. **Study 98 is the String acoustic authority only.** Its persistent Classic/Foundation architecture and `classicStringNote()` transient character are the timbral target requested for the native port.
-3. Native DSP may use a different low-cost realization where WebAudio primitives are inappropriate, but it may not change the musical/state contract.
+2. **Study 98 is the String acoustic authority where that acoustic feature exists in Study 98.** Its persistent Classic/Foundation architecture and `classicStringNote()` transient character are the preferred timbral target.
+3. **Features introduced after Study 98 use Study 126 as their acoustic authority.** Study 98 has no `surfaceMode`, independent left/right String coordinates or WIRE voice; therefore Dual BODY/WIRE cannot be copied from Study 98 and must retain the Study-126 acoustic roles.
+4. Native DSP may use a different low-cost realization where WebAudio primitives are inappropriate, but it may not change the musical/state contract.
 
 Locked identities are recorded in `SOURCE_LOCK.md` and `STRING_TIMBRE_REFERENCE.md`.
 
@@ -47,6 +48,36 @@ Before source level:
 
 This is the acoustic architecture intentionally preferred over Study 126 Classic's BODY+WIRE-at-one-pitch sustain redesign.
 
+## Dual sustain — source-resolved Study 126 strategy
+
+Study 98 predates Dual. It contains no `surfaceMode`, no independent `leftSplit`, and no WIRE voice. Native Dual therefore preserves the later Study-126 dry architecture rather than inventing a fake "old Dual".
+
+Foundation remains the preferred Study-98 Foundation pair above. On top of it, Dual has exactly two persistent side voices:
+
+### BODY / left side
+
+- frequency = current Study-126 left String frequency;
+- harmonic oscillator uses the Study-126 `stringWave` spectrum: real partial coefficients `[1, .31, .15, .085, .052, .030, .018]`, normalized;
+- gain before source level = `0.020 * leftLevel`;
+- pan = `-0.23`;
+- low-pass target = 1550 Hz, Q 0.38;
+- pitch smoothing follows String glide.
+
+### WIRE / right side
+
+- frequency = current Study-126 right String frequency;
+- triangle oscillator;
+- gain before source level = `0.0155 * rightLevel`;
+- pan = `+0.23`;
+- low-pass target = 3600 Hz, Q 0.48;
+- pitch smoothing is Study-126's faster WIRE rule: no slower than about 45 ms when the main String glide is longer.
+
+This keeps Dual's two independently pitched voices, side levels, anchors, Gravity-follow state and stereo identity intact. It does **not** change Classic back to the Study-126 BODY/WIRE layer; Classic remains the Study-98 sine/Drift pair above.
+
+The persistent voice ceiling therefore remains four oscillators in either mode:
+- two Foundation voices;
+- plus two Classic sine voices **or** one BODY + one WIRE.
+
 ## Study 98 transient DNA for later M4 String slices
 
 `classicStringNote()` is not part of the first M4a sustain implementation, but its contract is frozen now so later transient work cannot drift.
@@ -72,7 +103,7 @@ Optional root shadow:
 
 ## Study 126 constraints that override old engine mechanics
 
-The following remain mandatory even while targeting the older sound:
+The following remain mandatory even while targeting the older Classic sound:
 
 - default surface mode is Dual;
 - Classic is one perceived String/controller;
@@ -97,6 +128,7 @@ Implement and prove a pure allocation-free native DSP core with:
 
 - Study-98 Foundation pair;
 - Study-98 Classic sine/Drift pair;
+- Study-126 Dual BODY/WIRE pair;
 - Study-126 pitch/state as input;
 - Study-126 transport gate;
 - smoothed pitch and gain;
@@ -106,20 +138,20 @@ Implement and prove a pure allocation-free native DSP core with:
 - no `libm` dependency;
 - no target-unavailable 64-bit division helper.
 
-M4a may expose Dual state to the pure core for tests, but live target integration is not accepted until Dual has a defined native dry strategy. Do not silently reinterpret Study 126 Dual just to make M4a produce sound sooner.
-
 ## M4a test requirements before app_audio integration
 
-1. Source-derived target calculation for default Foundation and Classic voices.
+1. Source-derived target calculation for default Foundation, Classic and Dual voices.
 2. Foundation root uses `scaleAt(frameDegree())` and honours `foundationOctave`.
 3. Drift offsets are exactly `±0.55*d` for Foundation and `±0.5*d` for Classic.
-4. `foundation=false` removes only Foundation voices.
-5. `string.sound=false` or source level zero converges to silence without discontinuity.
-6. Transport stop converges smoothly to silence; restart ramps back without resetting musical state.
-7. String pitch changes glide rather than phase-reset/click.
-8. Rendered Q15 samples stay bounded and deterministic.
-9. Long render has no DC runaway/filter instability.
-10. Host normal + ASAN/UBSAN pass before target integration.
+4. Dual uses independent left/right native String targets, not a Classic centre-pitch shortcut.
+5. Dual BODY/WIRE gain, waveform, filter and pan roles match Study 126.
+6. `foundation=false` removes only Foundation voices.
+7. `string.sound=false` or source level zero converges to silence without discontinuity.
+8. Transport stop converges smoothly to silence; restart ramps back without resetting musical state.
+9. String pitch changes glide rather than phase-reset/click.
+10. Rendered Q15 samples stay bounded and deterministic.
+11. Long render has no DC runaway/filter instability.
+12. Host normal + ASAN/UBSAN pass before target integration.
 
 ## Deferred from M4a
 
@@ -127,9 +159,8 @@ M4a may expose Dual state to the pure core for tests, but live target integratio
 - String Rhythm transient modes;
 - Attractor excitation;
 - String bus dynamic filter modulation;
-- fully defined Dual timbral realization;
 - Cathedral/Space send;
-- final source-level/Mother audio routing integration;
+- final Mother/master routing integration;
 - physical-hardware listening judgement.
 
-The first audible FM-1 integration should happen only after the dry core passes the above tests and the Dual strategy is explicitly documented.
+The first audible FM-1 integration may begin only after the dry Classic **and** Dual sustain paths pass the above host/sanitizer contract.
