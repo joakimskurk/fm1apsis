@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define APSIS_STATE_VERSION 2u
+#define APSIS_STATE_VERSION 3u
 #define APSIS_SPIRAL_POINTS 36u
 #define APSIS_SPIRAL_ROUTE_MAX 30u
 #define APSIS_ATTRACTOR_STEPS 24u
@@ -181,8 +181,7 @@ typedef struct {
     uint16_t voicing_spread_q15;
     uint16_t length_ms;
     uint16_t attack_ms;
-    uint16_t unfurl_q15;
-    uint16_t spread_q15;
+    uint16_t unfurl_ms; /* Study 126 seconds 0..3.6 represented directly in ms. */
     uint16_t width_q15;
     uint16_t brightness_q15;
     uint8_t tuning_mode;
