@@ -1,6 +1,6 @@
 # M4B STRING TRANSIENT CONTRACT
 
-This document is the normative source/implementation contract for the next dry String slice after M4a.
+This document is the normative source/implementation contract for the finite dry String slice after M4a.
 
 M4a is merged to `main` as `2ea217f09c143d30385f136e84e2b29d582987a0`. Its persistent reference audio in `M4A_REFERENCE_AUDIO.md` is frozen and must remain bit-identical whenever no transient is active.
 
@@ -11,11 +11,11 @@ M4a is merged to `main` as `2ea217f09c143d30385f136e84e2b29d582987a0`. Its persi
 3. **Study 124/125/126 safety changes override older engine mechanics.** In particular, String onset is safer, audible voices are never hard-stopped during stealing, Clock pulses do not hard-step the global scene gain, and the removed broadband random-noise String exciter stays removed.
 4. Native FM-1 realization may replace WebAudio primitives with deterministic fixed-point DSP, but must not invent a private clock or silently change the musical topology.
 
-## M4b staging
+## M4b staging and disposition
 
 ### M4b1 — pure finite transient engine
 
-Build and prove the low-level source-derived transient primitive before connecting it to transport events:
+The low-level source-derived transient primitive was built and proven before live transport integration:
 
 - fixed-state / allocation-free transient voice pool;
 - Study-98 normal Classic partial stack;
@@ -26,21 +26,23 @@ Build and prove the low-level source-derived transient primitive before connecti
 - no `libm`, allocation or target-unavailable 64-bit division;
 - host normal + ASAN/UBSAN before live event integration.
 
-M4b1 does **not** yet make `APSIS_EVENT_STRING_RHYTHM` audible.
+M4b1 is complete. Its frozen reference is peak/hash 1309 / `97142d3e`; the proven pool is 80 logical + 32 fade-tail reserve = 112 physical slots.
 
 ### M4b2 — Study-126 performance topology on the shared timeline
 
-After M4b1 is proven:
+After M4b1 was green, M4b2 connected the existing shared event:
 
-- consume the existing `APSIS_EVENT_STRING_RHYTHM`; do not schedule a second String clock;
+- consume `APSIS_EVENT_STRING_RHYTHM`; do not schedule a second String clock;
 - preserve Study-126 Classic composite and Dual side ownership;
 - preserve Rhythm BOW/PIZZ/MOTION behaviour and side alternation where the current source defines it;
-- preserve source state observation at the event boundary;
+- freeze planned Rhythm mode in event metadata while late-reading current sound/pitch/surface/levels at audio bind;
 - prove M3c queue/hash/capacity semantics remain unchanged.
+
+M4b2 is complete. Validated implementation head `0749ac86e6162fab190f343730ebc9b133c13e47` passed core #170 and staged #159.
 
 ### Later gate — Attractor excitation
 
-String Attractor is intentionally separate because Study 126 late-binds/re-reads String pitch near the target. Do not fold that into M4b1 simply because the same transient primitive is reused.
+String Attractor remains intentionally separate because Study 126 late-binds/re-reads String pitch near the target. Do not fold that into M4b simply because the same transient primitive is reused.
 
 ## Source-exact `classicStringNote()` acoustic primitive
 
@@ -91,7 +93,7 @@ Study 98 `tone()` supplies the oscillator/filter/envelope mechanics:
 
 **Safety override from Study 124/126:** current Study 126 uses a **16 ms onset for String** instead of the older 10 ms generic onset. Native M4b uses the 16 ms String onset.
 
-The native fixed-point envelope does not need to reproduce WebAudio's internal exponential implementation bit-for-bit, but its source-derived reference vectors must preserve onset, end time, monotonic decay, bounded output and no discontinuity.
+The native fixed-point envelope does not need to reproduce WebAudio's internal exponential implementation bit-for-bit, but its source-derived reference vectors preserve onset, end time, monotonic decay, bounded output and no discontinuity.
 
 ## Gravity-root shadow
 
@@ -119,6 +121,8 @@ Current Study 126:
 - Classic calls one composite transient at the current right/Classic String frequency;
 - Dual calls the selected side at that side's current frequency and side level.
 
+Manual physical-control integration is not part of M4b; these facts remain source constraints for the later control layer.
+
 ### Classic composite
 
 Current Study 126 `stringCompositeTransient()`:
@@ -126,7 +130,7 @@ Current Study 126 `stringCompositeTransient()`:
 - left leg at `t`, level scale `0.66`;
 - right leg at `t + 4 ms`, level scale `0.78`.
 
-This composite topology is behavioural authority even though Study 98 predates it. M4b1 does not implement the full composite until the left/bowed acoustic mapping is explicitly source-resolved.
+This composite topology is behavioural authority even though Study 98 predates it. M4b2 implements it using the source-resolved native BODY role plus the Study-98-derived WIRE/pizz primitive.
 
 ### Dual side roles
 
@@ -139,19 +143,51 @@ Current Study 126 `stringSideTransient()`:
 
 The broadband random-noise bow exciter removed in Study 126 is **never** restored.
 
+Native M4b BODY uses the same seven-harmonic BODY identity already accepted for M4a Dual sustain, with the Study-126 finite envelope/brightness/pan role. Frozen host BODY reference is peak/hash 947 / `c1168570`.
+
 ### String Rhythm event
 
-The native Phase-3 transport already owns Rhythm timing.
+The native Phase-3 transport owns Rhythm timing.
 
-When String Rhythm is enabled and its trigger condition hits, transport emits exactly one `APSIS_EVENT_STRING_RHYTHM` at **Clock pulse +26 ms**, carrying the shared pulse/step metadata. M4b must consume this existing event; it must not create a String-private scheduler.
+When String Rhythm is enabled and its trigger condition hits, transport emits exactly one `APSIS_EVENT_STRING_RHYTHM` at **Clock pulse +26 ms**, carrying the shared pulse/step metadata. M4b consumes this existing event; it does not create a String-private scheduler.
 
 Study-126 topology at that event:
 
 - base level is `.052 * sourceLevel * rhythmLevel`;
-- Dual side alternates left/right by Clock step parity;
+- Dual side alternates left/right by pulse parity;
 - Classic currently uses the composite transient and returns regardless of BOW/PIZZ/MOTION mode;
 - Dual PIZZ and BOW call the selected side with their source-defined level scalars;
 - Dual MOTION uses the current Gravity chord note folded to the source range and the bowed-role path.
+
+Planning/bind observation contract:
+
+- Study 126 passes the Rhythm mode into `scheduleStringRhythmBound()` when the event is planned; native M4b stores that BOW/PIZZ/MOTION value in the event's otherwise-unused `sub_index`;
+- at consumption, native M4b re-reads current String sound/level, Classic/Dual surface, String pitch, side levels and brightness;
+- MOTION additionally reads the current Gravity chord at bind;
+- M3c owns event consumption; a passive observation wrapper publishes the due event without adding state to `ApsisRuntime`.
+
+## M4b callback-boundary timing policy
+
+M4b intentionally preserves the M4a callback boundary rather than introducing the larger Phase-5 sample-splitting architecture.
+
+Target audio order is:
+
+1. render persistent M4a String;
+2. render already-active finite M4b voices;
+3. advance the shared M3c timeline for the callback while observing a due Rhythm event;
+4. bind a consumed Rhythm event into the finite pool for the next callback.
+
+Therefore a new Rhythm voice can be at most one 256-frame block late and can never sound before its target sample.
+
+Deterministic full-chain proof:
+
+- first Rhythm target at 44.1 kHz is sample 1147;
+- callback 1024..1279 consumes it only after that callback's audio was rendered;
+- first legal audible callback starts at sample 1280;
+- delay is 133 samples, less than 256;
+- no early audio is possible under this ordering.
+
+Sample-exact structural/event-to-sounding-source application remains Phase 5.
 
 ## Attractor late observation facts
 
@@ -160,7 +196,8 @@ Current Study 126 does not simply freeze String pitch when Attractor decides to 
 - bind lead is 65 ms on narrow UI, 45 ms otherwise in the browser source;
 - at fire time it re-reads current String frequency and side level;
 - Classic routes to the composite transient; Dual routes to selected side(s);
-- actual WebAudio start is guarded to at least current time +8 ms.
+- actual WebAudio start is guarded to at least current time +8 ms;
+- right Attractor may add the short upper-octave accent when normalized energy exceeds 0.52.
 
 Native timing policy for Attractor must be specified/tested separately against the shared sample timeline before it becomes audible.
 
@@ -176,41 +213,53 @@ Study 124 is normative:
 - Study 125 removes pulse-wide scene-gain hard steps;
 - Study 126 keeps broadband String noise disabled.
 
-A fixed native pool cannot naively contain exactly 80 structs and immediately reuse a stolen slot: the browser removes the stolen voice from its tracking list while its 105 ms fade tail continues to exist. Therefore M4b must explicitly model a finite fade-tail reserve or another proven click-free equivalent.
+A fixed native pool cannot naively contain exactly 80 structs and immediately reuse a stolen slot: the browser removes the stolen voice from its tracking list while its 105 ms fade tail continues to exist.
 
-The physical pool capacity is **not guessed in this contract**. M4b1 must measure/stress a proposed capacity and prove deterministic behaviour under legal trigger bursts. If a safety reserve is exhausted, the fallback must remain bounded and must not hard-stop an audible voice.
+M4b resolves this with 80 logical slots plus 32 explicit physical fade-tail reserve slots, for 112 physical slots total. The legal 30 ms burst test reaches logical 80 / physical 112 with 480 steals and 0 drops. Realistic Classic-composite stress reaches 80 / 108 with 410 steals and 0 drops. Exhaustion remains bounded and never authorizes a hard stop of an audible voice.
 
 ## Native numeric requirements
 
 - sample rate 44.1 kHz;
 - stereo interleaved Q15 output;
 - partial start offsets are sample-referenced; 3 ms is converted deterministically to the nearest native sample;
-- fixed-point harmonic attenuation must be validated against source-derived floating reference vectors over legal brightness/resonance ranges;
+- fixed-point harmonic attenuation is validated against source-derived floating reference vectors over legal brightness/resonance ranges;
 - no dynamic allocation;
 - no `libm` on target;
 - no non-power-of-two 64-bit division helper on JieLi target;
 - all accumulators saturate/bound before writing Q15 output.
 
-## M4b1 acceptance before live event integration
+## M4b1 acceptance — completed
 
-1. M4a sustain hashes remain exactly `b20610c1` (Classic) and `10d23cf4` (Dual) when transient pool is idle.
-2. Normal 1..4 and pizz 1..3 harmonic identities, waveform roles and 3 ms staggering match source-derived vectors.
-3. Harmonic amplitude ratios track the Study-98 exponent law within a documented tight tolerance across low/default/high brightness.
-4. Per-partial durations match normal/pizz source formulas at sample resolution.
-5. String onset is 16 ms and no first-sample discontinuity is introduced.
-6. Triangle low-pass target follows `clamp(freq*2.35,1600,16000)`; sine partials do not receive that filter.
-7. Root-shadow octave folding and scale are correct for at least below/equal/above played-pitch cases.
-8. Pan topology matches fundamental vs upper-harmonic rule.
-9. Repeated triggers are deterministic and bounded.
-10. Pool stress proves click-free stealing/fade behaviour and exposes high-water/drop/steal telemetry.
-11. Long render has no DC runaway or overflow.
-12. Normal host + ASAN/UBSAN pass before transport/runtime integration.
+1. PASS — M4a sustain hashes remain exactly `b20610c1` (Classic) and `10d23cf4` (Dual) when transient pool is idle.
+2. PASS — normal 1..4 and pizz 1..3 harmonic identities, waveform roles and 3 ms staggering match source-derived vectors.
+3. PASS — harmonic amplitude ratios track the Study-98 exponent law within the documented tight interpolation tolerance.
+4. PASS — per-partial durations match normal/pizz source formulas at sample resolution.
+5. PASS — String onset is 16 ms and no first-sample discontinuity is introduced.
+6. PASS — triangle low-pass target follows `clamp(freq*2.35,1600,16000)`; sine partials bypass it.
+7. PASS — root-shadow octave folding and scale are covered across pitch relationships.
+8. PASS — pan topology matches fundamental vs upper-harmonic rule.
+9. PASS — repeated triggers are deterministic and bounded.
+10. PASS — pool stress proves bounded click-safe stealing and exposes high-water/drop/steal telemetry.
+11. PASS — long render has no DC runaway or overflow.
+12. PASS — normal host + ASAN/UBSAN passed before transport/runtime integration.
 
-## Deferred beyond M4b1
+## M4b final verification disposition
 
-- full Study-126 Classic composite left/bowed realization;
-- live `APSIS_EVENT_STRING_RHYTHM` consumption;
-- Attractor late-bound excitation;
+Validated implementation/test head: `0749ac86e6162fab190f343730ebc9b133c13e47`.
+
+- core #170: PASS including ASAN/UBSAN and full transport -> observer -> trigger -> render handoff;
+- staged #159: PASS through real JieLi target and FM-1 emulator;
+- target image 81,752 B / 581,564 B;
+- target RAM 42,648 B / 98,304 B;
+- target pool 30,720 B / 344,064 B;
+- package SHA `8abc090ffa51efe93b21b4f59f2a40a9ab70a6983a2c5720633baba26fa7163b`;
+- default Rhythm OFF keeps emulator PCM bit-identical to M4a: `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`;
+- M3c live telemetry remains queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`.
+
+## Deferred beyond M4b
+
+- String Attractor late-bound excitation and upper-octave accent;
 - dynamic String bus filter modulation;
+- manual physical-control trigger integration;
 - Cathedral/Space;
 - physical-hardware listening judgement and real ISR-cycle measurement.
