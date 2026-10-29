@@ -19,20 +19,22 @@ static uint32_t render_hash(ApsisState *s, uint32_t blocks)
 {
     ApsisStringPitchMemory memory;
     ApsisStringDsp dsp;
+    ApsisStringTransientPool pool;
     int32_t buf[512];
     uint32_t block, i, hash = 2166136261u;
     apsis_string_pitch_memory_reset(&memory);
     apsis_string_dsp_reset(&dsp);
+    apsis_string_transient_pool_reset(&pool);
     apsis_string_dsp_update(&dsp, s, &memory, 1u);
     for (block = 0u; block < blocks; ++block) {
         for (i = 0u; i < 512u; ++i) buf[i] = 0;
         apsis_string_dsp_render(&dsp, buf, 256u);
         /* M4b must be a mathematical no-op while no transient is active. */
-        apsis_string_transient_render(&dsp, buf, 256u);
+        apsis_string_transient_render(&pool, buf, 256u);
         for (i = 0u; i < 512u; ++i) hash = fnv(hash, buf[i]);
     }
-    CHECK(apsis_string_dsp_transient_physical_active(&dsp) == 0u);
-    CHECK(dsp.transient_trigger_count == 0u);
+    CHECK(apsis_string_dsp_transient_physical_active(&pool) == 0u);
+    CHECK(pool.transient_trigger_count == 0u);
     return hash;
 }
 
