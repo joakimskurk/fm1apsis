@@ -142,6 +142,45 @@ static void test_mother_horizon_and_ordered_gravity(void)
     assert(r.mother_apply_blocked == 0u);
 }
 
+static void test_mother_dispatcher_recovers_after_block(void)
+{
+    ApsisState s;
+    ApsisRuntime r;
+    ApsisKeepBank bank;
+    ApsisChainSequence chain;
+    ApsisMotherPending mother;
+    ApsisBloomVoicingState bloom;
+    uint32_t calls = 0u;
+    uint16_t before;
+    const uint64_t next_clock_one = 220500u;
+
+    init_all(&s, &r, &bank, &chain, &mother, &bloom);
+    before = s.drift.amount_q15;
+    apsis_mother_set_sync(&s.mother, &mother, 1u);
+    apsis_mother_set_horizon(&s.mother, &mother, 1u, -1);
+    assert(apsis_mother_queue_param(&mother, 10u, APSIS_Q15_MILLI(777), -1) == 1u);
+    apsis_runtime_start(&r);
+
+    /* First due commit has no dispatcher. It must preserve pending state and
+     * report the block rather than partially committing or clearing Mother. */
+    apsis_runtime_process(&r, &s, &bank, &chain, &mother, &bloom, 256u, 0, 0);
+    assert(r.mother_apply_blocked == 1u);
+    assert(apsis_mother_pending_count(&mother) == 1u);
+    assert(s.mother.sync == 1u);
+    assert(s.drift.amount_q15 == before);
+
+    /* The next Clock 1 is allowed to retry with a valid dispatcher. A stale
+     * diagnostic flag must not permanently poison this later commit. */
+    process_to(&r, &s, &bank, &chain, &mother, &bloom, next_clock_one);
+    apsis_runtime_process(&r, &s, &bank, &chain, &mother, &bloom, 1u,
+                          mother_apply_test, &calls);
+    assert(calls == 1u);
+    assert(r.mother_apply_blocked == 0u);
+    assert(s.drift.amount_q15 == APSIS_Q15_MILLI(777));
+    assert(apsis_mother_pending_count(&mother) == 0u);
+    assert(s.mother.sync == 0u);
+}
+
 static void test_mother_gravity_owns_runtime_request(void)
 {
     ApsisState s;
@@ -370,6 +409,7 @@ int main(void)
     test_step_one_resync_precedes_spiral();
     test_gravity_quantized_boundary();
     test_mother_horizon_and_ordered_gravity();
+    test_mother_dispatcher_recovers_after_block();
     test_mother_gravity_owns_runtime_request();
     test_chain_start_advance_and_morph();
     test_chain_freezes_meter_length();
