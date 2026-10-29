@@ -111,3 +111,22 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 **Decision:** Distinguish implemented, desktop-tested, sanitizer-tested, target-built, emulator-tested and physical-hardware-tested.
 
 **Why:** A successful build is not equivalent to hardware validation. Physical FM-1 hardware is not currently available.
+
+## 2026-10-29 - Attached `index.html` is the existing frozen source
+
+**Decision:** The attached Study 126 `index.html` does not create a new source revision. Its raw LF form is 601,005 bytes with SHA-256 `c5b16e6d137809163255bfa8ffb741eaa433a3703baff05fdbb40040563039bf`; normalizing LF to CRLF reproduces exactly the frozen 606,747-byte source and SHA-256 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`.
+
+**Why:** The apparent byte/hash difference is line-ending-only. Behavioural authority therefore remains the existing source lock with no parity relock.
+
+## 2026-10-29 - Study 98 is the String acoustic reference, not the behavioural source
+
+**Decision:** Keep locked Study 126 as the authority for String state, performance interaction, timing, Gravity relationship, routing, Classic/Dual behaviour and all later safety/click fixes. Use attached `old_index.html` (Study 98, raw LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`) only as the acoustic/timbre target for String DSP.
+
+When Phase 4 String DSP begins, preserve the preferred old String DNA as closely as practical on FM-1:
+- the persistent low Gravity-root Foundation;
+- the CLASSIC sine/drift pair around the played String pitch;
+- the older overtone/pluck transient character.
+
+Do **not** use Study 98 to roll back newer APSIS behaviour. In particular retain Study 126 Classic/Dual interaction, current two-coordinate/Gravity semantics, shared source-bus/Cathedral-send role, and the Study 120/124/125/126 de-click, guard and pulse-isolation fixes. Do not restore the removed broadband random-noise bow exciter merely to imitate the old version.
+
+**Why:** The user explicitly prefers the old String sound, and source comparison shows that the later BODY/WIRE redesign materially changed the sound architecture. Treating Study 98 as a narrow acoustic reference lets the FM-1 port match the preferred timbre without corrupting the newer, locked musical model.

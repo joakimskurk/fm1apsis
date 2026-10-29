@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* APSIS for M-VAVE FM-1 — parity-first native shell.
  *
- * M3a adds the deterministic shared transport to the real FM-1 single
- * translation unit. Runtime consumers and DSP remain intentionally deferred.
+ * M3b instantiates the shared transport/runtime coordinator in the real FM-1
+ * single translation unit. The audio ISR advances structural time only; DSP
+ * remains intentionally deferred until Phase 3 timing semantics are proven.
  */
 #define APP_NAME "APSIS"
 #include "platform.c"
@@ -18,6 +19,7 @@
 #include "apsis_chain.h"
 #include "apsis_mother.h"
 #include "apsis_transport.h"
+#include "apsis_runtime.h"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"
@@ -30,6 +32,7 @@
 #include "apsis_chain.c"
 #include "apsis_mother.c"
 #include "apsis_transport.c"
+#include "apsis_runtime.c"
 
 static ApsisState apsis;
 static ApsisStringPitchMemory string_pitch_memory;
@@ -37,6 +40,12 @@ static ApsisBloomVoicingState bloom_voicing_state;
 static ApsisKeepBank keep_bank;
 static ApsisChainSequence chain_sequence;
 static ApsisMotherPending mother_pending;
+static ApsisRuntime apsis_runtime;
+static volatile uint8_t runtime_ready;
+/* Four-word target/emulator telemetry block. It is deliberately passive:
+ * magic, live queue high-water, overflow flag, low 32 bits of sample cursor.
+ * CI locates this symbol in the target ELF and reads it after emulator smoke. */
+static volatile uint32_t apsis_runtime_probe[4];
 
 enum {
     SURF_MOTHER = 0,
@@ -56,8 +65,17 @@ static uint8_t surface = SURF_MOTHER;
 static void app_audio(int32_t *out, uint32_t n)
 {
     (void)out;
-    (void)n;
-    /* Platform supplies an already-zeroed stereo buffer. M3a remains silent. */
+    /* Dinghy enables IRQs before app_main(), so the ISR can run while the
+     * static runtime is being initialized. runtime_ready stays zero until all
+     * state is initialized; the output buffer is already zeroed by Dinghy. */
+    if (runtime_ready) {
+        apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
+                              &mother_pending, &bloom_voicing_state, n, 0, 0);
+        apsis_runtime_probe[0] = 0x41505349u; /* "APSI" */
+        apsis_runtime_probe[1] = apsis_runtime.queue_high_water;
+        apsis_runtime_probe[2] = apsis_runtime.queue_overflowed;
+        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;
+    }
 }
 
 static const char *surface_name(uint8_t s)
@@ -167,7 +185,7 @@ static void draw_surface(void)
     draw_text_box(0, 49, 240, &FONT_S, surface_name(surface), RGB(174, 168, 157), 1);
     draw_primary_surface();
     draw_text_box(0, 169, 240, &FONT_S, "SOURCE-LOCKED NATIVE PORT", RGB(92, 89, 83), 1);
-    draw_text_box(0, 195, 240, &FONT_S, "M2 CORE MODEL  v" APP_VER, RGB(92, 89, 83), 1);
+    draw_text_box(0, 195, 240, &FONT_S, "M3 SILENT RUNTIME  v" APP_VER, RGB(92, 89, 83), 1);
 }
 
 static void leds(void)
@@ -202,12 +220,20 @@ static uint8_t surface_from_buttons(uint32_t b, uint8_t current)
 static void app_main(void)
 {
     uint8_t drawn = 255u;
+    runtime_ready = 0u;
+    apsis_runtime_probe[0] = 0x41505349u;
+    apsis_runtime_probe[1] = 0u;
+    apsis_runtime_probe[2] = 0u;
+    apsis_runtime_probe[3] = 0u;
     apsis_state_default(&apsis);
     apsis_string_pitch_memory_reset(&string_pitch_memory);
     apsis_bloom_voicing_reset(&bloom_voicing_state);
     apsis_keep_bank_reset(&keep_bank);
     apsis_chain_sequence_reset(&chain_sequence);
     apsis_mother_pending_reset(&mother_pending);
+    apsis_runtime_reset(&apsis_runtime, FS, 0u, 0x41505349u);
+    apsis_runtime_start(&apsis_runtime);
+    runtime_ready = 1u;
     lcd_fill(0, 0, 240, 240, C_BLACK);
 
     for (;;) {
