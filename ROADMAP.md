@@ -72,6 +72,7 @@ Active branch: `m3b-runtime-consumers`. PR #5. Implementation/evidence is green 
 - [x] instantiate shared transport/event queue in FM-1 runtime
 - [x] add runtime coordinator regression tests
 - [x] Mother horizon + next-1 commit on shared timeline
+- [x] Mother blocked-dispatcher retry/recovery without losing pending state
 - [x] Chain pulse/cell transitions on shared timeline
 - [x] preserve browser Chain meter snapshot after start
 - [x] Gravity immediate vs quantized pending commit
@@ -83,10 +84,10 @@ Active branch: `m3b-runtime-consumers`. PR #5. Implementation/evidence is green 
 - [x] measure live runtime RAM footprint
 - [x] measure host stress queue high-water: 14 / 256, no overflow
 - [x] measure emulator target-RAM live queue high-water: 7 / 256, no overflow
-- [x] full M3b target/emulator implementation gate (`APSIS core` #76, staged #66)
+- [x] full M3b target/emulator implementation gate (`APSIS core` #81, staged #71)
 - [~] final documentation-head checks, mark PR #5 ready, squash-merge
 
-Verified implementation/evidence head before documentation: `fa486917d6c9a328b7cf6f37147c2669d1ae966c`.
+Verified implementation/evidence head before final documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`.
 
 ### M3c - late binding and long timing trace
 
