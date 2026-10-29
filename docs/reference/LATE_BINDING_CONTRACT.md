@@ -115,11 +115,19 @@ It also does **not** inspect Mother's pending structural queue. Mother-held chan
 
 The plan is explicitly copied before each petal timer is scheduled. **Register is therefore frozen through the plan; it is not re-read at petal bind.**
 
-### 3.4 Per-petal pitch-bind lead
+### 3.4 Per-petal pitch-bind lead and occurrence causality
 
-Each Bloom petal is bound independently at its own `voiceAt`:
+Each Bloom petal requests a pitch-bind timer relative to its own `voiceAt`:
 - desktop (`innerWidth > 700`): voice target − **50 ms**
 - narrow browser (`innerWidth <= 700`): voice target − **70 ms**
+
+However, those per-petal timers are not created until `playBloom()` runs inside the Bloom occurrence callback at target −45 ms. `scheduleBloomBoundVoice()` uses `Math.max(0, ...)`, so a petal bind can never execute before the occurrence that created it.
+
+Therefore the deterministic native equivalent is:
+- `occurrenceSample = bloomTarget − 45 ms`
+- `petalBindSample = max(occurrenceSample, voiceTarget − nativePetalLead)`
+
+For the first petal, `voiceTarget == bloomTarget`. Under both browser lead profiles its nominal bind (−50 or −70 ms) lies before the −45 ms occurrence, so the first petal effectively observes state **at occurrence time**, approximately target −45 ms. Later petals can bind at their normal target-relative lead once their `voiceAt` is sufficiently later than the occurrence target.
 
 Because `voiceAt = occurrence target + phase × unfurl`, later petals can bind substantially later than the Bloom occurrence and can observe different state.
 
@@ -159,13 +167,11 @@ Both late-bind paths re-check whether their source is on when the bind callback 
 
 The source has two browser safety-lead profiles because the browser main thread uses `innerWidth` as a proxy for the narrow/mobile environment. FM-1 has no browser viewport and no main-thread timer jitter.
 
-M3c tests must encode **both source values** so the browser contract is not lost. The target implementation must use one explicit, documented native lead profile rather than deriving musical behaviour from display width. The chosen FM-1 profile must be recorded in `DECISIONS.md` before the first native late-bind event implementation is merged.
+M3c tests encode **both source values** so the browser contract is not lost. FM-1 uses the source desktop profile as recorded in `DECISIONS.md`: Spiral 80 ms and Bloom petal 50 ms, with Bloom occurrence fixed at 45 ms. Bloom occurrence causality still applies, so the first petal cannot bind before the 45 ms occurrence.
 
-Until that decision is recorded, no implementation may silently choose 80 vs 110 ms for Spiral or 50 vs 70 ms for Bloom.
+## 7. Required regression expectations before runtime implementation
 
-## 7. Required regression expectations before implementation
-
-The first M3c regression slice must prove at minimum:
+The M3c regression slice must prove at minimum:
 
 1. Spiral route ordinal is frozen at occurrence but final sequence length/pitch is re-read at bind.
 2. Spiral observes a Gravity change that committed before bind.
@@ -178,8 +184,9 @@ The first M3c regression slice must prove at minimum:
 9. Each Bloom petal re-reads tuning independently while retaining the occurrence-frozen plan.
 10. A later petal can resolve differently from an earlier petal after a mid-unfurl state change.
 11. Desktop/narrow source lead constants are represented explicitly.
-12. Added bind events remain bounded in the fixed 256-entry queue and do not create a second module clock.
-13. M3c output remains exactly silent.
+12. First-petal Bloom bind cannot precede the 45 ms occurrence; later petals use `max(occurrence, voiceAt−lead)`.
+13. Added bind events remain bounded in the fixed 256-entry queue and do not create a second module clock.
+14. M3c output remains exactly silent.
 
 ## 8. Non-goals
 
