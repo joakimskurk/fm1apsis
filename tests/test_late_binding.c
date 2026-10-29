@@ -14,6 +14,27 @@ static void test_source_lead_constants(void)
     assert(APSIS_BLOOM_BIND_LEAD_NATIVE_MS == APSIS_BLOOM_BIND_LEAD_DESKTOP_MS);
 }
 
+static void test_source_causal_bind_samples(void)
+{
+    const uint32_t rate = 44100u;
+    const uint64_t target = 100000u;
+    uint64_t occurrence;
+
+    assert(apsis_late_spiral_bind_sample(target, rate) == target - 3528u);
+    occurrence = apsis_late_bloom_occurrence_sample(target, rate);
+    assert(occurrence == target - 1985u); /* 45 ms = 1984.5 samples -> nearest */
+
+    /* playBloom() cannot create the per-petal timer before scheduleBloom()
+     * fires. Voice 0 nominally wants target-50 ms, but its effective bind is
+     * occurrence time because 50 ms is earlier than the 45 ms occurrence. */
+    assert(apsis_late_bloom_bind_sample(occurrence, target, rate) == occurrence);
+
+    /* A later petal 100 ms after the Bloom target has enough runway for the
+     * normal target-50 ms bind to occur after the occurrence callback. */
+    assert(apsis_late_bloom_bind_sample(occurrence, target + 4410u, rate) ==
+           target + 2205u);
+}
+
 static void test_bloom_target_projects_only_pending_degree_ring(void)
 {
     ApsisState s;
@@ -203,6 +224,7 @@ static void test_bloom_petals_reread_tuning_but_not_plan_register(void)
 int main(void)
 {
     test_source_lead_constants();
+    test_source_causal_bind_samples();
     test_bloom_target_projects_only_pending_degree_ring();
     test_spiral_rebind_uses_current_sequence_register_tuning();
     test_spiral_has_no_pending_gravity_projection();
