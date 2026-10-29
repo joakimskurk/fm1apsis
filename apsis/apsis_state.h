@@ -50,6 +50,12 @@ typedef enum { APSIS_STRING_TRIGGER_EVERY = 0, APSIS_STRING_TRIGGER_SEQUENCE } A
 typedef enum { APSIS_STRING_FILTER_OFF = 0, APSIS_STRING_FILTER_SEQUENCE, APSIS_STRING_FILTER_ATTRACTOR } ApsisStringFilterMode;
 typedef enum { APSIS_STRING_PULSE_FULL = 0, APSIS_STRING_PULSE_SUSTAIN, APSIS_STRING_PULSE_FILTER, APSIS_STRING_PULSE_EXCITE } ApsisStringPulseDiag;
 typedef enum { APSIS_STRING_ATTRACTOR_HALF = 0, APSIS_STRING_ATTRACTOR_1, APSIS_STRING_ATTRACTOR_2, APSIS_STRING_ATTRACTOR_4, APSIS_STRING_ATTRACTOR_8 } ApsisStringAttractorEvery;
+typedef enum {
+    APSIS_STRING_ATTRACTOR_LEFT = 0,
+    APSIS_STRING_ATTRACTOR_RIGHT,
+    APSIS_STRING_ATTRACTOR_ALTERNATE,
+    APSIS_STRING_ATTRACTOR_BOTH
+} ApsisStringAttractorTarget;
 typedef enum { APSIS_CLOCK_STONE = 0 } ApsisClockVoice;
 typedef enum { APSIS_SPIRAL_THREAD = 0, APSIS_SPIRAL_GLASS, APSIS_SPIRAL_REED, APSIS_SPIRAL_HALO } ApsisSpiralVoice;
 typedef enum { APSIS_BLOOM_VEIL = 0, APSIS_BLOOM_CHOIR, APSIS_BLOOM_ORGAN, APSIS_BLOOM_GLASS } ApsisBloomVoice;
@@ -100,6 +106,7 @@ typedef struct {
     uint32_t filter_mask;
     uint8_t filter_attractor_every;
     uint8_t filter_attractor_length;
+    uint8_t attractor_target;
     uint16_t filter_attractor_lock_q15;
     uint16_t filter_attractor_strum_q15;
     uint16_t filter_attractor_strum_level_q15;
