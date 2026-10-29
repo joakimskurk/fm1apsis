@@ -61,6 +61,7 @@ void apsis_state_default(ApsisState *s)
     s->string.filter_mask = 0x00000249u; /* 0,3,6,9 */
     s->string.filter_attractor_every = APSIS_STRING_ATTRACTOR_1;
     s->string.filter_attractor_length = 8u;
+    s->string.attractor_target = APSIS_STRING_ATTRACTOR_ALTERNATE;
     s->string.filter_attractor_lock_q15 = APSIS_Q15_MILLI(860);
     s->string.filter_attractor_strum_q15 = APSIS_Q15_MILLI(620);
     s->string.filter_attractor_strum_level_q15 = APSIS_Q15_MILLI(780);
