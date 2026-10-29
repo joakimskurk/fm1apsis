@@ -16,6 +16,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_string.h apsis/apsis_string.c \
    apsis/apsis_string_dsp.h apsis/apsis_string_dsp.c \
    apsis/apsis_string_transient.c apsis/apsis_string_transient_pool.c \
+   apsis/apsis_string_rhythm_audio.h apsis/apsis_string_rhythm_audio.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
@@ -58,6 +59,20 @@ if '#include "apsis_string_transient_pool.c"' not in s:
     s = s.replace(transient_anchor,
                   transient_anchor + '\n#include "apsis_string_transient_pool.c"', 1)
 
+# M4b2 binds already-consumed shared Rhythm events to the finite pool. The
+# event observer remains part of apsis_runtime_final.c; this layer adds no
+# second scheduler or queue.
+if '#include "apsis_string_rhythm_audio.h"' not in s:
+    h2_anchor = '#include "apsis_string_dsp.h"'
+    if h2_anchor not in s:
+        raise SystemExit('FAIL: M4b Rhythm header anchor missing')
+    s = s.replace(h2_anchor, h2_anchor + '\n#include "apsis_string_rhythm_audio.h"', 1)
+if '#include "apsis_string_rhythm_audio.c"' not in s:
+    c2_anchor = '#include "apsis_string_transient_pool.c"'
+    if c2_anchor not in s:
+        raise SystemExit('FAIL: M4b Rhythm source anchor missing')
+    s = s.replace(c2_anchor, c2_anchor + '\n#include "apsis_string_rhythm_audio.c"', 1)
+
 old = '#include "apsis_runtime.c"'
 new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_final.c"'
 if old not in s:
@@ -77,6 +92,30 @@ if pool_anchor not in s:
     raise SystemExit('FAIL: M4b transient pool declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
+# Audio ordering is deliberate: render M4a sustain and all transients that were
+# already active at block start, then advance the frozen M3c timeline while
+# passively observing one due STRING_RHYTHM event, then bind that event into the
+# finite pool for the next callback. A target can therefore be at most one
+# callback late and can never sound before its shared-timeline sample.
+audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
+        apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
+                              &mother_pending, &bloom_voicing_state, n, 0, 0);'''
+audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
+        apsis_string_dsp_render(&string_dsp, out, n);
+        apsis_string_transient_render(&string_transient_pool, out, n);
+        apsis_runtime_process_observed(&apsis_runtime, &apsis, &keep_bank,
+                                       &chain_sequence, &mother_pending,
+                                       &bloom_voicing_state, n, 0, 0,
+                                       &rhythm_observation);
+        if (rhythm_observation.valid)
+            (void)apsis_string_rhythm_trigger_event(&string_transient_pool,
+                                                    &apsis,
+                                                    &string_pitch_memory,
+                                                    &rhythm_observation.event);'''
+if audio_old not in s:
+    raise SystemExit('FAIL: M4b live audio handoff anchor missing')
+s = s.replace(audio_old, audio_new, 1)
+
 probe_anchor = '        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;'
 probe_extra = probe_anchor + '\n        apsis_runtime_probe[4] = (uint32_t)apsis_runtime.late_slot_overflowed | ((uint32_t)apsis_runtime.scheduler_starved << 1);\n        apsis_runtime_probe[5] = apsis_runtime.late_trace_hash;'
 if probe_anchor not in s:
@@ -88,14 +127,9 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# BSS is already zeroed by the platform. A single ordered volatile write after
-# runtime readiness keeps the not-yet-live pool in the target image without
-# changing the pre-ready initialization path or rendering it in app_audio().
-ready_anchor = '    runtime_ready = 1u;'
-ready_extra = ready_anchor + '\n    *(volatile uint32_t *)&string_transient_pool.transient_next_serial = 0u;'
-if ready_anchor not in s:
-    raise SystemExit('FAIL: M4b transient pool retention anchor missing')
-s = s.replace(ready_anchor, ready_extra, 1)
+# The pool is live-referenced by app_audio(), so it no longer needs an explicit
+# retention write. Platform BSS zeroing gives the same reset state without
+# adding a 6 kB memset to the IRQ-enabled startup path.
 
 p.write_text(s)
 PY
