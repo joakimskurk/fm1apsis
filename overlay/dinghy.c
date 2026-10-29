@@ -61,8 +61,9 @@ static uint8_t surface = SURF_MOTHER;
 static void app_audio(int32_t *out, uint32_t n)
 {
     (void)out;
-    /* Dinghy supplies a zeroed stereo buffer and n is stereo frames. M3b uses
-     * the callback only as the sample clock; the output intentionally stays 0. */
+    /* Dinghy enables IRQs before app_main(), so the ISR can run while the
+     * static runtime is being initialized. runtime_ready stays zero until all
+     * state is initialized; the output buffer is already zeroed by Dinghy. */
     if (runtime_ready)
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);
@@ -219,7 +220,6 @@ static void app_main(void)
     apsis_mother_pending_reset(&mother_pending);
     apsis_runtime_reset(&apsis_runtime, FS, 0u, 0x41505349u);
     apsis_runtime_start(&apsis_runtime);
-    RING_PUBLISH();
     runtime_ready = 1u;
     lcd_fill(0, 0, 240, 240, C_BLACK);
 
