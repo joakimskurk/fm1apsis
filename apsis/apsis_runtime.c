@@ -69,24 +69,47 @@ static void runtime_commit_due_gravity(ApsisRuntime *r, ApsisState *s, uint64_t 
     r->gravity_pending.active = 0u;
 }
 
+/* Chain morph spans are bounded to one source Clock cycle. Convert the
+ * elapsed/span ratio to Q15 with a 15-step binary fraction so the pi32v2
+ * target never needs the unavailable __udivdi3 helper. */
+static uint16_t runtime_fraction_q15(uint64_t elapsed, uint64_t span)
+{
+    uint32_t rem, den;
+    uint16_t out = 0u;
+    uint8_t i;
+    if (!span || elapsed >= span) return APSIS_Q15_ONE;
+    while (span > 0x3fffffffu) {
+        span >>= 1;
+        elapsed >>= 1;
+        if (elapsed >= span) elapsed = span ? span - 1u : 0u;
+    }
+    den = (uint32_t)span;
+    rem = (uint32_t)elapsed;
+    for (i = 0u; i < 15u; ++i) {
+        rem <<= 1;
+        out <<= 1;
+        if (rem >= den) { rem -= den; out |= 1u; }
+    }
+    return out;
+}
+
 static uint16_t runtime_smooth_q15(uint64_t sample, uint64_t start, uint64_t end)
 {
-    uint64_t span, elapsed, x, xx, factor, e;
+    uint32_t x, xx, factor, e;
     if (sample <= start) return 0u;
     if (sample >= end || end <= start) return APSIS_Q15_ONE;
-    span = end - start;
-    elapsed = sample - start;
-    x = (elapsed * APSIS_Q15_ONE) / span;
-    xx = (x * x) / APSIS_Q15_ONE;
-    factor = (uint64_t)3u * APSIS_Q15_ONE - 2u * x;
-    e = (xx * factor) / APSIS_Q15_ONE;
+    x = runtime_fraction_q15(sample - start, end - start);
+    xx = (x * x + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
+    factor = (uint32_t)3u * APSIS_Q15_ONE - 2u * x;
+    e = (xx * factor + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
     return (uint16_t)(e > APSIS_Q15_ONE ? APSIS_Q15_ONE : e);
 }
 
 static uint16_t runtime_lerp_q15(uint16_t from, uint16_t to, uint16_t t)
 {
     int32_t delta = (int32_t)to - (int32_t)from;
-    int32_t value = (int32_t)from + (int32_t)(((int64_t)delta * t) / APSIS_Q15_ONE);
+    int32_t scaled = (delta * (int32_t)t) / (int32_t)APSIS_Q15_ONE;
+    int32_t value = (int32_t)from + scaled;
     if (value < 0) value = 0;
     if (value > (int32_t)APSIS_Q15_ONE) value = APSIS_Q15_ONE;
     return (uint16_t)value;
@@ -123,7 +146,7 @@ static uint64_t runtime_chain_morph_samples(const ApsisRuntime *r, const ApsisSt
     n = runtime_chain_clock_n(r, s);
     pulse_q32 = apsis_transport_interval_q32(&clock, r->transport.sample_rate, 0u);
     cycle_q32 = pulse_q32 * n;
-    duration_q32 = (cycle_q32 / 4u) * q + ((cycle_q32 % 4u) * q) / 4u;
+    duration_q32 = (cycle_q32 * q) >> 2;
     return apsis_transport_round_sample(duration_q32);
 }
 
