@@ -56,7 +56,12 @@ typedef enum {
     APSIS_STRING_ATTRACTOR_ALTERNATE,
     APSIS_STRING_ATTRACTOR_BOTH
 } ApsisStringAttractorTarget;
-typedef enum { APSIS_CLOCK_STONE = 0 } ApsisClockVoice;
+typedef enum {
+    APSIS_CLOCK_STONE = 0,
+    APSIS_CLOCK_WOOD,
+    APSIS_CLOCK_GLASS,
+    APSIS_CLOCK_SOFT
+} ApsisClockVoice;
 typedef enum { APSIS_SPIRAL_THREAD = 0, APSIS_SPIRAL_GLASS, APSIS_SPIRAL_REED, APSIS_SPIRAL_HALO } ApsisSpiralVoice;
 typedef enum { APSIS_BLOOM_VEIL = 0, APSIS_BLOOM_CHOIR, APSIS_BLOOM_ORGAN, APSIS_BLOOM_GLASS } ApsisBloomVoice;
 typedef enum { APSIS_BLOOM_DEPTH_FOLLOW = 0, APSIS_BLOOM_DEPTH_TRIAD, APSIS_BLOOM_DEPTH_SEVENTH, APSIS_BLOOM_DEPTH_NINTH } ApsisBloomDepth;
@@ -148,7 +153,7 @@ typedef struct {
     uint8_t sound;
     uint16_t level_q15;
     uint8_t voice;
-    int8_t pitch;
+    uint8_t pitch_centi; /* Study 126: 50..200 => 0.50x..2.00x. */
     uint16_t inner_level_q15;
     uint16_t snap_level_q15;
     uint16_t snap_tone_hz;
