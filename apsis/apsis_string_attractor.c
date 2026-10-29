@@ -216,7 +216,7 @@ uint8_t apsis_string_attractor_pending_bind(ApsisStringAttractorRuntime *r,
         return 0u;
     }
     if (r->binding_count >= APSIS_STRING_ATTRACTOR_BINDS_PER_BLOCK_MAX) {
-        r->pending_overflowed = 1u;
+        r->binding_overflowed = 1u;
         return 0u;
     }
     b = &r->binding[r->binding_count++];
