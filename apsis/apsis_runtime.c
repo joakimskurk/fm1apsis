@@ -31,6 +31,12 @@ static uint8_t runtime_clock_n(uint8_t n)
     return n < 3u ? 3u : (n > 24u ? 24u : n);
 }
 
+static uint8_t runtime_chain_clock_n(const ApsisRuntime *r, const ApsisState *s)
+{
+    if (r && r->chain_meter_n) return runtime_clock_n(r->chain_meter_n);
+    return s ? runtime_clock_n(s->clock.n) : 12u;
+}
+
 static uint64_t runtime_next_transport_sample(const ApsisTransport *t)
 {
     if (!t) return 0u;
@@ -114,7 +120,7 @@ static uint64_t runtime_chain_morph_samples(const ApsisRuntime *r, const ApsisSt
     q = morph_quarters > 4u ? 4u : morph_quarters;
     clock = s->clock;
     clock.swing_q15 = 0u; /* browser clockCycleMs() is nominal, without swing */
-    n = runtime_clock_n(clock.n);
+    n = runtime_chain_clock_n(r, s);
     pulse_q32 = apsis_transport_interval_q32(&clock, r->transport.sample_rate, 0u);
     cycle_q32 = pulse_q32 * n;
     duration_q32 = (cycle_q32 / 4u) * q + ((cycle_q32 % 4u) * q) / 4u;
@@ -163,12 +169,14 @@ static uint8_t runtime_apply_chain_cell(ApsisRuntime *r, ApsisState *s,
 static void runtime_restart_chain(ApsisRuntime *r, ApsisState *s, ApsisKeepBank *bank,
                                   ApsisChainSequence *seq, uint64_t sample)
 {
+    uint8_t n;
     if (!r || !s || !bank || !seq || !seq->count) return;
+    n = runtime_chain_clock_n(r, s);
     seq->pos = 0u;
     seq->pulse = 0u;
     seq->phrase_pulse = 0u;
     seq->hold_tail = 0u;
-    seq->master_pulses = apsis_chain_master_pulses(seq, &s->chain, s->clock.n);
+    seq->master_pulses = apsis_chain_master_pulses(seq, &s->chain, n);
     runtime_apply_chain_cell(r, s, bank, seq, 0u, sample);
 }
 
@@ -177,8 +185,9 @@ static void runtime_advance_chain(ApsisRuntime *r, ApsisState *s, ApsisKeepBank 
 {
     const ApsisChainCell *cell;
     uint16_t total;
-    uint8_t on_one;
+    uint8_t on_one, n;
     if (!r || !s || !bank || !seq || !e || !seq->playing || !seq->count) return;
+    n = runtime_chain_clock_n(r, s);
     on_one = e->clock_step == 0u;
     if (seq->armed) {
         if (s->chain.start_sync == APSIS_CHAIN_SYNC_ONE && !on_one) return;
@@ -198,7 +207,7 @@ static void runtime_advance_chain(ApsisRuntime *r, ApsisState *s, ApsisKeepBank 
     }
     if (seq->pos >= seq->count) return;
     cell = &seq->cells[seq->pos];
-    total = apsis_chain_cell_pulses(cell, &s->chain, s->clock.n);
+    total = apsis_chain_cell_pulses(cell, &s->chain, n);
     seq->pulse++;
     seq->phrase_pulse++;
     if (seq->pulse < total) return;
@@ -359,7 +368,10 @@ uint8_t apsis_runtime_request_gravity(ApsisRuntime *r,
 void apsis_runtime_chain_start(ApsisRuntime *r, ApsisState *s,
                                ApsisChainSequence *seq)
 {
+    uint8_t n;
     if (!r || !s || !seq || !seq->count) return;
+    n = runtime_clock_n(s->clock.n);
+    r->chain_meter_n = n;
     seq->playing = 1u;
     seq->armed = 1u;
     seq->pos = 0u;
@@ -367,7 +379,7 @@ void apsis_runtime_chain_start(ApsisRuntime *r, ApsisState *s,
     seq->phrase_pulse = 0u;
     seq->hold_tail = 0u;
     seq->last_applied = 1u;
-    seq->master_pulses = apsis_chain_master_pulses(seq, &s->chain, s->clock.n);
+    seq->master_pulses = apsis_chain_master_pulses(seq, &s->chain, n);
     r->chain_morph_active = 0u;
 }
 
@@ -381,6 +393,7 @@ void apsis_runtime_chain_stop(ApsisRuntime *r, ApsisChainSequence *seq)
     seq->hold_tail = 0u;
     seq->master_pulses = 0u;
     seq->last_applied = 1u;
+    r->chain_meter_n = 0u;
     r->chain_morph_active = 0u;
 }
 
