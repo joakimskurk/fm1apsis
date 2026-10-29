@@ -159,9 +159,11 @@ Physical FM-1: **not tested**.
 
 Branch: `m3b-runtime-consumers`.
 PR: #5.
-Final implementation/evidence head before final documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`.
+Merged to `main`: `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
+Final implementation/evidence head: `001d69a758369e2d14665ba2fd176c1fd116990b`.
+Final documentation head: `6a8a182cbd0559cc2164c78bf956fbba7e0ee919`.
 
-Status: **implementation verified through emulator; merge pending final documentation-head checks**.
+Status: **verified through emulator and merged**.
 
 Implemented:
 - dedicated allocation-free `apsis_runtime.[ch]` coordinator
@@ -206,7 +208,7 @@ GitHub Actions `APSIS core` run #81 on `001d69a758369e2d14665ba2fd176c1fd116990b
 
 ### M3b staged target/emulator evidence
 
-GitHub Actions `APSIS staged validation` run #71 on the same head:
+GitHub Actions `APSIS staged validation` run #71 on the same implementation head:
 - source core and pinned upstream: PASS
 - unchanged Dinghy host and target: PASS
 - APSIS overlay and host shell: PASS
@@ -214,6 +216,10 @@ GitHub Actions `APSIS staged validation` run #71 on the same head:
 - FM-1 emulator boot/input/silent-audio/runtime-queue smoke: PASS
 - evidence artifact upload: PASS
 - development firmware artifact upload: PASS
+
+Final documentation head validation:
+- `APSIS core` run #84: PASS
+- `APSIS staged validation` run #74: PASS through real target and emulator
 
 Target evidence:
 - app image: 66,428 B / 581,564 B
@@ -249,6 +255,7 @@ Emulator M3b:
 M3b verification levels:
 - implemented: YES
 - committed: YES
+- merged: YES
 - desktop/core regression: PASS
 - sanitizer: PASS
 - real target with live runtime instantiated: PASS
@@ -259,6 +266,18 @@ M3b verification levels:
 M3b deliberately does **not** implement DSP or final Spiral/Bloom pitch binding. Those remain blocked behind M3c.
 
 Physical FM-1: **not tested**.
+
+## Phase 3 / M3c
+
+Branch: `m3c-late-binding`.
+Base: `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
+
+Status: **source audit active; no M3c implementation has been promoted to a verification level yet**.
+
+Current rule:
+- Study 126 remains the timing/state authority.
+- M3c must stay silent and allocation-free.
+- No late-binding implementation should be written until occurrence-vs-bind state observation has been audited and encoded as regression expectations.
 
 ## Release-level validation not yet performed
 
