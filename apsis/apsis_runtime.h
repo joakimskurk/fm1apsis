@@ -106,7 +106,7 @@ typedef struct {
     ApsisRuntimeGravityPending gravity_pending;
 
     uint8_t spiral_attractor_pos;
-    uint8_t spiral_step;
+    uint32_t spiral_step;
     uint32_t spiral_occurrence_count;
     uint32_t spiral_bind_count;
     uint32_t spiral_bind_skipped;
