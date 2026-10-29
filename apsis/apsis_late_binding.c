@@ -26,6 +26,40 @@ static uint8_t late_pc(int32_t step)
     return (uint8_t)pc;
 }
 
+static uint64_t late_ms_samples(uint32_t sample_rate, uint32_t ms)
+{
+    uint64_t product;
+    if (!sample_rate) sample_rate = 44100u;
+    product = (uint64_t)sample_rate * ms;
+    return (product + 500u) / 1000u;
+}
+
+static uint64_t late_sub_saturate(uint64_t sample, uint64_t delta)
+{
+    return sample > delta ? sample - delta : 0u;
+}
+
+uint64_t apsis_late_spiral_bind_sample(uint64_t target_sample, uint32_t sample_rate)
+{
+    return late_sub_saturate(target_sample,
+        late_ms_samples(sample_rate, APSIS_SPIRAL_BIND_LEAD_NATIVE_MS));
+}
+
+uint64_t apsis_late_bloom_occurrence_sample(uint64_t target_sample, uint32_t sample_rate)
+{
+    return late_sub_saturate(target_sample,
+        late_ms_samples(sample_rate, APSIS_BLOOM_OCCURRENCE_LEAD_MS));
+}
+
+uint64_t apsis_late_bloom_bind_sample(uint64_t occurrence_sample,
+                                      uint64_t voice_target_sample,
+                                      uint32_t sample_rate)
+{
+    uint64_t nominal = late_sub_saturate(voice_target_sample,
+        late_ms_samples(sample_rate, APSIS_BLOOM_BIND_LEAD_NATIVE_MS));
+    return nominal < occurrence_sample ? occurrence_sample : nominal;
+}
+
 static uint8_t late_bloom_tuning_mode(const ApsisState *s)
 {
     if (!s || s->bloom.tuning_mode == APSIS_BLOOM_TUNING_FOLLOW)
