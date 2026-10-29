@@ -16,7 +16,7 @@ M3b work lives on:
 - branch `m3b-runtime-consumers`
 - PR #5: `M3b: structural runtime consumers`
 - base: merged M3a commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
-- final implementation/evidence head before documentation: `fa486917d6c9a328b7cf6f37147c2669d1ae966c`
+- final implementation/evidence head before documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`
 
 ## Product invariant
 
@@ -90,6 +90,7 @@ Silent structural/runtime consumers:
 - live transport + 256-event heap instantiated in the real FM-1 overlay
 - `app_audio()` drives only the deterministic sample timeline and remains silent
 - Mother horizon / next-1 commit on the shared timeline
+- Mother blocked-dispatcher state preserves pending edits and recovers on a later Clock-1 retry
 - Chain start/loop/cell/chance/transpose/morph progression
 - browser-parity Chain meter snapshot at Chain start
 - Gravity immediate/quantized pending commit on the correct boundary
@@ -100,19 +101,19 @@ Silent structural/runtime consumers:
 - live target-RAM queue telemetry in the emulator gate
 
 M3b final implementation/evidence head before documentation:
-- `fa486917d6c9a328b7cf6f37147c2669d1ae966c`
-- `APSIS core` run #76: PASS, including ASAN/UBSAN
-- `APSIS staged validation` run #66: PASS through real target and emulator
+- `001d69a758369e2d14665ba2fd176c1fd116990b`
+- `APSIS core` run #81: PASS, including ASAN/UBSAN
+- `APSIS staged validation` run #71: PASS through real target and emulator
 
 M3b target evidence:
-- app image: 66,384 B / 581,564 B
-- image delta vs M3a: +9,704 B
+- app image: 66,428 B / 581,564 B
+- image delta vs M3a: +9,748 B
 - RAM `.data + .bss`: 22,552 B / 98,304 B
 - RAM delta vs M3a: +8,448 B
 - pool: 30,720 B / 344,064 B
 - pool delta vs M3a: 0 B
 - package bytes: 610,110 B
-- package SHA-256 `819402c1105eceac1a6cbc7031bb2e2c6dabb8b82f444cfb3b6a80f29963f9dd`
+- package SHA-256 `16ff1f412649bfb392ddc7fbfabd03bb405d0a86fca96a0d37d0b60b4f19c819`
 
 M3b queue/runtime evidence:
 - host `sizeof(ApsisRuntime)`: 8,456 B
@@ -169,13 +170,12 @@ M3c remains silent. Phase 4 DSP is blocked until M3c is complete and green.
 
 ## Exact next action
 
-1. Commit `PROJECT_STATE.md`, `ROADMAP.md`, and `TESTING.md` with the verified M3b evidence.
-2. Run `APSIS core` and the complete staged target/emulator validation on that final documentation head.
-3. Verify PR #5 is mergeable against current `main` and no new base commits require rebase/reconstruction.
-4. Mark PR #5 ready and squash-merge it with the verified HEAD lock.
-5. Create the M3c work branch from the resulting `main` merge commit.
-6. Before implementing M3c, audit Study 126's exact Spiral/Bloom late-binding state-observation points and encode those as regression expectations.
-7. Only then implement late binding and the long deterministic trace. Do not start DSP.
+1. Run `APSIS core` and the complete staged target/emulator validation on the final documentation head.
+2. Verify PR #5 is mergeable against current `main` and no new base commits require rebase/reconstruction.
+3. Mark PR #5 ready and squash-merge it with the verified HEAD lock.
+4. Create the M3c work branch from the resulting `main` merge commit.
+5. Before implementing M3c, audit Study 126's exact Spiral/Bloom late-binding state-observation points and encode those as regression expectations.
+6. Only then implement late binding and the long deterministic trace. Do not start DSP.
 
 ## Do not regress
 
