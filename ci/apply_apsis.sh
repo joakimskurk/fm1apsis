@@ -28,22 +28,24 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_runtime_final.c \
    work/apsis/firmware/src/
 
-# The checked-in overlay remains the stable UI/runtime shell. Generated target
-# source adds the M4a DSP translation-unit members so the real JieLi compiler
-# must accept them before app_audio is allowed to render them. This is a compile
-# gate only: live output remains the proven M3c silent path until the M4a target
-# integration slice explicitly changes app_audio.
 python3 - <<'PY'
 from pathlib import Path
 p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
 
+# Older checked-in overlays did not yet include M4a. Keep the generator
+# backwards-safe, but never duplicate a .c include once the live M4a overlay
+# owns it directly.
 h_anchor = '#include "apsis_string.h"'
 c_anchor = '#include "apsis_string.c"'
-if h_anchor not in s or c_anchor not in s:
-    raise SystemExit('FAIL: String include anchors missing from Dinghy overlay')
-s = s.replace(h_anchor, h_anchor + '\n#include "apsis_string_dsp.h"', 1)
-s = s.replace(c_anchor, c_anchor + '\n#include "apsis_string_dsp.c"', 1)
+if '#include "apsis_string_dsp.h"' not in s:
+    if h_anchor not in s:
+        raise SystemExit('FAIL: String header include anchor missing')
+    s = s.replace(h_anchor, h_anchor + '\n#include "apsis_string_dsp.h"', 1)
+if '#include "apsis_string_dsp.c"' not in s:
+    if c_anchor not in s:
+        raise SystemExit('FAIL: String source include anchor missing')
+    s = s.replace(c_anchor, c_anchor + '\n#include "apsis_string_dsp.c"', 1)
 
 old = '#include "apsis_runtime.c"'
 new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_final.c"'
@@ -69,7 +71,6 @@ PY
 
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
-# Host compilation is a structural gate for the single-translation-unit FM-1 app.
 ( cd work/apsis && APP_VER="$VERSION" bash tests/run_host.sh ) 2>&1 | tee build/evidence/apsis_host.log
 
 printf 'PASS: APSIS overlay + host shell\n'
