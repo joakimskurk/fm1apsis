@@ -73,3 +73,58 @@ void apsis_runtime_stop(ApsisRuntime *r)
      * in Study 126. Keep exactly that one future callback alive. */
     final_requeue_pending_gravity(r);
 }
+
+static uint8_t final_due_string_rhythm(const ApsisRuntime *r, uint64_t end,
+                                       ApsisTransportEvent *out)
+{
+    uint16_t i;
+    uint8_t found = 0u;
+    if (!r || !out) return 0u;
+    for (i = 0u; i < r->queue.count; ++i) {
+        const ApsisTransportEvent *e = &r->queue.events[i];
+        if (e->type != APSIS_EVENT_STRING_RHYTHM || e->sample >= end) continue;
+        if (!found || m3c_event_before(e, out)) {
+            *out = *e;
+            found = 1u;
+        }
+    }
+    return found;
+}
+
+uint8_t apsis_runtime_process_observed(ApsisRuntime *r,
+                                      ApsisState *s,
+                                      ApsisKeepBank *bank,
+                                      ApsisChainSequence *chain,
+                                      ApsisMotherPending *mother_pending,
+                                      ApsisBloomVoicingState *bloom_voicing,
+                                      uint32_t frames,
+                                      ApsisRuntimeMotherApplyFn mother_apply,
+                                      void *mother_user,
+                                      ApsisRuntimeStringRhythmObservation *observation)
+{
+    ApsisTransportEvent due;
+    uint32_t before = 0u;
+    uint64_t end = 0u;
+    uint8_t have_due = 0u;
+
+    if (observation) runtime_zero(observation, (uint32_t)sizeof(*observation));
+    if (r && frames) {
+        before = r->event_count[APSIS_EVENT_STRING_RHYTHM];
+        end = r->cursor_sample + frames;
+        if (end < r->cursor_sample) end = ~(uint64_t)0;
+        have_due = final_due_string_rhythm(r, end, &due);
+    }
+
+    apsis_runtime_process(r, s, bank, chain, mother_pending, bloom_voicing,
+                          frames, mother_apply, mother_user);
+
+    if (r && have_due &&
+        r->event_count[APSIS_EVENT_STRING_RHYTHM] != before) {
+        if (observation) {
+            observation->valid = 1u;
+            observation->event = due;
+        }
+        return 1u;
+    }
+    return 0u;
+}
