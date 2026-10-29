@@ -4,18 +4,23 @@ Last updated: 2026-10-29
 
 ## Current milestone
 
-**Phase 4 / M4a — persistent dry String DSP core, final documentation gate before merge.**
+**Phase 4 / M4b — finite dry String transients + shared Rhythm audio.**
 
-Phase 3 is complete and merged:
+Implementation is complete and verified through desktop, ASAN/UBSAN, real JieLi target build and FM-1 emulator. PR #8 is merge-pending only; physical FM-1 hardware has not been tested.
+
+Completed and merged baselines:
 - M3a transport: `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
 - M3b runtime: `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
-- M3c late binding: `ec0dc0b350793572f19040efc938f00121128dc6` via PR #6
+- M3c late binding: `ec0dc0b350793572f19040efc938f00121128dc6`
+- M4a persistent String: `2ea217f09c143d30385f136e84e2b29d582987a0` via PR #7
 
 Active work:
-- branch `m4-string-dsp`
-- PR #7
-- base `ec0dc0b350793572f19040efc938f00121128dc6`
-- first live-audio implementation/evidence head `839bc7b65695b7fa81a6336995537d374b8a3e1b`
+- branch `m4b-string-transients`
+- PR #8
+- base `2ea217f09c143d30385f136e84e2b29d582987a0`
+- validated implementation/test head `0749ac86e6162fab190f343730ebc9b133c13e47`
+- implementation gates: core #170 PASS; staged #159 PASS
+- current task: final documentation-head double gate, then squash-merge
 
 ## Product/source invariant
 
@@ -28,7 +33,8 @@ Behavioural authority:
 String acoustic authority:
 - Study 98 · Performance Architecture where the acoustic feature existed there
 - raw LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
-- later features absent from Study 98, notably Dual BODY/WIRE, remain Study-126 acoustic behavior
+- later features absent from Study 98 remain Study-126 behaviour/acoustics unless explicitly source-resolved otherwise
+- Study-124/125/126 de-click and pulse-isolation fixes override older engine mechanics
 
 Pinned FM-1 baseline:
 - Dinghy `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
@@ -37,143 +43,211 @@ Pinned FM-1 baseline:
 
 Physical FM-1: **not tested**.
 
-## Phase 3 final baseline
+## Frozen M3c runtime baseline
 
-M3c exact final pre-merge head `4fa7d25920523b9e5d8591ae6185e1b5f910c083` passed core #123 and staged #113.
+M3c remains the only scheduler/runtime. M4b does not add a String-private clock or event queue.
 
-M3c target:
-- image 71,608 B
-- RAM 35,272 B
-- pool 30,720 B
-- package SHA `854f3fd315f1d489017cf1c9dfca2d8b59107281ba9deefd27d0067518fcf491`
+Frozen host invariants:
+- `sizeof(ApsisRuntime) = 21,928 B`
+- canonical queue 352/512
+- extreme queue 357/512
+- Spiral slots 59/64
+- Bloom slots 44/64
+- random trace `78771ff5`
+- late trace `0e6fc422`
 
-M3c emulator:
-- queue 28/512, overflow 0, late flags 0
+Live emulator invariants:
+- queue 28/512
+- overflow 0
+- late flags 0
 - cursor 123,648
 - late trace `811c9dc5`
-- WAV peak 0
 
-## Phase 4 String authority
+## Frozen M4a persistent String baseline
+
+M4a merged to `main` as `2ea217f09c143d30385f136e84e2b29d582987a0`.
 
 Normative references:
 - `docs/reference/STRING_TIMBRE_REFERENCE.md`
 - `docs/reference/STRING_DSP_CONTRACT.md`
 - `docs/reference/M4A_REFERENCE_AUDIO.md`
 
-### Study-98 acoustic recovery
+Persistent architecture:
+- 2 Study-98 Foundation voices
+- plus 2 Study-98 Classic sine voices or Study-126 BODY/WIRE
+- fixed 44.1 kHz stereo Q15
+- transport-gated sustain
+- no shared Space
 
-Foundation:
-- low current Gravity root;
-- root ±0.55× Drift;
-- sine pair;
-- `.016 * foundationLevel` source gain;
-- dark ~1050 Hz low-pass character.
+Frozen host references:
+- Classic peak 1477, hash `b20610c1`
+- Dual peak L/R 823/787, hash `10d23cf4`
 
-Classic:
-- current Study-126 played String pitch ±0.5× Drift;
-- sine pair;
-- `.020` each before source level;
-- ~1800 Hz low-pass character.
-
-### Study-126 Dual preservation
-
-Study 98 has no Dual/surfaceMode/WIRE. Default Dual therefore keeps Study-126 acoustic identity:
-- BODY = independent left String pitch, normalized `[1,.31,.15,.085,.052,.030,.018]` harmonic wave, `.020*leftLevel`, LP ~1550 Hz, pan -0.23;
-- WIRE = independent right String pitch, triangle, `.0155*rightLevel`, LP ~3600 Hz, pan +0.23;
-- mode changes fade to zero before timbre/filter/pan swap, then fade in.
-
-Persistent voice ceiling stays four:
-- 2 Foundation;
-- plus 2 Classic sine voices or BODY+WIRE.
-
-## M4a implementation complete
-
-Implemented:
-- `apsis_string_dsp.[ch]` fixed-state 44.1 kHz renderer;
-- deterministic lookup-table sine, triangle and BODY harmonic oscillator;
-- fixed-point frequency/tuning conversion;
-- target-safe phase conversion without target-unavailable division helper;
-- per-voice one-pole low-pass, pitch/gain smoothing and stereo mix;
-- transport-gated sustain;
-- smooth mode transition without phase reset;
-- live `app_audio()` integration;
-- generated single-TU target integration;
-- non-zero emulator audio gate while preserving M3c telemetry.
-
-M4a intentionally does **not** yet include:
-- Study-98 pluck/root-shadow transient;
-- String Rhythm transient modes;
-- Attractor excitation;
-- dynamic String bus filter modulation;
-- Cathedral/Space;
-- sample-exact structural-to-audio handoff.
-
-## M4a verified evidence
-
-Host + ASAN/UBSAN:
-- Classic peak 1477, deterministic hash `b20610c1`
-- Dual peak L/R 823/787, deterministic hash `10d23cf4`
-- all M3c runtime/capacity hashes unchanged
-
-Real JieLi target, staged #126:
-- image **75,700 B / 581,564 B**
-- RAM **35,464 B / 98,304 B**
-- pool **30,720 B / 344,064 B**
-- package SHA **`eb11271d26bb56a60d1883aae5eedb1c76300596d0803fceed3a69ae9a5aec0d`**
-
-Delta from M3c:
-- image +4,092 B
-- RAM +192 B
-- pool 0 B
-
-FM-1 emulator, staged #126:
-- first intentional APSIS audio: PASS
+Frozen emulator reference:
 - peak 317 Q15
 - RMS L/R 101/100
 - stereo delta 63
 - mean L/R -2/-2
 - raw PCM SHA `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
-- queue 28/512, overflow 0, late flags 0
-- cursor 123,648
-- late trace `811c9dc5`
 
-The low dry level is source-derived. Later Mother/master/source-bus/room architecture has not been added yet.
+M4b preserves these references exactly when no transient is active.
 
-## M4a callback boundary
+## M4b normative authority
 
-Current `app_audio()` order:
-1. resolve/update String targets from state visible at callback start;
-2. render dry String for the callback;
-3. advance M3c runtime for that callback.
+Normative reference:
+- `docs/reference/M4B_STRING_TRANSIENT_CONTRACT.md`
 
-At 256 frames / 44.1 kHz, a structural event inside a block may become audible at most one callback late (~5.8 ms), never early from future state.
+### M4b1 — finite transient engine
 
-Sample-exact structural-to-sounding-source timing is reserved for Phase 5.
+Study-98 `classicStringNote()` acoustic DNA implemented natively:
+- normal harmonics 1,2,3,4
+- pizz harmonics 1,2,3
+- normal roll exponent `1.28 + (1-brightness)*0.58`
+- pizz exponent 1.52
+- 3 ms stagger per harmonic index
+- normal duration multiplier `1 + hi*0.16`
+- pizz duration multiplier `1 - hi*0.09`
+- first two harmonics triangle, higher harmonics sine
+- fundamental at requested pan; upper harmonics use inverted ×0.45 pan
+- triangle LP follows `clamp(freq*2.35,1600,16000)`; sine bypasses that filter
+- folded current Gravity-root shadow
 
-## Performance status
+Current safety overrides retained:
+- 16 ms String onset instead of Study-98's older 10 ms onset
+- no broadband random-noise String exciter
+- no hard scene-gain Clock stepping
+- audible voice steals fade with the source-derived 14 ms time constant and remain alive for 105 ms before teardown
 
-The live-audio emulator smoke took approximately the same wall-clock duration as M3c, so there is no emulator evidence of a major performance regression.
+Native pool architecture:
+- browser logical ceiling: 80 voices
+- native fade-tail reserve: 32 additional physical slots
+- total fixed physical slots: 112
+- no allocation, no `libm`
+- pool state is separate from `ApsisStringDsp`; merged M4a sustain struct remains exactly 196 B
+- legal 30 ms burst: logical 80 / physical 112, 480 steals, 0 drops
 
-Real physical ISR cycle headroom remains unverified because no FM-1 hardware is available.
+Frozen M4b1 host references:
+- partial transient peak 1309, hash `97142d3e`
+- BODY peak 947, hash `c1168570`, energy L/R `4176243 / 2564882`
+- realistic Classic-composite stress: logical 80 / physical 108, 410 steals, 0 drops
+- normal and ASAN/UBSAN agree
 
-Several current 64-bit per-sample intermediates have statically proven 32-bit-safe bounds. Optimization is deferred rather than changing the first frozen audible reference without hardware need; any later optimization must preserve host and emulator audio hashes bit-for-bit.
+### BODY/WIRE finite topology
+
+Later Dual/BODY behaviour remains Study-126 authority. Native BODY transient reuses the already accepted M4a seven-harmonic BODY identity so persistent and finite String voices stay in the same instrument family.
+
+Study-126 topology preserved:
+- Classic composite: left BODY at t ×0.66; right WIRE/pizz at t+4 ms ×0.78
+- Dual left side remains the longer BODY/bowed role
+- Dual right side remains the shorter WIRE/pizz role
+- side timbre is determined by side role; BOW/PIZZ changes source level scaling, not the left/right acoustic identity
+- Motion uses current Gravity chord material folded into the source range and renders as BODY
+
+## M4b2 — shared Rhythm integration
+
+Phase-3 transport already owned `APSIS_EVENT_STRING_RHYTHM`; M4b consumes it rather than creating another scheduler.
+
+Transport contract:
+- target remains Clock pulse +26 ms
+- EVERY vs SEQUENCE trigger selection remains transport-owned
+- Clock step, absolute pulse and shared flags remain event metadata
+- the one source value frozen at planning is BOW/PIZZ/MOTION mode, stored in the event's otherwise-unused `sub_index`
+- transport diff versus M4a is therefore only that metadata assignment; Clock/queue/timing logic is otherwise unchanged
+
+Late-read contract at audio bind:
+- String sound/level
+- Classic vs Dual surface
+- current String pitch
+- left/right side levels
+- current brightness
+- current Gravity chord for Motion
+
+Runtime observation:
+- `apsis_runtime_process_observed()` passively pre-scans the existing shared heap, calls the unchanged M3c process, and publishes a copy only when M3c actually consumes a due Rhythm event
+- observation state lives outside `ApsisRuntime`; the frozen 21,928 B runtime layout is unchanged
+- legal Clock spacing proves no more than one Rhythm target can occur in a 256-frame callback
+
+Target audio ordering:
+1. update persistent M4a String state
+2. render persistent M4a String
+3. render already-active finite M4b transients
+4. advance shared M3c runtime while observing a due Rhythm event
+5. bind any consumed Rhythm event into the finite pool for the next callback
+
+This policy intentionally prevents early audio. It does **not** claim sample-exact event-to-audio application; Phase 5 owns that callback architecture change.
+
+Full-chain proof at 44.1 kHz / 256 frames:
+- first source Rhythm target = sample 1147
+- callback ending at 1024 contains no event/audio
+- callback 1024..1279 consumes target 1147 but renders no new transient early
+- next callback starts at 1280 and is the first legal audible block
+- handoff = 133 samples late, less than one callback, never early
+- frozen BOW event still binds after current live `state.string.rhythm` is changed to OFF, proving planned-mode freeze independently from late-read sound state
+
+## M4b verified implementation evidence
+
+Validated implementation/test head: `0749ac86e6162fab190f343730ebc9b133c13e47`.
+
+Exact code-head gates:
+- APSIS core #170: PASS including normal + ASAN/UBSAN and full live handoff test
+- staged validation #159: PASS through source/core, unchanged Dinghy, APSIS overlay, real JieLi target and FM-1 emulator
+
+Target #159:
+- image 81,752 B / 581,564 B
+- image headroom 499,812 B
+- RAM 42,648 B / 98,304 B
+- RAM headroom 55,656 B
+- pool 30,720 B / 344,064 B
+- pool headroom 313,344 B
+- package bytes 610,110 B
+- package SHA `8abc090ffa51efe93b21b4f59f2a40a9ab70a6983a2c5720633baba26fa7163b`
+
+Default emulator #159:
+- Rhythm is OFF by default, so the live M4b path remains acoustically idle in smoke
+- raw PCM remains bit-identical to M4a: `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
+- peak 317
+- RMS L/R 101/100
+- stereo delta 63
+- mean L/R -2/-2
+- M3c queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`
+
+Audible Rhythm correctness is therefore proven by deterministic host/sanitizer integration tests; the default emulator smoke proves the live target path boots/builds and remains regression-transparent while Rhythm is OFF. Physical device audio is not claimed.
+
+## Deliberately deferred from M4b
+
+### String Attractor excitation
+
+Attractor remains a separate String gate because Study 126 re-reads String pitch/side state near target time and has its own lead/bind/accent behaviour. Do not silently fold it into M4b.
+
+Still unresolved for that slice:
+- exact native bind lead on the shared sample timeline
+- left/right/Classic Attractor dispatch at bind
+- upper-octave accent rule
+- target/emulator stress and reference freeze
+
+Also deferred:
+- dynamic String bus filter modulation
+- shared Space/Cathedral
+- physical FM-1 validation and real ISR timing
 
 ## Exact next action
 
-1. Finalize `TESTING.md`, `ROADMAP.md`, PR #7 body and this handoff.
-2. Run APSIS core + ASAN/UBSAN and full staged real-target/emulator validation on the **exact final documentation head**.
-3. If both are green, mark PR #7 ready and squash-merge M4a.
-4. Start the next String slice from merged `main`, keeping `M4A_REFERENCE_AUDIO.md` immutable as the persistent-layer baseline.
-5. Next String slice: implement source-derived Study-98 `classicStringNote()` transient/root-shadow behavior and String Rhythm excitation separately from the persistent engine.
+1. Finish this documentation-only head (`ROADMAP.md`, `PROJECT_STATE.md`, `TESTING.md`, and contract disposition as needed).
+2. Run both workflows on that exact final documentation head.
+3. If both are green, update PR #8 metadata only, mark it ready and squash-merge with an expected-head SHA guard.
+4. Start the next String slice from the actual M4b merge commit; keep Attractor isolated as its own late-binding gate.
 
 ## Do not regress
 
-- Study 126 remains behavioral/state/timing authority;
-- Study 98 is narrow acoustic authority, not a behavior rollback;
-- one shared Phase-3 scheduler; no module clocks;
-- KEEP remains partial musical memory;
-- CHAIN and Mother semantics remain unchanged;
-- Spiral/Bloom M3c late binding remains unchanged;
-- `stepOneResync` OFF by default;
-- no shared Space/Cathedral during initial dry source work;
-- do not claim physical hardware or real ISR timing without device evidence.
+- Study 126 remains behavioural/state/timing/safety authority
+- Study 98 is narrow acoustic authority, not a behaviour rollback
+- M4a host and idle-emulator references remain immutable when M4b is inactive
+- one shared Phase-3 scheduler; no module clocks
+- M3c runtime stays 21,928 B unless a later explicitly scoped phase changes it
+- KEEP / CHAIN / MOTHER semantics unchanged
+- Spiral/Bloom M3c late binding unchanged
+- `stepOneResync` OFF by default
+- no broadband String noise
+- no hard-stop of audible transients
+- no shared Space/Cathedral during initial dry source work
+- do not claim physical hardware or real ISR timing without device evidence

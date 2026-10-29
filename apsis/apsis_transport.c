@@ -384,7 +384,7 @@ uint8_t apsis_transport_schedule_next(ApsisTransport *t,
             apsis_transport_local_add(local, &count, APSIS_EVENT_STRING_RHYTHM,
                 apsis_transport_target_sample(t->next_sample, t->next_frac_q32,
                     apsis_transport_ms_q32(t->sample_rate, 26u)),
-                interval_q32, abs, i, 0u, 1u, flags);
+                interval_q32, abs, i, s->string.rhythm, 1u, flags);
     }
 
     bloom_cycles = apsis_transport_bloom_cycles(s->bloom.cycles);
