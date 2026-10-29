@@ -163,7 +163,7 @@ void apsis_drift_dsp_update(ApsisDriftDsp *dsp,
             v->pitch_initialized = 1u;
         }
         v->target_phase_inc = inc;
-        v->target_gain_q15 = target.gain_q15[i];
+        v->target_gain_q23 = (int32_t)target.gain_q15[i] << 8;
         v->target_mix_left_q15 = target.mix_left_q15[i];
         v->target_mix_right_q15 = target.mix_right_q15[i];
     }
@@ -178,14 +178,15 @@ void apsis_drift_dsp_render(ApsisDriftDsp *dsp, int32_t *out, uint32_t frames)
         uint8_t i;
         for (i = 0u; i < APSIS_DRIFT_DSP_VOICES; ++i) {
             ApsisDriftDspVoice *v = &dsp->voice[i];
-            int32_t wave, sample;
+            int32_t wave, sample, gain_q15;
             if (!v->pitch_initialized) continue;
             v->phase_inc = drift_smooth_u32(v->phase_inc, v->target_phase_inc);
-            v->gain_q15 = drift_smooth_i32(v->gain_q15, v->target_gain_q15);
+            v->gain_q23 = drift_smooth_i32(v->gain_q23, v->target_gain_q23);
             v->mix_left_q15 = drift_smooth_i32(v->mix_left_q15, v->target_mix_left_q15);
             v->mix_right_q15 = drift_smooth_i32(v->mix_right_q15, v->target_mix_right_q15);
             wave = drift_sine_q15(v->phase);
-            sample = (int32_t)(((int64_t)wave * v->gain_q15) >> 15);
+            gain_q15 = (v->gain_q23 + 128) >> 8;
+            sample = (int32_t)(((int64_t)wave * gain_q15) >> 15);
             sum_l += ((int64_t)sample * v->mix_left_q15) >> 15;
             sum_r += ((int64_t)sample * v->mix_right_q15) >> 15;
             v->phase += v->phase_inc;
