@@ -22,7 +22,8 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_chain.h apsis/apsis_chain.c \
    apsis/apsis_mother.h apsis/apsis_mother.c \
    apsis/apsis_transport.h apsis/apsis_transport.c \
-   apsis/apsis_runtime.h apsis/apsis_runtime.c \
+   apsis/apsis_late_binding.h apsis/apsis_late_binding.c \
+   apsis/apsis_runtime.h apsis/apsis_runtime.c apsis/apsis_runtime_m3c.c \
    work/apsis/firmware/src/
 python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
