@@ -66,7 +66,7 @@ Merged to `main` at `fe2911c43fd69e63839220482e50bb10c7a2e4c2`. Final rebased PR
 
 ### M3b - structural/runtime consumers
 
-Active branch: `m3b-runtime-consumers`. PR #5. Implementation/evidence is green through real target and emulator; final documentation-head check + merge remains.
+Merged to `main` at `a61a40dc83c9b52129f7d3f920da26a9a61837d9` via PR #5.
 
 - [x] establish M3b project/source reference documentation
 - [x] instantiate shared transport/event queue in FM-1 runtime
@@ -85,21 +85,27 @@ Active branch: `m3b-runtime-consumers`. PR #5. Implementation/evidence is green 
 - [x] measure host stress queue high-water: 14 / 256, no overflow
 - [x] measure emulator target-RAM live queue high-water: 7 / 256, no overflow
 - [x] full M3b target/emulator implementation gate (`APSIS core` #81, staged #71)
-- [~] final documentation-head checks, mark PR #5 ready, squash-merge
+- [x] final documentation-head gate (`APSIS core` #84, staged #74)
+- [x] mark PR #5 ready and squash-merge
 
-Verified implementation/evidence head before final documentation: `001d69a758369e2d14665ba2fd176c1fd116990b`.
+Final implementation/evidence head: `001d69a758369e2d14665ba2fd176c1fd116990b`.
+Final documentation head: `6a8a182cbd0559cc2164c78bf956fbba7e0ee919`.
 
 ### M3c - late binding and long timing trace
 
-Do not start until PR #5 is merged.
+Active branch: `m3c-late-binding`, based on M3b merge `a61a40dc83c9b52129f7d3f920da26a9a61837d9`.
 
-- [ ] audit exact Study 126 Spiral/Bloom late-bind state-observation points
+- [~] audit exact Study 126 Spiral/Bloom late-bind state-observation points
+- [ ] document occurrence-time vs bind-time frozen/re-read state contract
+- [ ] add source-derived regression expectations before implementation
 - [ ] Spiral final pitch resolution against latest committed Gravity/Tuning
 - [ ] Bloom per-petal late pitch resolution
 - [ ] deterministic random source traceability
 - [ ] fixed-capacity event queue stress/high-water tests with late-bind events
 - [ ] long deterministic reference trace
 - [ ] full Phase 3 target/emulator validation
+
+M3c remains intentionally silent. Do not start Phase 4 DSP until M3c is merged and green.
 
 ## Phase 4 - five dry source engines
 
