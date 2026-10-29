@@ -231,9 +231,10 @@ static void test_deterministic_references(void)
     snap_b = render_one(APSIS_EVENT_CLOCK_SNAP, APSIS_CLOCK_STONE, b, frames, 0);
     assert(snap_a == snap_b);
     assert(memcmp(a, b, (size_t)frames * 2u * sizeof(*a)) == 0);
-    assert(stone_peak > 0 && glass_peak > 0 && snap_peak > 0);
-    printf("M4e refs: STONE peak=%d hash=%08x GLASS peak=%d hash=%08x SNAP peak=%d hash=%08x\n",
-           stone_peak, stone, glass_peak, glass, snap_peak, snap_a);
+    assert(stone_peak == 2081 && stone == 0xedcc4a81u);
+    assert(glass_peak == 1880 && glass == 0x0adf9829u);
+    assert(snap_peak == 738 && snap_a == 0x04bc514au);
+    printf("PASS: M4e frozen Clock refs STONE=2081/edcc4a81 GLASS=1880/0adf9829 SNAP=738/04bc514a\n");
     free(a); free(b);
 }
 
@@ -292,10 +293,10 @@ static void test_worst_case_pool(void)
         apsis_clock_dsp_render(&dsp, out, frames);
     }
     assert(dsp.drop_count == 0u);
-    assert(dsp.high_water <= APSIS_CLOCK_DSP_VOICES);
-    printf("M4e worst Clock pool: high-water=%u/%u triggers=%u drops=%u\n",
-           dsp.high_water, APSIS_CLOCK_DSP_VOICES,
-           (unsigned)dsp.trigger_count, (unsigned)dsp.drop_count);
+    assert(dsp.high_water == 23u);
+    assert(APSIS_CLOCK_DSP_VOICES == 32u);
+    printf("PASS: M4e worst Clock pool high-water=23/32 triggers=%u drops=0\n",
+           (unsigned)dsp.trigger_count);
 }
 
 int main(void)
