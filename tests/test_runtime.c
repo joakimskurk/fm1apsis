@@ -213,6 +213,52 @@ static void test_chain_start_advance_and_morph(void)
     assert(s.gravity.tonic == 7u);
 }
 
+static void test_chain_freezes_meter_length(void)
+{
+    ApsisState s, source;
+    ApsisRuntime r;
+    ApsisKeepBank bank;
+    ApsisChainSequence chain;
+    ApsisMotherPending mother;
+    ApsisBloomVoicingState bloom;
+    const uint64_t pulse_12 = 220500u;
+
+    init_all(&s, &r, &bank, &chain, &mother, &bloom);
+    apsis_state_default(&source);
+    source.gravity.tonic = 2u;
+    bank.slots[0] = apsis_keep_capture(&source);
+    source.gravity.tonic = 9u;
+    bank.slots[1] = apsis_keep_capture(&source);
+    s.chain.scope_key_scale = 1u;
+    chain.count = 2u;
+    chain.cells[0] = apsis_chain_default_cell(0u, &s.chain, 12u);
+    chain.cells[0].cycles = 1u;
+    chain.cells[0].fine_pulses = 0u;
+    chain.cells[1] = apsis_chain_default_cell(1u, &s.chain, 12u);
+    chain.cells[1].cycles = 1u;
+    chain.cells[1].fine_pulses = 0u;
+
+    apsis_runtime_chain_start(&r, &s, &chain);
+    assert(r.chain_meter_n == 12u);
+    assert(chain.master_pulses == 24u);
+    apsis_runtime_start(&r);
+    apsis_runtime_process(&r, &s, &bank, &chain, &mother, &bloom, 256u, 0, 0);
+    assert(chain.pos == 0u && s.gravity.tonic == 2u);
+
+    /* Browser chainClockN() keeps using startChain()'s chainMeter.n even when
+     * the live Clock length changes. The transport may now wrap at 8, but the
+     * first Chain cell must still last 12 subsequent pulses. */
+    s.clock.n = 8u;
+    process_to(&r, &s, &bank, &chain, &mother, &bloom, pulse_12);
+    assert(chain.pos == 0u);
+    apsis_runtime_process(&r, &s, &bank, &chain, &mother, &bloom, 1u, 0, 0);
+    assert(chain.pos == 1u);
+    assert(s.gravity.tonic == 9u);
+
+    apsis_runtime_chain_stop(&r, &chain);
+    assert(r.chain_meter_n == 0u);
+}
+
 static void test_spiral_symbolic_occurrences(void)
 {
     ApsisState s;
@@ -326,6 +372,7 @@ int main(void)
     test_mother_horizon_and_ordered_gravity();
     test_mother_gravity_owns_runtime_request();
     test_chain_start_advance_and_morph();
+    test_chain_freezes_meter_length();
     test_spiral_symbolic_occurrences();
     test_mother_commit_precedes_bloom_plan();
     high_water = test_runtime_queue_stress();
