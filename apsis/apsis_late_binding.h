@@ -45,6 +45,15 @@ typedef struct {
     ApsisBloomHarmony harmony;
 } ApsisBloomLateBinding;
 
+/* Deterministic native sample equivalents of the browser scheduling causality.
+ * Bloom petal timers are only created by the occurrence callback, so a petal
+ * bind can never precede occurrence_sample even when its nominal lead is larger. */
+uint64_t apsis_late_spiral_bind_sample(uint64_t target_sample, uint32_t sample_rate);
+uint64_t apsis_late_bloom_occurrence_sample(uint64_t target_sample, uint32_t sample_rate);
+uint64_t apsis_late_bloom_bind_sample(uint64_t occurrence_sample,
+                                      uint64_t voice_target_sample,
+                                      uint32_t sample_rate);
+
 ApsisBloomHarmony apsis_late_bloom_harmony_at(const ApsisState *state,
                                                const ApsisLatePendingGravity *pending,
                                                uint64_t target_sample,
