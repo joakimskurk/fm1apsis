@@ -1,6 +1,6 @@
 # M4C STRING ATTRACTOR CONTRACT
 
-This document is the normative source/implementation contract for the String Attractor excitation slice after merged M4b.
+This document is the normative source/implementation contract for String Attractor excitation after merged M4b.
 
 M4b is merged to `main` as `c96c00debf9a67948f1e874e36b090999dacadb9`. Its persistent + finite String references, shared Rhythm integration, pool behavior and M3c regression anchors are frozen.
 
@@ -18,96 +18,87 @@ M4c implements **String Attractor excitation** only:
 - deterministic native S&H cell state and cursor;
 - source rate/lock/gate/target semantics;
 - source planning-time decision on the existing shared Clock lookahead;
-- one shared-heap bind callback per audible side;
+- shared-heap bind callbacks;
 - late pitch/level re-read;
 - target-delayed use of the M4b transient pool;
 - right-side upper-octave Attractor accent.
 
-Explicitly not part of M4c:
+Deferred beyond M4c:
 
-- dynamic String bus-filter cutoff modulation;
+- audible dynamic String bus-filter cutoff modulation;
 - String filter sequence audio;
-- manual physical-control mapping;
+- UI/display cursor rendering and manual physical-control mapping;
 - shared Space/Cathedral;
-- sample-exact Phase-5 structural state application unrelated to this already-looked-ahead Attractor path;
+- unrelated Phase-5 sample-exact structural state application;
 - physical FM-1 validation / real ISR timing.
 
-The S&H planner must still advance correctly when Attractor is in filter-only pulse mode even though filter audio is deferred, so later filter work does not start from the wrong cell/cursor state.
+The S&H planner still advances correctly in FILTER-only mode even though filter audio is deferred, so later filter work cannot start from the wrong cell/cursor state.
 
 ## Source state
 
-Study 126 String defaults relevant to Attractor:
+Study 126 defaults relevant to Attractor:
 
 - `filterMode = off`;
-- `filterAttractorEvery = 1`;
-- legal rates: `0.5, 1, 2, 4, 8` Clock intervals;
-- `filterAttractorLength = 8`, legal lengths 4/8/12/16;
+- `filterAttractorEvery = 1`; legal rates `0.5, 1, 2, 4, 8` Clock intervals;
+- `filterAttractorLength = 8`; legal lengths 4/8/12/16;
 - `filterAttractorLock = 0.86`;
 - `filterAttractorStrum = 0.62`;
 - `filterAttractorStrumLevel = 0.78`;
 - `filterAttractorSeed = 317`;
-- default gates: `[1,0,1,0,1,1,0,0,1,0,1,0,1,0,0,1]`;
-- `attractorTarget = alternate`, legal `left/right/alternate/both`.
+- default gates `[1,0,1,0,1,1,0,0,1,0,1,0,1,0,0,1]`;
+- `attractorTarget = alternate`; legal `left/right/alternate/both`.
 
-Native M2 state already contains every listed Attractor field except `attractorTarget`. M4c adds an explicit target enum/field with default `ALTERNATE`; it must not hide target policy inside DSP code.
+M4c adds an explicit native `attractorTarget` enum/field with default `ALTERNATE`; target policy is not hidden in DSP code.
 
 ## Seeded S&H reset
 
-Study 126 `resetStringAttractor()` creates the current-length cell array from a local seeded LCG:
+Study 126 `resetStringAttractor()`:
 
-- `x = seed` (minimum 1; source default 317);
-- each draw: `x = 1664525*x + 1013904223` modulo 2^32;
-- cell value is the resulting uniform value in `[0,1)`;
-- reset sets planner cursor to zero;
-- changing/rerolling seed regenerates the cells;
-- changing length regenerates the cells for the new length;
-- Clock step-one resync resets the cursor to zero but does **not** regenerate cell values.
+- starts `x = seed` with source default 317;
+- advances `x = 1664525*x + 1013904223` modulo 2^32;
+- converts each draw to one cell value in `[0,1)`;
+- resets planner cursor to zero;
+- regenerates cells on seed/length reset;
+- step-one resync resets cursor only, not cell values.
 
-`audio.start()` calls `resetStringAttractor()` before `startScheduler()`, so every new transport run regenerates the cells deterministically from the current seed. A mid-run seed/length reset regenerates cells/cursor but does not cancel already-created Attractor voice timers. `audio.stop()` does cancel those pending timers.
+`audio.start()` calls `resetStringAttractor()` before `startScheduler()`, so each new transport run regenerates cells deterministically. A mid-run seed/length reset regenerates cells/cursor but does not cancel already-created Attractor voice timers. `audio.stop()` cancels pending Attractor timers.
 
-Native cells use Q15. Conversion from the deterministic 32-bit draw to Q15 must be monotonic and tested against a source-derived reference vector.
+Native cells use Q15. The local seeded reset generator consumes no shared M3c RNG.
 
-The local seeded reset generator does not consume the shared M3c random stream.
+## Planning order and mutation
 
-## Planning order and random mutation
+Study 126 calls `clockStringFilter(step, when, interval)` before Spiral Attractor decisions and before the occasional Clock ghost random draw.
 
-Study 126 calls `clockStringFilter(step, when, interval)` at the beginning of each scheduled Clock iteration, before Spiral Attractor decisions and before the occasional Clock ghost random draw.
+Active native draw order is therefore:
 
-Therefore when String Attractor is active, native random draw order is:
-
-1. String Attractor lock/mutation draws for the scheduled pulse (and half-pulse when rate=0.5);
-2. Spiral Attractor draws;
+1. String Attractor lock/mutation draw(s), including the half-pulse when rate=0.5;
+2. Spiral Attractor draw(s);
 3. Clock ghost draw when due;
-4. later runtime random consumers in their existing order.
+4. later runtime consumers in their existing order.
 
-When String Attractor is inactive, M4c must consume **zero** additional shared random draws/events so all frozen M3c/M4b default traces remain bit-identical.
+Inactive/default Attractor consumes zero additional shared random draws/events.
 
 For each S&H advance:
 
 1. `pos = cursor % length`;
-2. read current lock;
-3. draw one shared random value and compare to lock;
-4. if draw > lock, draw a second shared random value and replace the current cell;
-5. freeze the resulting cell value `v`;
-6. advance planner cursor immediately to `(pos+1)%length`;
-7. use the same frozen `v/pos` for optional filter CV and optional excitation.
+2. draw once and compare against current lock;
+3. if draw > lock, draw a second time and replace the current cell;
+4. freeze resulting value `v` and current gate;
+5. advance cursor immediately;
+6. use the same frozen `v/pos` for optional filter CV and optional excitation.
 
-Gates are not randomized by this per-step mutation path; the current gate mask is sampled for the frozen position.
+Gates are not randomized by the per-step mutation path.
 
-## Rate and shared-timeline targets
+## Rate and shared timeline
 
-Attractor is driven by the same Clock lookahead as Phase 3.
+For rates 1/2/4/8, only Clock steps satisfying `step % rate == 0` advance the S&H and target the Clock pulse sample.
 
-For rates 1/2/4/8:
+For rate 0.5, every Clock pulse advances at:
 
-- only Clock steps satisfying `step % rate == 0` advance the S&H;
-- target sample is the Clock pulse target.
+- the pulse target;
+- `pulse + interval/2`.
 
-For rate 0.5:
-
-- every Clock pulse advances once at the pulse target;
-- it advances a second time at `pulse + interval/2`;
-- both targets are inserted into the **shared M3c heap**; no module-local clock/timer exists.
+Both use the **shared M3c heap**. No String-private clock or queue exists.
 
 Step-one resync, when enabled, resets the S&H cursor before the step-zero advance.
 
@@ -118,208 +109,220 @@ Study 126 derives:
 - `allowFilter = pulseDiag in {FULL,FILTER}`;
 - `allowExcite = pulseDiag in {FULL,EXCITE}`.
 
-Attractor returns without advancing only when neither path is allowed.
-
 M4c behavior:
 
-- FULL: advance S&H and schedule excitation; filter audio remains deferred;
-- EXCITE: advance S&H and schedule excitation;
-- FILTER: advance/mutate S&H exactly as source but schedule no voice; future filter work may consume the frozen S&H behavior without rewinding state;
-- SUSTAIN: no Attractor S&H advance and no additional random draw/event.
+- FULL: advance/mutate and schedule excitation; filter audio deferred;
+- EXCITE: advance/mutate and schedule excitation;
+- FILTER: advance/mutate, no voice;
+- SUSTAIN: no Attractor advance, random draw or event.
 
 ## Planning-time excitation freeze
 
-Study 126 `attractorStrum(value, target, pos, gate)` executes at Clock planning time.
+`attractorStrum(value,target,pos,gate)` runs at Clock planning time. If String sound is off then, gate is false, or strum amount is effectively zero, no audio bind is created.
 
-If String `sound` is off, the gate is false, or strum amount is effectively zero, no audio bind timer is created.
-
-When an excitation is created, the following values are frozen at planning time:
+The following values freeze at planning time:
 
 - target sample;
-- S&H position `pos`;
-- normalized S&H value `norm`;
-- gate result;
-- base strum level:
-  - `(.050 + .095*norm) * strumAmount * strumLevel`;
-- Classic vs Dual surface **at planning time**;
-- target-side selection **at planning time**:
-  - Classic -> one `CLASSIC` route;
+- S&H position/value/gate;
+- base strum level `(.050 + .095*norm) * strumAmount * strumLevel`;
+- Classic vs Dual surface;
+- target route:
+  - Classic -> CLASSIC;
   - Dual LEFT -> left;
   - Dual RIGHT -> right;
   - Dual BOTH -> left + right;
-  - Dual ALTERNATE -> left for even `pos`, right for odd `pos`;
-- whether the route is one-sided or BOTH; BOTH applies the source ×0.78 level scale to each side.
+  - Dual ALTERNATE -> even pos left, odd pos right;
+- whether BOTH scaling applies; each BOTH side gets source ×0.78.
 
-This is intentionally different from M4b Rhythm, where surface is re-read at bind. Do not reuse Rhythm's observation policy blindly.
+This intentionally differs from M4b Rhythm, whose surface is late-read.
 
 ## Bind lead and late-read contract
 
 Browser source facts:
 
-- narrow UI (`innerWidth <= 700`): bind timer fires 65 ms before target;
-- normal/wide UI: bind timer fires 45 ms before target;
-- at fire, WebAudio start is guarded to `max(target, currentTime+8 ms)`.
+- narrow UI: 65 ms pre-target timer;
+- normal/wide UI: 45 ms pre-target timer;
+- WebAudio start guard `max(target,currentTime+8 ms)`.
 
-FM-1 has no browser viewport. Native M4c uses a fixed **45 ms bind lead**, matching the normal/wide source path and the existing native policy of selecting one deterministic non-UI lead.
+FM-1 has no viewport, so native M4c uses fixed **45 ms** bind lead.
 
 At bind, re-read current:
 
-- String `sound` flag; if off, skip the voice;
+- String `sound`; off skips voice;
 - String source level;
 - selected side frequency from current String/Gravity/tuning state;
-- selected side level (Classic uses 1.0);
-- String brightness;
-- Foundation enabled state/root contribution used by the WIRE transient;
-- other acoustic state already read by the proven M4b BODY/WIRE trigger.
+- selected side level; Classic uses 1.0;
+- current String brightness as actually consumed by the selected acoustic path;
+- Foundation state/root contribution used by WIRE.
 
-Do **not** re-evaluate:
+Do not re-evaluate planning-time surface/route/value/position/gate/base level.
 
-- Classic vs Dual routing;
-- LEFT/RIGHT/BOTH/ALTERNATE selection;
-- S&H value/position/gate;
-- base strum amount/strum-level product.
+## Shared-heap architecture
 
-Those are planning-time facts.
+M4c does not enlarge the frozen `ApsisRuntime` for String-module state.
 
-## Shared-heap native architecture
+`ApsisStringAttractorRuntime` is external and contains:
 
-M4c must not enlarge or rewrite the frozen `ApsisRuntime` merely to store String-module state.
+- max 16 Q15 cells;
+- planner cursor and reset identity;
+- 64 fixed pending side slots;
+- six per-process completed-binding outputs;
+- Attractor-specific telemetry.
 
-Add a separate fixed `ApsisStringAttractorRuntime` owned by the String layer. It contains:
+`APSIS_EVENT_STRING_ATTRACTOR_BIND` is appended after existing Phase-3/M4b event values. It is not added to the frozen `ApsisRuntime.event_count[]`; `sizeof(ApsisRuntime)` remains **21,928 B**.
 
-- at most 16 Q15 S&H cells;
-- planner cursor;
-- reset identity (seed/length);
-- fixed pending occurrence/bind slots and telemetry.
-
-The existing `apsis_runtime_process()` remains the frozen M3c path. M4c adds an explicit extended process entry point that receives the external String Attractor runtime and internally preserves the same scheduler, heap and event ordering. With a null/inactive Attractor context, behavior and hashes remain identical to merged M4b.
-
-`APSIS_EVENT_STRING_ATTRACTOR_BIND` is appended after the existing Phase-3/M4b event values so prior same-sample ordering remains stable. It is not added to the frozen `ApsisRuntime.event_count[]` dimension; M4c telemetry lives in the external String runtime and `sizeof(ApsisRuntime)` remains 21,928 bytes.
+The original `apsis_runtime_process()` remains the frozen M3c path. Explicit M4c entry points extend the same scheduler/heap when an Attractor runtime is active.
 
 ## Bind slot and target-delayed voice policy
 
-A planned audible Attractor side allocates a fixed pending slot and a shared-heap `STRING_ATTRACTOR_BIND` event at:
+Each planned audible side gets a fixed pending slot and shared-heap bind event at:
 
 `max(0, targetSample - 45 ms)`.
 
-The slot freezes planning-time values and target sample. The bind event carries only slot/token identity; the slot is invalidated after bind/skip.
+At bind, M4c resolves current state and allocates existing M4b finite voice(s) with a pool start delay equal to remaining samples until the frozen target.
 
-At bind, M4c resolves current pitch/level and allocates M4b finite voice(s) with an additional start delay equal to the remaining samples until target.
+With normal 45 ms lead and 256-frame callbacks, bind can be observed up to one callback late while still leaving enough lead to hit the musical target sample exactly. Startup/near-immediate clamped binds are deterministic and never early.
 
-Because the bind lead is ~1985 samples at 44.1 kHz and the audio callback is 256 frames, the bind callback can be observed up to one block late and still normally has more than enough lead to schedule the transient at its exact target sample inside a later render block.
-
-Startup/near-immediate targets that do not have 45 ms of lead remain a documented boundary case and must be deterministic/never early. At transport origin, multiple clamped bind callbacks may share sample zero; the external per-process binding output is sized for this legal burst.
+Target smoke preserves the frozen M4b startup path while Attractor has never been active: external Attractor BSS remains zero and the original M4b observer path runs. First real Attractor planning lazily generates cells from seed. Once initialized, the M4c consumer stays available even if filter mode later turns OFF so already-planned bind events can still complete.
 
 ## Attractor acoustic topology
 
 ### Classic
 
-Classic uses the M4b composite at the current Classic/right frequency:
+Classic uses current Classic/right frequency:
 
-- left BODY Attractor leg at target, source composite level ×0.66;
-- right WIRE/pizz Attractor leg at target +4 ms, source composite level ×0.78;
-- Attractor-specific side durations/attack/root behavior below still applies.
+- BODY at target, composite level ×0.66;
+- WIRE/pizz at target +4 ms, composite level ×0.78;
+- right accent, when applicable, starts another +6 ms after WIRE = target +10 ms total.
 
 ### Dual left / BODY
 
-Study 126 Attractor left side:
+Audible source behavior:
 
 - duration 0.72 s;
 - pan -0.30;
-- brightness = current String brightness -0.10 +0.06, then bounded by the bowed BODY path;
+- bowed brightness input = current String brightness −0.10 +0.06 = current −0.04, bounded by the bowed path;
 - attack 30 ms;
-- BODY waveform identity is the already-frozen M4b native BODY;
-- **no root shadow is audible on BODY.** `stringSideTransient()` computes `rootGain=0.08` and passes it in the options object, but Study 126's bowed `stringSolo()` path never reads `opts.rootGain`. Native must preserve the actual sounding source behavior, not the unused caller argument.
+- frozen M4b BODY waveform identity;
+- **no root shadow**: Study 126 passes `rootGain=.08` in options, but bowed `stringSolo()` never reads it.
 
 ### Dual right / WIRE
 
-Study 126 Attractor right side:
+Audible source behavior:
 
 - duration 0.42 s;
 - pan +0.30;
-- brightness = current String brightness +0.18 +0.06, clamped to source range;
-- level into Classic/pizz primitive ×0.92;
+- level into the M4b pizz primitive ×0.92;
 - root contribution 0.05 when Foundation is enabled;
-- WIRE uses the already-frozen Study-98-derived pizz primitive.
+- WIRE uses the frozen Study-98-derived pizz primitive;
+- **audible brightness is the current base `state.string.brightness`.** `stringSideTransient()` computes and passes a +0.24 brightness option, but `classicStringNote()` never reads `opts.brightness`; native follows the sounding source rather than the unused caller argument.
 
 ### Right upper-octave accent
 
-When normalized S&H value `norm > 0.52`, every Attractor right/WIRE route adds:
+When frozen `norm > 0.52`, each right/WIRE route adds:
 
 - sine at `freq * 2`;
-- level `rightTransientInputLevel * 0.15` — this is the level passed into `stringSideTransient()` before its internal WIRE ×0.92;
-- start right-route target +6 ms;
-- duration `min(0.20 s, 0.42*0.42 s)` = 176.4 ms for the source Attractor right duration;
-- pan `+0.30 * 0.72 = +0.216`;
-- the generic String `tone()` 16 ms onset and sine/no-low-pass behavior.
+- level `rightTransientInputLevel * 0.15` before WIRE's internal ×0.92;
+- +6 ms from right-route start;
+- 176.4 ms duration;
+- pan +0.216;
+- generic String 16 ms onset;
+- sine/no-low-pass behavior.
 
-Classic composite also contains a right Attractor leg beginning at target +4 ms, so its accent begins at target +10 ms when `norm > 0.52`.
-
-The accent must use the same global 80+32 finite pool/steal ceiling; it does not get a separate voice budget.
+The accent shares the same global 80 logical +32 fade-tail finite pool and steal policy.
 
 ## Frozen M4c1 capacity evidence
 
-Worst legal 1.20 s planner-horizon stress uses:
+Worst legal 1.20 s planner-horizon stress:
 
-- 180 BPM;
-- 1/4 Clock division;
-- maximum swing;
-- Attractor rate 0.5;
-- BOTH target;
-- all gates on;
-- full excitation;
+- 180 BPM, 1/4 division, max swing;
+- rate 0.5, BOTH, all gates, full excitation;
 - maximal Attractor mutation draw load;
 - concurrent String Rhythm, Spiral rate 4, Bloom and Clock events;
-- 512-frame process blocks, deliberately larger than the 256-frame target callback to add burst margin.
+- 512-frame process blocks for extra burst margin;
+- deterministic 60-second run.
 
-Measured over a deterministic 60-second run:
+Measured:
 
-- shared heap high-water: **415 / 512**;
-- Attractor planned-but-not-bound high-water: **60 sides**;
-- final pending-slot capacity: **64**, giving four side slots of deterministic margin;
-- per-process binding-output bound: **6** for the explicit 512-frame stress case; normal 256-frame startup requires at most four;
-- S&H advances: **1470**;
-- mutations: **1470**;
-- consumed bind callbacks: **2884**;
-- shared random trace: `b7a9a395`;
-- late trace: `e777a771`;
-- zero pending, binding-output, heap, Spiral-slot, Bloom-slot overflow/starvation;
-- the same run passes ASAN/UBSAN.
+- shared heap **415 / 512**;
+- planned-but-not-bound sides **60 / 64**;
+- per-process binding-output bound **6**; normal 256-frame startup requires at most 4;
+- S&H advances 1470;
+- mutations 1470;
+- bind callbacks 2884;
+- random trace `b7a9a395`;
+- late trace `e777a771`;
+- zero pending/binding/heap/Spiral/Bloom overflow or starvation;
+- normal + ASAN/UBSAN agree.
 
-The existing 512-event heap therefore remains sufficient with 97 events of measured worst-case headroom. No module-private queue is permitted.
+512 shared events remain sufficient with 97 measured worst-case headroom.
+
+## Frozen M4c2 live/audio evidence
+
+Host tests prove:
+
+- planning-time route/value/base facts remain frozen;
+- bind-time sound/pitch/source-level/side-level/brightness/Foundation are late-read;
+- BODY/WIRE/Classic/accent topology matches the actual sounding Study-126 code;
+- full shared timeline -> target−45 ms bind -> finite-pool delay is never early and is exact at target under normal lead.
+
+Full-chain reference:
+
+- target sample 36,750;
+- bind-processing block ends at 34,816;
+- remaining pool delay 1,934 samples;
+- voice age remains 0 through the full delay and advances first on the target sample.
+
+All host suites pass normal + ASAN/UBSAN.
+
+## Target / emulator evidence
+
+Validated implementation head: `e2171caac10eb402e97a6d566eff71a27544e3fc`.
+
+- APSIS core #198: PASS normal + ASAN/UBSAN;
+- staged validation #187: PASS all five gates, real JieLi target + FM-1 emulator;
+- image **85,564 / 581,564 B**;
+- RAM **44,680 / 98,304 B**;
+- pool **30,720 / 344,064 B**;
+- package SHA-256 `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`;
+- emulator queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`;
+- peak 317; RMS L/R 101/100; stereo delta 63; mean L/R −2/−2;
+- default Attractor OFF is bit-identical to frozen M4a/M4b PCM:
+  `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`.
+
+An earlier target-integrated head changed only the smoke PCM startup phase while Attractor was OFF. That result was rejected. The final target preserves the exact frozen M4b observer/startup path until first actual Attractor activation, restoring the immutable PCM hash above.
 
 ## Acceptance gates
 
 ### M4c1 — state + silent planner
 
-1. [x] Add explicit `attractorTarget` state enum/field, default ALTERNATE.
-2. [x] Source-seeded LCG produces deterministic 4/8/12/16-cell reference vectors.
-3. [x] Step-one resync resets cursor but not cells.
-4. [x] Rate 0.5 produces pulse + half-pulse targets on the shared timeline; rates 1/2/4/8 match source step selection.
-5. [x] FILTER-only advances/mutates cells with no voice bind; SUSTAIN consumes no Attractor random/events.
-6. [x] Attractor random draws precede Spiral/ghost draws when active.
-7. [x] Inactive/default Attractor preserves all M3c/M4b random/late/queue/audio hashes exactly.
-8. [x] Worst legal horizon establishes fixed pending-slot and heap capacity with zero overflow/starvation.
-9. [x] Normal + ASAN/UBSAN pass before audio bind integration.
+1. [x] explicit Attractor target state/default;
+2. [x] deterministic source-seeded LCG vectors;
+3. [x] cursor-only step-one resync;
+4. [x] 0.5 pulse + half-pulse and source 1/2/4/8 selection;
+5. [x] FILTER-only advance and SUSTAIN no-op;
+6. [x] Attractor random draws precede Spiral/ghost;
+7. [x] inactive/default preserves frozen M3c/M4b behavior;
+8. [x] measured fixed slot/heap capacity with zero overflow;
+9. [x] normal + ASAN/UBSAN.
 
 ### M4c2 — late bind + finite excitation
 
-1. Planning freezes surface/target-side/value/position/base-level as source specifies.
-2. Bind at native target−45 ms re-reads current String sound/pitch/source-level/side-level/brightness/Foundation state.
-3. Turning String off after planning but before bind skips the voice; turning it on after a plan-time skip does not resurrect a missing bind.
-4. Pitch/side-level changes after planning but before bind affect the sounding voice.
-5. Classic/Dual/LEFT/RIGHT/BOTH/ALTERNATE routing changes after planning do not reroute an already-planned occurrence.
-6. BODY/WIRE durations, pan, brightness offsets, effective root behavior and Classic composite scales match Study 126.
-7. Right `norm > 0.52` accent matches frequency/level/+6 ms/pan/duration rules.
-8. Target-delay rendering is deterministic, never early, and sample-exact at target when normal 45 ms lead is available.
-9. Existing M4b Rhythm and M4a sustain references remain unchanged when Attractor is inactive.
-10. Shared heap/pending slots/transient pool show zero overflow/drop under legal stress.
-11. Real JieLi target and emulator regression pass.
+1. [x] planning freezes route/value/position/base level;
+2. [x] target−45 ms bind late-reads sound/pitch/source/side/brightness/Foundation;
+3. [x] bind-time mute skips; planning-time skip cannot be resurrected;
+4. [x] pitch/side-level changes before bind affect sounding voice;
+5. [x] later surface/target changes do not reroute planned occurrence;
+6. [x] BODY/WIRE/Classic durations, pan, effective brightness/root behavior and scales match source;
+7. [x] right `norm > 0.52` octave accent matches source;
+8. [x] pool delay is deterministic, never early and sample-exact at normal target;
+9. [x] M4a/M4b references remain unchanged when Attractor is inactive;
+10. [x] shared heap/pending/binding/transient pools show zero legal-stress overflow/drop;
+11. [x] real JieLi target and emulator regression pass.
 
 ## Deferred beyond M4c
 
 - audible dynamic String filter S&H modulation and filter sequence;
-- UI/display cursor rendering;
-- manual physical controls for Attractor target/rate/reroll/gates;
+- UI/display cursor and manual physical Attractor controls;
 - shared Space/Cathedral;
 - physical FM-1 listening and ISR-cycle evidence.
