@@ -112,9 +112,11 @@ Source probe pitch and gain each use a 25 ms WebAudio time constant. Native M4d
 therefore smooths both oscillator frequency and gain toward their new targets
 with a 25 ms source-equivalent time constant.
 
-Pan/width changes must also be de-clicked. They may use the same 25 ms native
-smoothing because the browser source never defines a separate audible Drift
-pan automation constant after the wiring divergence.
+Gain smoothing is kept internally at fractional precision so low default gains
+do not collapse the 25 ms time constant through integer minimum-step rounding.
+Pan/width changes use the same 25 ms de-clicking policy because the browser
+source defines no separate audible Drift-pan automation constant after the
+wiring divergence.
 
 Mute/Stop must never hard-discontinue an audible oscillator.
 
@@ -137,38 +139,102 @@ Mute/Stop must never hard-discontinue an audible oscillator.
 - allocation-free;
 - no `libm` on target;
 - reuse the existing 257-point fixed Drift-delta table;
-- tuning/frequency conversion must be deterministic fixed-point and must not
-  alter frozen String output when Drift rendering is omitted/muted;
+- reuse the validated fixed String tuning/frequency conversion for the live
+  Gravity root;
 - saturation occurs only at the final additive stereo mix boundary.
 
-## Required host evidence
+## Frozen host evidence
 
-Before target integration, tests must prove:
+`tests/test_drift_dsp.c` proves:
 
 1. amount endpoints reproduce 0.05 Hz and 4.00 Hz base delta;
-2. default state reproduces the expected symmetric tuned pair;
-3. mute gives zero target gain and zero audible separation without destroying
+2. default state produces a symmetric tuned pair;
+3. mute gives zero target gain and zero audible separation without hard-resetting
    oscillator state;
 4. depth clamps to the source minimum 0.15;
 5. Equal / Just / Pythagorean + tuning-strength changes move the carrier using
    current Gravity-root semantics;
-6. width 0 collapses the pair to centre and width 1 reaches ±0.34 pan with
-   equal-power stereo mapping;
+6. width 0 collapses the pair exactly to centre and width 1 reaches the
+   source-derived ±0.34 pan law with equal-power mapping;
 7. 25 ms pitch/gain smoothing is deterministic and click-safe;
-8. a deterministic standalone Drift render has a frozen peak/hash;
-9. all frozen M3c/M4a/M4b/M4c tests remain unchanged.
+8. all frozen M3c/M4a/M4b/M4c tests remain unchanged.
 
-## Target / emulator gate
+Frozen standalone default Drift render, 2 s at 44.1 kHz:
 
-Unlike M4b/M4c, Drift is ON by default. Therefore integrating M4d is expected
-to change the default emulator PCM. The old String-only raw PCM hash is a
-regression reference for **String-only / Drift-muted** operation, not the new
-full-default output.
+- peak: **488 Q15**
+- FNV hash: **`0aec6bc2`**
+- normal and ASAN/UBSAN agree.
 
-The accepted M4d target must prove both:
+## Target / emulator verification
 
-- Drift-muted output retains the frozen prior String path; and
-- default Drift-on output boots/renders deterministically and receives a new
-  recorded emulator PCM reference.
+Unlike M4b/M4c, Drift is ON by default. Integrating M4d is therefore expected
+to change the default emulator PCM.
 
-Physical FM-1 sound and ISR margin remain unverified until hardware exists.
+Validated implementation head:
+`0b2a351b17adfa7556c217f24af8a08c1c708d2c`.
+
+Exact implementation-head gates:
+
+- APSIS core #210: PASS normal + ASAN/UBSAN;
+- staged validation #199: PASS source/core, unchanged Dinghy, APSIS overlay,
+  real JieLi target, default FM-1 emulator, and the dedicated Drift-DSP bypass
+  regression gate.
+
+Default M4d target:
+
+- image: **86,544 / 581,564 B**
+- RAM: **44,760 / 98,304 B**
+- pool: **30,720 / 344,064 B**
+- package bytes: 610,110 B
+- package SHA-256:
+  **`394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`**
+- product: `FM-1_972`.
+
+Relative to M4c, the complete persistent Drift engine costs 980 B app image,
+80 B RAM and zero additional pool memory.
+
+Default Drift-on emulator reference:
+
+- frames: 124,928
+- peak: **433 Q15**
+- RMS L/R: **135 / 135**
+- stereo delta: **125**
+- mean L/R: **-3 / -3**
+- raw PCM SHA-256:
+  **`539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`**
+- M3c queue: 28/512
+- overflow: 0
+- late flags: 0
+- cursor: 123,648
+- late trace: `811c9dc5`.
+
+The changed PCM is therefore the intended audible consequence of enabling the
+identity-bearing Drift source, while runtime scheduling telemetry remains
+frozen.
+
+### Exact M4c bypass proof
+
+A simple `state.drift.sound=0` is **not** a valid isolation test because the
+already-frozen browser architecture also uses Drift state inside String/Spiral
+couplings. Staged Gate 5b instead regenerates the target with only the new
+`ApsisDriftDsp` layer omitted while leaving all pre-M4d state/runtime behavior
+and the same `0.1-dev` identity untouched.
+
+That CI-only bypass produces:
+
+- image: **85,564 B**
+- RAM: **44,680 B**
+- pool: **30,720 B**
+- package SHA-256:
+  **`c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`**
+- raw PCM SHA-256:
+  **`10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`**
+- peak 317; RMS 101/100; stereo delta 63; mean -2/-2
+- queue 28/512; overflow 0; late flags 0; late trace `811c9dc5`.
+
+Both the package SHA and PCM SHA are exactly the frozen final M4c references.
+This proves the M4d target delta is isolated to the new persistent Drift DSP;
+the previous String/runtime target remains bit-identical when that layer is
+removed.
+
+Physical FM-1 sound and real ISR margin remain unverified until hardware exists.
