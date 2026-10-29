@@ -14,7 +14,8 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_harmony.h apsis/apsis_harmony.c \
    apsis/apsis_gravity.h apsis/apsis_gravity.c \
    apsis/apsis_string.h apsis/apsis_string.c \
-   apsis/apsis_string_dsp.h apsis/apsis_string_dsp.c apsis/apsis_string_transient.c \
+   apsis/apsis_string_dsp.h apsis/apsis_string_dsp.c \
+   apsis/apsis_string_transient.c apsis/apsis_string_transient_pool.c \
    apsis/apsis_drift.h apsis/apsis_drift.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
@@ -47,15 +48,15 @@ if '#include "apsis_string_dsp.c"' not in s:
         raise SystemExit('FAIL: String source include anchor missing')
     s = s.replace(c_anchor, c_anchor + '\n#include "apsis_string_dsp.c"', 1)
 
-# M4b1 compiles the finite transient engine in the real single-TU target but
-# deliberately does not call it from app_audio() yet. This isolates target/
-# linker/RAM proof from the later shared-timeline trigger integration.
+# M4b1 compiles the finite transient engine against a separate pool object.
+# The wrapper includes the already-validated transient implementation while
+# preserving ApsisStringDsp's exact M4a layout.
 transient_anchor = '#include "apsis_string_dsp.c"'
-if '#include "apsis_string_transient.c"' not in s:
+if '#include "apsis_string_transient_pool.c"' not in s:
     if transient_anchor not in s:
         raise SystemExit('FAIL: M4b transient include anchor missing')
     s = s.replace(transient_anchor,
-                  transient_anchor + '\n#include "apsis_string_transient.c"', 1)
+                  transient_anchor + '\n#include "apsis_string_transient_pool.c"', 1)
 
 old = '#include "apsis_runtime.c"'
 new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_final.c"'
