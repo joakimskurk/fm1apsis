@@ -275,8 +275,50 @@ static void test_mother_commit_precedes_bloom_plan(void)
     assert(r.last_bloom.harmony.degree == 3u);
 }
 
+static uint16_t test_runtime_queue_stress(void)
+{
+    ApsisState s;
+    ApsisRuntime r;
+    ApsisKeepBank bank;
+    ApsisChainSequence chain;
+    ApsisMotherPending mother;
+    ApsisBloomVoicingState bloom;
+    uint8_t i;
+
+    init_all(&s, &r, &bank, &chain, &mother, &bloom);
+    s.clock.step_one_resync = 1u;
+    s.clock.main_mask = 0x0FFFu;
+    s.clock.snap_mask = 0x0FFFu;
+    s.clock.inner_mask = 0x0FFFu;
+    s.clock.ghost_q15 = APSIS_Q15_ONE;
+    s.string.rhythm = APSIS_STRING_RHYTHM_PIZZ;
+    s.string.rhythm_trigger = APSIS_STRING_TRIGGER_EVERY;
+    s.string.rhythm_every = 1u;
+    s.string.pulse_diag = APSIS_STRING_PULSE_FULL;
+    s.spiral.attractor_rate = 4u;
+    s.spiral.route_count = 4u;
+    s.spiral.attractor_lock_q15 = APSIS_Q15_ONE;
+    s.spiral.attractor_gates = 0xFFFFu;
+    for (i = 0u; i < 4u; ++i) s.spiral.route[i] = (uint8_t)(i * 3u);
+    s.bloom.cycles = 1u;
+    s.bloom.rate = 4u;
+    s.bloom.trigger_step = 0u;
+    s.bloom.delay_ms = 0u;
+
+    apsis_runtime_start(&r);
+    process_to(&r, &s, &bank, &chain, &mother, &bloom, 220756u);
+
+    assert(r.queue_overflowed == 0u);
+    assert(r.queue_high_water == 15u);
+    assert(r.event_count[APSIS_EVENT_CLOCK_GHOST] > 0u);
+    assert(r.event_count[APSIS_EVENT_BLOOM] > 0u);
+    assert(r.spiral_occurrence_count > 0u);
+    return r.queue_high_water;
+}
+
 int main(void)
 {
+    uint16_t high_water;
     test_default_block_runtime();
     test_step_one_resync_precedes_spiral();
     test_gravity_quantized_boundary();
@@ -285,6 +327,9 @@ int main(void)
     test_chain_start_advance_and_morph();
     test_spiral_symbolic_occurrences();
     test_mother_commit_precedes_bloom_plan();
-    puts("PASS: APSIS runtime coordinator");
+    high_water = test_runtime_queue_stress();
+    printf("PASS: APSIS runtime coordinator (sizeof=%lu, stress high-water=%u/%u)\n",
+           (unsigned long)sizeof(ApsisRuntime), (unsigned)high_water,
+           (unsigned)APSIS_TRANSPORT_QUEUE_CAP);
     return 0;
 }
