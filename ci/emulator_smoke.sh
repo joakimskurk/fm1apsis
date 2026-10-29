@@ -14,10 +14,9 @@ git clone -q https://github.com/joakimeriksson/fm1-emu.git work/fm1-emu
 ( cd work/fm1-emu && cargo build -q --release -p fm1-emu )
 EMU=work/fm1-emu/target/release/fm1-emu
 
-# M3c contract: APSIS boots, accepts native surface buttons, remains silent,
-# advances the shared target runtime without queue/slot starvation, and keeps
-# deterministic late-binding telemetry alive. Locate the passive probe in the
-# real target ELF rather than guessing layout.
+# M4a contract: APSIS boots, native surface buttons still work, the proven M3c
+# runtime remains healthy, and the first dry source now produces bounded stereo
+# String sustain. Locate the passive runtime probe in the real target ELF.
 OBJDUMP="${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN not set}/common/bin/objdump"
 "$OBJDUMP" -t work/apsis/build/dinghy.elf > work/emu-smoke/target_symbols.txt
 PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found) print found }' \
@@ -32,7 +31,7 @@ PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found
 
 python3 - <<'PY'
 from pathlib import Path
-import hashlib, json, re, struct, wave
+import hashlib, json, math, re, struct, wave
 
 root = Path('work/emu-smoke')
 for p in Path('work').glob('lcd_*.bmp'):
@@ -64,10 +63,26 @@ with wave.open(str(wp), 'rb') as w:
     fr = w.getnframes()
 if sw != 2:
     raise SystemExit(f'FAIL: unexpected WAV sample width {sw}')
+if ch != 2:
+    raise SystemExit(f'FAIL: expected stereo WAV, got {ch} channels')
 vals = struct.unpack('<' + 'h' * (len(raw) // 2), raw)
+left = vals[0::2]
+right = vals[1::2]
 peak = max((abs(v) for v in vals), default=0)
-if peak != 0:
-    raise SystemExit(f'FAIL: M3c APSIS runtime must remain silent, peak={peak}')
+if not (100 <= peak <= 4096):
+    raise SystemExit(f'FAIL: M4a String peak outside conservative Q15 window: {peak}')
+stereo_delta = max((abs(l - r) for l, r in zip(left, right)), default=0)
+if stereo_delta < 8:
+    raise SystemExit(f'FAIL: default Dual String is not measurably stereo, delta={stereo_delta}')
+mean_l = sum(left) // max(1, len(left))
+mean_r = sum(right) // max(1, len(right))
+if abs(mean_l) > 16 or abs(mean_r) > 16:
+    raise SystemExit(f'FAIL: String DC offset too high: L={mean_l} R={mean_r}')
+rms_l = math.isqrt(sum(v * v for v in left) // max(1, len(left)))
+rms_r = math.isqrt(sum(v * v for v in right) // max(1, len(right)))
+if rms_l < 20 or rms_r < 20:
+    raise SystemExit(f'FAIL: String RMS unexpectedly low: L={rms_l} R={rms_r}')
+wav_sha256 = hashlib.sha256(raw).hexdigest()
 
 log = (root / 'run.log').read_text(errors='replace')
 lines = log.splitlines()
@@ -107,6 +122,12 @@ report = {
     'wav_frames': fr,
     'wav_channels': ch,
     'wav_peak': peak,
+    'wav_rms_left': rms_l,
+    'wav_rms_right': rms_r,
+    'wav_stereo_delta': stereo_delta,
+    'wav_mean_left': mean_l,
+    'wav_mean_right': mean_r,
+    'wav_raw_sha256': wav_sha256,
     'runtime_queue_high_water': queue_high_water,
     'runtime_queue_capacity': 512,
     'runtime_queue_overflowed': queue_overflowed,
@@ -116,5 +137,5 @@ report = {
 }
 (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, sort_keys=True))
-print('PASS: APSIS emulator boot/input/silent-audio/M3c-runtime contract')
+print('PASS: APSIS emulator boot/input/M4a-String-audio/M3c-runtime contract')
 PY
