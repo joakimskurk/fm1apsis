@@ -101,8 +101,15 @@ static void drift_equal_power_pair(uint16_t width_q15,
 {
     uint16_t width = width_q15 > APSIS_Q15_ONE ? APSIS_Q15_ONE : width_q15;
     uint16_t pan = drift_mul_q15(width, DRIFT_PAN_MAX_Q15);
-    uint16_t x_far = (uint16_t)((APSIS_Q15_ONE - pan) / 2u);
-    uint16_t x_near = (uint16_t)(APSIS_Q15_ONE - x_far);
+    uint16_t x_far, x_near;
+    if (!pan) {
+        uint16_t centre = drift_quarter_sine_q15((uint16_t)((APSIS_Q15_ONE + 1u) / 2u));
+        if (near_q15) *near_q15 = centre;
+        if (far_q15) *far_q15 = centre;
+        return;
+    }
+    x_far = (uint16_t)((APSIS_Q15_ONE - pan) / 2u);
+    x_near = (uint16_t)(APSIS_Q15_ONE - x_far);
     if (near_q15) *near_q15 = drift_quarter_sine_q15(x_near);
     if (far_q15) *far_q15 = drift_quarter_sine_q15(x_far);
 }
