@@ -18,10 +18,9 @@ EMU=work/fm1-emu/target/release/fm1-emu
 # and the live target runtime queue advances without overflowing. Locate the
 # passive telemetry block in the real target ELF rather than guessing layout.
 OBJDUMP="${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN not set}/common/bin/objdump"
-PROBE_ADDR=$(
-  "$OBJDUMP" -t work/apsis/build/dinghy.elf \
-    | awk '$NF == "apsis_runtime_probe" { print "0x" $1; exit }'
-)
+"$OBJDUMP" -t work/apsis/build/dinghy.elf > work/emu-smoke/target_symbols.txt
+PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found) print found }' \
+  work/emu-smoke/target_symbols.txt)
 [[ -n "$PROBE_ADDR" ]] || { echo "FAIL: apsis_runtime_probe symbol not found" >&2; exit 3; }
 
 "$EMU" --fwsc "$PKG" --ms 3000 --wav work/emu-smoke/apsis.wav \
