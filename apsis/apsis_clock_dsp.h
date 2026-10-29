@@ -5,7 +5,7 @@
 #include "apsis_runtime.h"
 
 #define APSIS_CLOCK_DSP_RATE 44100u
-#define APSIS_CLOCK_DSP_VOICES 48u
+#define APSIS_CLOCK_DSP_VOICES 32u
 #define APSIS_CLOCK_DSP_BATCH_CAP 8u
 
 typedef struct {
