@@ -30,7 +30,10 @@ typedef enum {
     APSIS_EVENT_CHAIN_APPLY_OBSERVE,
     APSIS_EVENT_SPIRAL_BIND,
     APSIS_EVENT_BLOOM_OCCURRENCE,
-    APSIS_EVENT_BLOOM_BIND
+    APSIS_EVENT_BLOOM_BIND,
+    /* M4c is appended after the frozen M3c/M4b range so every prior numeric
+     * event identity and same-sample ordering remains unchanged. */
+    APSIS_EVENT_STRING_ATTRACTOR_BIND
 } ApsisEventType;
 
 typedef struct {
