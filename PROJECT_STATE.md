@@ -4,7 +4,7 @@ Last updated: 2026-10-29
 
 ## Current milestone
 
-**Phase 3 / M3b - structural/runtime consumers on the shared transport.**
+**Phase 3 / M3b - implementation complete and verified through emulator; final documentation-head merge gate is active.**
 
 Phase 2 musical/state core is merged to `main` at `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
 
@@ -12,9 +12,11 @@ M3a deterministic transport is complete and squash-merged to `main` at:
 - merge commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
 - PR #4: `M3a: deterministic sample-referenced transport core`
 
-Active work now lives on:
+M3b work lives on:
 - branch `m3b-runtime-consumers`
+- PR #5: `M3b: structural runtime consumers`
 - base: merged M3a commit `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
+- final implementation/evidence head before documentation: `fa486917d6c9a328b7cf6f37147c2669d1ae966c`
 
 ## Product invariant
 
@@ -73,18 +75,52 @@ Deterministic shared transport:
 - long-running sample-counter tests
 - transport compiled in the real FM-1 single translation unit
 
-Final M3a PR head after rebase:
-- `cb0319185a483ff2972aae104da6b2a86c202add`
-- `APSIS core` run #60: PASS
-- `APSIS staged validation` run #50: PASS through real target and emulator
-
-M3a target evidence:
-- app image: 56,680 B / 581,564 B
-- RAM `.data + .bss`: 14,104 B / 98,304 B
-- pool: 30,720 B / 344,064 B
-- package bytes: 610,110 B
+M3a final evidence:
+- final rebased PR head `cb0319185a483ff2972aae104da6b2a86c202add`
+- `APSIS core` #60: PASS
+- `APSIS staged validation` #50: PASS through real target and emulator
+- app image: 56,680 B
+- RAM `.data + .bss`: 14,104 B
+- pool: 30,720 B
 - package SHA-256 `6f2b4549eef194672d4a340e8b7cb33fe1c04befe564ad7da39d3275b8f96e94`
-- emulator WAV peak 0, expected because M3a is intentionally silent
+
+### Phase 3 / M3b
+Silent structural/runtime consumers:
+- dedicated allocation-free `apsis_runtime.[ch]` coordinator
+- live transport + 256-event heap instantiated in the real FM-1 overlay
+- `app_audio()` drives only the deterministic sample timeline and remains silent
+- Mother horizon / next-1 commit on the shared timeline
+- Chain start/loop/cell/chance/transpose/morph progression
+- browser-parity Chain meter snapshot at Chain start
+- Gravity immediate/quantized pending commit on the correct boundary
+- Spiral attractor progression and symbolic occurrence capture
+- Bloom occurrence and voicing-plan capture
+- deterministic same-sample ordering and deterministic random source
+- target-safe Q32/runtime arithmetic without pi32v2 `__udivdi3`
+- live target-RAM queue telemetry in the emulator gate
+
+M3b final implementation/evidence head before documentation:
+- `fa486917d6c9a328b7cf6f37147c2669d1ae966c`
+- `APSIS core` run #76: PASS, including ASAN/UBSAN
+- `APSIS staged validation` run #66: PASS through real target and emulator
+
+M3b target evidence:
+- app image: 66,384 B / 581,564 B
+- image delta vs M3a: +9,704 B
+- RAM `.data + .bss`: 22,552 B / 98,304 B
+- RAM delta vs M3a: +8,448 B
+- pool: 30,720 B / 344,064 B
+- pool delta vs M3a: 0 B
+- package bytes: 610,110 B
+- package SHA-256 `819402c1105eceac1a6cbc7031bb2e2c6dabb8b82f444cfb3b6a80f29963f9dd`
+
+M3b queue/runtime evidence:
+- host `sizeof(ApsisRuntime)`: 8,456 B
+- host stress queue high-water: 14 / 256, no overflow
+- emulator target-RAM live queue high-water: **7 / 256**
+- emulator target-RAM overflow flag: **0**
+- emulator runtime cursor: **123,648** low-32 sample value after smoke
+- emulator WAV peak: 0, required because M3b is intentionally silent
 
 ## Browser timing facts already audited
 
@@ -109,46 +145,37 @@ Browser lead timers express late-binding intent, not timing jitter to reproduce 
 
 Native transport must preserve the musical boundary/state-observation semantics on one sample-referenced timeline.
 
-## Current M3b goal
+## M3b status
 
-M3b turns the proven event generator into the real silent FM-1 runtime timeline.
+All required M3b implementation work is complete and verified through emulator. The only remaining M3b work is repository hygiene around the final documentation commit(s):
+- rerun core and staged validation on the final documentation head;
+- confirm PR #5 still targets current `main` cleanly;
+- mark PR #5 ready;
+- squash-merge PR #5.
 
-Required work:
-- instantiate `ApsisTransport` and `ApsisEventQueue` in the FM-1 runtime;
-- schedule enough future events for the current audio block / bounded lookahead;
-- consume structural events deterministically without producing audio;
-- apply Mother horizon/next-1 commits on the shared timeline;
-- apply Chain pulse/cell transitions on the shared timeline;
-- commit Gravity immediate/quantized pending changes at the correct boundary;
-- progress Spiral attractor state and create symbolic Spiral occurrences;
-- create Bloom occurrence/voice-plan state at the correct boundaries;
-- preserve ordering needed for later M3c late binding;
-- measure real live queue RAM and queue high-water on target/emulator.
+Do **not** begin M3c code until this merge gate is complete.
 
-M3b must remain allocation-free and must not create separate per-module clocks.
+## Next milestone: M3c
 
-## Current risks to prove
+M3c is the final deterministic-transport stage before DSP. Its scope is:
+- Spiral final pitch resolution against the latest committed Gravity/Tuning at the source-derived late-bind boundary;
+- Bloom per-petal final pitch resolution at the source-derived late-bind boundary;
+- make random decisions explicitly traceable/deterministic across the long reference trace;
+- extend queue stress/high-water validation for the added late-bind events;
+- create a long deterministic reference trace covering state observation/order over many cycles;
+- run the complete real target/emulator Phase 3 gate.
 
-- callback/block scheduling must never skip or double-consume a boundary;
-- same-sample state priority must be deterministic;
-- Mother and Chain commits must occur before/after dependent events exactly according to source intent;
-- pending Gravity must not become visible before its quantized commit;
-- Spiral/Bloom must schedule symbolic occurrences now but defer final pitch binding to M3c;
-- 256-entry queue must retain adequate high-water margin after live runtime instantiation;
-- random decisions must remain explicit/injected/deterministic;
-- `app_audio()` remains silent through M3b/M3c despite becoming the timeline driver.
+M3c remains silent. Phase 4 DSP is blocked until M3c is complete and green.
 
 ## Exact next action
 
-1. Inspect the public APIs and current tests for `apsis_transport`, `apsis_mother`, `apsis_chain`, `apsis_gravity`, `apsis_spiral`, `apsis_bloom`, `apsis_keep`, and `overlay/dinghy.c`.
-2. Design the smallest allocation-free runtime coordinator that owns transport + queue and consumes structural events; prefer a dedicated `apsis_runtime.[ch]` over embedding state-machine logic in `overlay/dinghy.c`.
-3. Add source-derived desktop regression tests for event consumption/state ordering **before** wiring it into the FM-1 overlay.
-4. Implement Mother/Chain/Gravity structural consumption first, then Spiral/Bloom symbolic occurrence state.
-5. Keep `app_audio()` sample output silent; use it only to advance the deterministic timeline.
-6. Run root tests + ASAN/UBSAN.
-7. Add the runtime module to the overlay and run the complete real target/emulator gate.
-8. Record live RAM/pool/image deltas and queue high-water in `TESTING.md`.
-9. Only after M3b is green proceed to M3c late binding; Phase 4 DSP remains blocked until M3c is complete.
+1. Commit `PROJECT_STATE.md`, `ROADMAP.md`, and `TESTING.md` with the verified M3b evidence.
+2. Run `APSIS core` and the complete staged target/emulator validation on that final documentation head.
+3. Verify PR #5 is mergeable against current `main` and no new base commits require rebase/reconstruction.
+4. Mark PR #5 ready and squash-merge it with the verified HEAD lock.
+5. Create the M3c work branch from the resulting `main` merge commit.
+6. Before implementing M3c, audit Study 126's exact Spiral/Bloom late-binding state-observation points and encode those as regression expectations.
+7. Only then implement late binding and the long deterministic trace. Do not start DSP.
 
 ## Do not regress
 
