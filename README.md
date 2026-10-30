@@ -23,8 +23,8 @@ The repository, not chat history, is the durable source of project state.
 - Phase 3 deterministic shared transport/runtime: complete and merged
 - Phase 4 five dry source engines: complete and merged
 - Phase 5 sounding-source structural integration: complete and merged as `d677a887cf6dc8552634bde5a71fec0221c299b5`
-- Phase 6 shared Space/Cathedral: **implementation and technical gates complete; PR #16 is the guarded merge vehicle**
-- Phase 7 persistent KEEP/CHAIN storage is next after Phase 6 merges
+- Phase 6 shared Space/Cathedral: **complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`**
+- Phase 7 persistent KEEP/CHAIN storage is the next implementation phase
 
 Physical FM-1 validation has not yet been performed. Real hardware ISR margin and listening quality therefore remain unverified.
 
@@ -53,7 +53,7 @@ Phase-5/M4g frozen default emulator baseline remains cursor **123,648**, queue 2
 
 ## Phase 6 — shared Space/Cathedral
 
-Phase 6 is now integrated into the generated FM-1 firmware path:
+Phase 6 is integrated and merged into `main`:
 
 - five post-source/post-Mother sends feed one shared room
 - selected compact modulated 8-line FDN
@@ -62,7 +62,7 @@ Phase 6 is now integrated into the generated FM-1 firmware path:
 - generated FM-1 Cathedral runs internally at **11.025 kHz** using 4:1 send averaging/wet hold, with its delay/filter/decay/modulation constants retimed to preserve real-time behaviour
 - dry source engines and final output remain 44.1 kHz
 
-Final technical target candidate:
+Frozen Phase-6 target candidate:
 
 - image **107,352 / 581,564 B**
 - RAM **87,780 / 98,304 B**
@@ -75,8 +75,10 @@ Final technical target candidate:
 
 The one-callback cursor difference from the older Phase-5 scenario is an explicit Phase-6 scenario baseline, not a scheduler rewrite. Both audible and room-return-disabled P6 variants land on the same cursor and retain healthy runtime telemetry.
 
+Final pre-merge head `cfdfff673204d4fa36208508e343c6297a37ff37` passed core #424, staged #413 and P6-final #22 before squash merge.
+
 ## Important verification boundary
 
 The firmware builds for the real JieLi target and passes the pinned FM-1 emulator. No physical FM-1 is currently available, so no claim is made yet about real DAC sound, physical controls, display behaviour under full load, or true ISR-cycle headroom.
 
-The 240x240 native visual surfaces and physical control mapping remain later roadmap phases.
+The next implementation phase is **Phase 7 — persistent KEEP / CHAIN storage**.

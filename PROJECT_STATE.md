@@ -4,17 +4,17 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 6 — shared Space / Cathedral is technically complete and merge-ready after its final documentation-head CI pass.**
+**Phase 6 — shared Space / Cathedral is complete and merged. Phase 7 — persistent KEEP / CHAIN storage is next.**
 
-Active integration branch: `p6-space-cathedral`  
-PR: #16  
-Base: merged Phase 5 `d677a887cf6dc8552634bde5a71fec0221c299b5`  
-Technical verification head before this documentation freeze: `0ec9915f9d994454aa079a5be107765844534666`
+Merged Phase-6 commit on `main`:
+- `cd321e9f7999d0568d280d89e7e3574c3da66054`
+- PR #16
+- guarded pre-merge head `cfdfff673204d4fa36208508e343c6297a37ff37`
 
-Technical-head gates:
-- core #416: **PASS**
-- staged #405: **PASS all gates**, including M4f Bloom-bypass and silent P6 storage probe
-- P6 final #14: **PASS all gates**, including audible Cathedral and exact-dry P6 variant
+Final pre-merge gates:
+- core #424: **PASS**
+- staged #413: **PASS all gates**
+- P6 final #22: **PASS all gates**
 
 Physical FM-1 hardware remains unavailable. Nothing is promoted to physical-hardware verification.
 
@@ -59,25 +59,9 @@ Phase-6 integrated boot-to-stop scenario:
 - cursor **123,392**
 - late trace `811c9dc5`
 
-The Phase-6 cursor is intentionally scenario-specific. Both audible and room-return-disabled P6 builds produce 123,392, while the older M4g/M4f staged baselines remain 123,648. The shared scheduler itself is unchanged.
+The Phase-6 cursor is scenario-specific. Both audible and room-return-disabled P6 builds produce 123,392, while older M4g/M4f staged baselines remain 123,648. The shared scheduler itself is unchanged.
 
-## Frozen pre-Space dry target
-
-Merged Phase 5 / M4g:
-- image **100,944 / 581,564 B**
-- RAM **87,336 / 98,304 B**
-- pool **30,720 / 344,064 B**
-- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-
-M4f Bloom-bypass remains exact:
-- image **95,804 B**
-- RAM **58,056 B**
-- pool **30,720 B**
-- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- same frozen dry PCM and 123,648 cursor
-
-## Phase 6 final architecture
+## Frozen Phase-6 target
 
 Study 126 defines one shared room fed by five post-source/post-Mother sends:
 - String 0.72
@@ -96,8 +80,6 @@ Shared Space defaults:
 Selected tail: compact 8-line modulated FDN with Hadamard feedback. Host/reference room remains 44.1 kHz. The generated FM-1 target room runs at 11.025 kHz internally; all room-time constants, delay geometry, damping and modulation are retimed for that rate. Source DSP and final output remain 44.1 kHz.
 
 Large Space memories live in a dedicated NOLOAD `.apsis_space_pool` immediately before Dinghy's ordinary `.pool`. Space uses fill/valid counters and never requires a giant boot-time clear.
-
-## Final Phase-6 target candidate
 
 Real JieLi target build:
 - image **107,352 / 581,564 B**
@@ -126,23 +108,25 @@ P6 dry-only regression:
 - cursor 123,392
 - late trace `811c9dc5`
 
-Host/reference FDN and full-room tests remain deterministic and sanitizer-clean.
+## Exact next action — Phase 7
 
-## Exact next action
-
-1. Run core + staged + P6-final on this final documentation head.
-2. If all pass, update PR #16 to final merge-ready status and guarded-merge it to `main`.
-3. Move project continuity to **Phase 7 — persistent KEEP / CHAIN storage**.
+Implement persistent KEEP / CHAIN project storage without disturbing the frozen musical/runtime/audio engine:
+1. freeze the exact persisted data contract for 8 KEEP slots + 32 CHAIN cells;
+2. define a versioned CRC-protected record format;
+3. select/validate dedicated FM-1 storage outside Dinghy's tiny settings slot;
+4. implement two-slot/journal recovery and safe deferred writes outside the audio callback;
+5. add desktop corruption/power-loss tests before any target integration.
 
 ## Do not regress
 
 - one shared M3c scheduler; no module-private clocks
 - one shared Space/Cathedral with five source sends; no per-source reverbs
 - source DSP/output stay 44.1 kHz
-- target Cathedral quarter-rate implementation must preserve real-time parameter roles
+- target Cathedral quarter-rate implementation preserves real-time parameter roles
 - `ApsisRuntime` stays 21,928 B unless explicitly re-approved
 - long Space storage stays in dedicated pre-`.pool` NOLOAD memory
-- dry-only P6 must preserve exact Phase-5 PCM
+- dry-only P6 preserves exact Phase-5 PCM
 - M4f/M4g historical bypass gates retain their original 123,648 cursor
 - Phase-6 integrated scenario baseline is 123,392 with zero late/overflow flags
+- project persistence must be journaled/versioned/CRC-protected and never block audio
 - physical FM-1 and real ISR timing remain unverified

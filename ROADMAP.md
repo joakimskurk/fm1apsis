@@ -42,7 +42,7 @@ Frozen runtime: 21,928 B, 512-event shared heap, no module-private clocks.
 
 ## Phase 6 — shared Space / Cathedral
 
-Status: **[~] implementation complete; final documentation-head gates + PR #16 merge remain.**
+Status: **[x] complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`.**
 
 - [x] freeze Study-126 shared-room topology / source sends / parameter roles
 - [x] compare compact modulated FDN vs nested allpass/Schroeder
@@ -57,10 +57,10 @@ Status: **[~] implementation complete; final documentation-head gates + PR #16 m
 - [x] audible-room emulator gate
 - [x] explicit Phase-6 boot-to-stop runtime baseline with zero late/overflow flags
 - [x] fix multi-variant target report to inspect the latest build summary
-- [ ] final documentation-head core + staged + P6-final gates
-- [ ] guarded PR #16 merge
+- [x] final documentation-head core #424 + staged #413 + P6-final #22
+- [x] guarded PR #16 squash merge
 
-Final technical candidate before documentation freeze:
+Frozen Phase-6 target:
 - image 107,352 / 581,564 B
 - RAM 87,780 / 98,304 B
 - POOL 309,532 / 344,064 B
@@ -69,10 +69,14 @@ Final technical candidate before documentation freeze:
 - P6 cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
 ## Phase 7 — persistent KEEP / CHAIN storage
-- [ ] 8-slot project persistence
-- [ ] 32-cell chain persistence
+
+Status: **[ ] next phase.**
+
+- [ ] freeze persisted data contract for 8 KEEP slots + 32 CHAIN cells
 - [ ] versioned CRC records
+- [ ] dedicated project storage selection/validation
 - [ ] two-slot/journal recovery
+- [ ] deferred/non-audio-thread writes
 - [ ] power-loss/corruption tests
 
 ## Phase 8 — native visual surfaces
@@ -107,4 +111,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Run the final documentation-head triple gate (core, staged, P6-final). If green, merge PR #16 and begin Phase 7.
+Begin Phase 7 with the persistence contract and storage-medium validation. Do not touch the frozen Phase-6 musical/audio path unless a measured target constraint requires it.

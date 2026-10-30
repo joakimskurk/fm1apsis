@@ -2,9 +2,9 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-10-30 - Phase 6 shared Space/Cathedral implementation complete
+## 2026-10-30 - Phase 6 shared Space/Cathedral merged
 
-PR #16 (`p6-space-cathedral`) integrates the Study-126 shared Space/Cathedral into the real generated FM-1 firmware path.
+PR #16 merged to `main` as `cd321e9f7999d0568d280d89e7e3574c3da66054` after the final guarded head `cfdfff673204d4fa36208508e343c6297a37ff37` passed core #424, staged #413 and P6-final #22.
 
 Completed:
 - one shared room with frozen String/Drift/Clock/Spiral/Bloom sends
@@ -19,19 +19,14 @@ Completed:
 - explicit P6 boot-to-stop cursor baseline 123,392 with queue 28/512, no overflow/late flags and unchanged late trace
 - multi-variant target report fixed to use the latest append-only build summary
 
-Technical verification head before final documentation freeze: `0ec9915f9d994454aa079a5be107765844534666`.
-- core #416 PASS
-- staged #405 PASS all gates
-- P6-final #14 PASS all gates
-
-Final technical target candidate:
+Frozen Phase-6 target:
 - image 107,352 / 581,564 B
 - RAM 87,780 / 98,304 B
 - POOL 309,532 / 344,064 B
 - audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - dry-only PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
-Final documentation-head gates and guarded PR #16 merge are the only remaining Phase-6 closure steps.
+Next phase: persistent KEEP / CHAIN storage.
 
 ## 2026-10-30 - Phase 5 sounding integration merged
 
