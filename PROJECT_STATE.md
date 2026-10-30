@@ -4,16 +4,20 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 4 / M4g — Bloom dry engine.**
+**Phase 4 / M4g — Bloom dry engine: implementation complete, final documentation-head gate pending.**
 
-M4f / Spiral is merged. M4g is active on `m4g-bloom`, draft PR #13, based directly on the actual M4f squash merge `734229f4d23626a176a8366de82aab2c58c48cc9`.
+M4f / Spiral is merged as `734229f4d23626a176a8366de82aab2c58c48cc9` via PR #12 after final documentation head `744559f89df733c4c167367efe30250b6dcdecdf` passed core #261 and staged #250.
 
-Current M4g head after source freeze:
-- `7b404fdeb8c117d68b57381270077c867083cd0f`
-- normative reference: `docs/reference/M4G_BLOOM_CONTRACT.md`
-- current task: implement and test a pure occurrence-time Bloom acoustic planner before any runtime bridge or renderer
+M4g is active on `m4g-bloom`, draft PR #13, based directly on that M4f merge.
 
-Physical FM-1 hardware has not been tested.
+Technically final M4g implementation/CI head:
+- `6c54d1cd5ca354543237a14c257b3ec28ab424d1`
+- core #292 PASS
+- staged #281 PASS through pinned source/core, unchanged Dinghy, M4g host/single-TU overlay, real JieLi `FM-1_972` target, emulator smoke and exact M4f Bloom-bypass gate
+
+No DSP/runtime changes are planned after `6c54d1cd…` unless the final documentation-head gate exposes a concrete defect.
+
+Physical FM-1 hardware has not been tested. No real ISR-cycle-margin claim is made.
 
 ## Completed and merged baselines
 
@@ -27,8 +31,6 @@ Physical FM-1 hardware has not been tested.
 - M4e Clock: `db9d0b3ecbc7931be343cec7717103059d3c5160` via PR #11
 - M4f Spiral: `734229f4d23626a176a8366de82aab2c58c48cc9` via PR #12
 
-M4f final documentation head `744559f89df733c4c167367efe30250b6dcdecdf` passed core #261 and staged #250 before the guarded squash merge.
-
 ## Product/source invariant
 
 APSIS remains a parity-first native port, not a generic synth/groovebox.
@@ -40,8 +42,8 @@ Behavioural/state/timing/safety authority:
 String acoustic exception only:
 - Study 98 · Performance Architecture
 - raw LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
-- only features that actually existed in Study 98 use it acoustically
-- later Study-124/125/126 de-click and pulse-isolation fixes override older engine mechanics
+- only String features that actually existed there use Study 98 acoustically
+- later Study-124/125/126 safety/de-click fixes override older engine mechanics
 
 Pinned FM-1 baseline:
 - Dinghy `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
@@ -50,7 +52,7 @@ Pinned FM-1 baseline:
 
 ## Frozen shared runtime baseline
 
-M3c remains the only scheduler/runtime timeline. M4 dry engines must not add module-private clocks or event queues.
+M3c remains the only musical scheduler/runtime timeline. M4 dry engines do not add module-private clocks or event queues.
 
 Frozen host invariants:
 - `sizeof(ApsisRuntime) = 21,928 B`
@@ -62,24 +64,23 @@ Frozen host invariants:
 - random trace `78771ff5`
 - late trace `0e6fc422`
 
-Pinned emulator invariants through M4f:
+Pinned emulator invariants through M4g:
 - queue 28/512
 - overflow 0
 - late flags 0
 - cursor **123,648 exactly**
 - late trace `811c9dc5`
 
-`ci/emulator_smoke.sh` asserts the exact 123,648-sample cursor. A new dry engine may not silently steal one or more 256-frame callbacks while still passing a weaker health check.
+`ci/emulator_smoke.sh` asserts the exact 123,648-sample cursor. Inactive dry engines may not silently steal a 256-frame callback.
 
 ## Frozen dry-engine references through M4f
 
 ### M4a String
 - Classic peak/hash 1477 / `b20610c1`
 - Dual peak L/R 823/787; hash `10d23cf4`
-- pre-Drift PCM `10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`
 
 ### M4b finite String
-- 80 logical + 32 fade-tail slots
+- 80 logical +32 fade-tail slots
 - transient 1309 / `97142d3e`
 - BODY 947 / `c1168570`
 
@@ -89,7 +90,6 @@ Pinned emulator invariants through M4f:
 - advances/mutations/binds 1470 / 1470 / 2884
 - random `b7a9a395`
 - late `e777a771`
-- merged target image/RAM 85,564 / 44,680 B
 
 ### M4d Drift
 - host 488 / `0aec6bc2`
@@ -110,27 +110,27 @@ Frozen host normal + ASAN/UBSAN:
 - GLASS 1157 / `9efa9bdc`
 - REED 967 / `e67a3c15`
 - HALO 1256 / `e7ed6161`
-- 8 s worst acoustic stress: 384 hits, logical HW 15, legs 30/32, oscillator HW 90, 0 steals, 0 drops, hash `02be4bc5`
+- stress: 384 hits, logical high-water 15, legs 30/32, oscillator high-water 90, 0 steals, 0 drops, hash `02be4bc5`
 
 Merged M4f target/emulator baseline:
 - image 95,804 B
 - RAM 58,056 B
 - pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- default source route is empty, so PCM remains exact M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 - queue 28/512; cursor 123,648; late trace `811c9dc5`
-
-M4f bypass is exact frozen M4e target/PCM/runtime.
 
 ## M4g normative authority
 
 Normative reference:
 - `docs/reference/M4G_BLOOM_CONTRACT.md`
 
-Study 126 defines Bloom as a three-stage source:
-1. Phase-3 transport plans the musical Bloom target.
-2. Existing M3c occurrence at nominal target−45 ms freezes the voicing plan and M4g acoustic geometry.
-3. Each existing M3c petal bind at `max(occurrence, petalTarget−50 ms)` resolves target-aware Gravity/tuning and reads current Bloom voice/attack/brightness.
+Study 126 Bloom remains a three-stage source:
+1. Phase-3 transport plans the Bloom musical target.
+2. Existing M3c occurrence at nominal target−45 ms freezes the voicing plan and occurrence-time acoustic geometry.
+3. Existing M3c petal bind at `max(occurrence, petalTarget−50 ms)` resolves target-aware Gravity/tuning and reads current Bloom voice/attack/brightness.
+
+M4g does not add another Bloom scheduler, event, random draw, harmony resolver or pitch resolver.
 
 ### Occurrence-frozen acoustic data
 
@@ -141,67 +141,99 @@ For the occurrence-frozen petal count `n`:
 - `amp = .010 * sourceLevel(bloom) * (1 − .065*i)`
 - `pan = ((i/(n−1))*2 − 1) * width` when `n>1`
 
-Length, unfurl, width, source level and these derived petal values stay frozen after occurrence.
+Length, unfurl, width, source level and these derived values stay frozen after occurrence.
 
 ### Bind-late acoustic data
 
-At each petal bind, M4g must use the already-resolved `ApsisBloomLateBinding` plus current:
-- Bloom voice (VEIL / CHOIR / ORGAN / GLASS)
+Each petal bind uses the already-resolved `ApsisBloomLateBinding` plus current:
+- Bloom voice VEIL / CHOIR / ORGAN / GLASS
 - attack
 - brightness
 - source ON/OFF
 
-A long unfurl may therefore legitimately change voice family between petals after a user edit.
+A long unfurl may therefore legitimately change acoustic voice family between petals after a user edit.
 
-### Existing M3c semantics that remain authoritative
+### Existing M3c semantics remain authoritative
 
 - occurrence-frozen voicing plan
 - future-aware ordinary pending Gravity projection with +0.5 ms tolerance
 - no Mother-held future projection
 - per-petal target-aware Gravity/tuning
-- frozen petal count preserved across later DEPTH changes
-- no extra random draw or queue event from M4g
+- frozen petal count across later DEPTH changes
+- no extra random draw or shared queue mutation from M4g
 
-## M4g implementation sequence
+## M4g implemented architecture
 
-1. **Pure acoustic planner** — occurrence-time target offsets, duration, amp and pan only.
-2. **External Bloom audio runtime** — mirror existing 64 M3c Bloom slots/tokens; capture on occurrence and pair each existing bind with frozen acoustic data plus M3c late pitch.
-3. **Finite Bloom DSP** — fixed-point VEIL/CHOIR/ORGAN/GLASS renderer.
-4. **Capacity stress** — measure legal worst case before freezing pool size.
-5. **Target integration** — activation latch so default idle callback budget remains unchanged until Bloom actually has audible finite work.
-6. **Bloom-DSP bypass** — recover frozen M4f target/PCM/runtime.
-7. Freeze docs, exact final-head core + staged gate, guarded squash merge.
+Implemented on `6c54d1cd…`:
+- pure `apsis_bloom_audio.[ch]` occurrence-time acoustic planner
+- external `ApsisBloomAudioRuntime` mirroring the existing 64 M3c Bloom slots/tokens
+- M4g runtime wrapper that observes existing M3c occurrence/bind lifecycle only
+- fixed-point finite `ApsisBloomDsp` for VEIL / CHOIR / ORGAN / GLASS
+- three oscillators maximum per petal
+- fixed **136-petal** pool, evidence-driven from legal worst-case stress
+- target activation latch: exact frozen M4f callback path remains active until an already-planned Bloom occurrence is due in the current block; once activated, Bloom stays live so pending petals/tails survive later edits/mutes
+- no `ApsisRuntime` growth
+- no shared Space/Cathedral yet
 
-## M4g capacity/stress requirement
+## M4g frozen host evidence
 
-Before pool capacity is frozen, test at least:
-- 180 BPM
-- 1/16 division
-- max swing
-- Bloom cycles 1
-- Bloom rate 4
-- 5 petals / 9th depth
-- unfurl 3.6 s
-- length 6 s
-- source level 1.25
-- worst three-oscillator voice family
+Core #292 PASS normal + ASAN/UBSAN.
 
-Record logical petal high-water, oscillator high-water, steals/drops, deterministic hash and target RAM/image delta. Do not choose capacity by intuition.
+Frozen voice references:
+- VEIL: peak **175**, hash `6177470f`
+- CHOIR: peak **143**, hash `4b2969f8`
+- ORGAN: peak **122**, hash `d54a68d9`
+- GLASS: peak **129**, hash `ca1c3127`
 
-## Deliberately deferred after M4g
+Legal worst-case Bloom stress:
+- triggers 186
+- petal high-water **125/136**
+- oscillator high-water **375**
+- drops 0
+- peak 266
+- hash `5881bb36`
+- `sizeof(ApsisBloomDsp) = 22,864 B`
 
-- shared Space/Cathedral
-- final Mother dry/wet integration beyond frozen state behaviour
-- native Bloom manual surface/gesture mapping (must later reuse the same acoustic primitive)
-- physical FM-1 validation
-- real ISR worst-case timing
+The measured 136-petal capacity leaves 11 petals of margin above the 125-petal legal high-water.
+
+## M4g real target/emulator evidence
+
+Staged #281 PASS all gates.
+
+Default M4g target:
+- image **100,944 / 581,564 B**
+- RAM **87,336 / 98,304 B**
+- RAM headroom **10,968 B**
+- pool **30,720 / 344,064 B**
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+- product `FM-1_972`
+
+Default emulator:
+- pinned three-second scenario does not reach a due Bloom occurrence, so the activation latch intentionally preserves the exact M4f callback/audio path
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- peak 856; RMS 144/144; stereo delta 125; mean -2/-2
+- queue 28/512; overflow 0; late flags 0; cursor **123,648**; late trace `811c9dc5`
+
+This default emulator proves target integration, boot, baseline audio/runtime preservation and callback-budget invariance. Audible Bloom is verified by source-vector, snapshot/bind, full shared-runtime handoff and finite-renderer host tests plus real target compile/link; physical listening is unverified.
+
+### Exact M4f bypass
+
+With only M4g Bloom DSP/runtime consumption omitted:
+- image **95,804 B**
+- RAM **58,056 B**
+- pool **30,720 B**
+- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+
+This is exact frozen M4f target/PCM/runtime.
 
 ## Exact next action
 
-1. Implement `apsis_bloom_audio.[ch]` as a pure occurrence-time acoustic planner only.
-2. Add source-vector tests for default 4-petal Bloom plus min/max edge values; no runtime or DSP yet.
-3. Gate the planner normal + ASAN/UBSAN while all frozen M3/M4 references remain unchanged.
-4. Only then add the external M3c Bloom token/snapshot bridge.
+1. Freeze the remaining root continuity docs and `M4G_BLOOM_CONTRACT.md` on top of technically final implementation head `6c54d1cd5ca354543237a14c257b3ec28ab424d1`.
+2. Run **APSIS core** and full **APSIS staged validation** on that exact final documentation head.
+3. If both are green, update PR #13 metadata without moving the head, mark it ready and squash-merge with `expected_head_sha` equal to the gated docs head.
+4. Create the Phase-5 sounding-source structural-integration branch from the actual M4g merge commit. Do not start shared Space/Cathedral before Phase 5 structural/audio behaviour is gated.
 
 ## Do not regress
 
@@ -210,7 +242,7 @@ Record logical petal high-water, oscillator high-water, steals/drops, determinis
 - one shared Phase-3 scheduler; no module clocks
 - `ApsisRuntime` remains 21,928 B
 - M3c Spiral/Bloom late binding remains authoritative
-- M4g must not draw random numbers or alter shared queue ordering
+- no extra M4g random draws or shared queue ordering changes
 - no shared Space/Cathedral during dry-engine work
 - inactive audio engines must not reduce the exact emulator cursor
-- no physical-hardware or real ISR timing claim without device evidence
+- physical FM-1 and real ISR timing remain unverified
