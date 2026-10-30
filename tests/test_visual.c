@@ -6,6 +6,8 @@
 #include "apsis_visual.h"
 
 #define PIXELS (APSIS_VISUAL_WIDTH * APSIS_VISUAL_HEIGHT)
+#define P8A_MOTHER_REFERENCE 0x27373657u
+#define P8A_GRAVITY_REFERENCE 0x55AFF30Bu
 
 static uint16_t full_frame[PIXELS];
 static uint16_t strip_frame[PIXELS];
@@ -113,6 +115,7 @@ static void test_strip_equivalence(void)
     mother_full = render_full(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
     mother_strips = render_two_strips(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
     assert(mother_full == mother_strips);
+    assert(mother_full == P8A_MOTHER_REFERENCE);
     assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
     assert(count_colour(full_frame, APSIS_VISUAL_STRING) > 0u);
     assert(count_colour(full_frame, APSIS_VISUAL_MOTHER) > 0u);
@@ -120,6 +123,7 @@ static void test_strip_equivalence(void)
     gravity_full = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
     gravity_strips = render_two_strips(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
     assert(gravity_full == gravity_strips);
+    assert(gravity_full == P8A_GRAVITY_REFERENCE);
     assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
     assert(count_colour(full_frame, APSIS_VISUAL_GRAVITY) > 0u);
     assert(count_colour(full_frame, APSIS_VISUAL_CLOCK) > 0u);
