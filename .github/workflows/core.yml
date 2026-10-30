@@ -31,3 +31,5 @@ jobs:
         run: bash ci/test_bloom_dsp.sh
       - name: M5a persistent structural audio targets
         run: bash ci/test_persistent_audio.sh
+      - name: M5a structural runtime target capture
+        run: bash ci/test_structural_audio_runtime.sh
