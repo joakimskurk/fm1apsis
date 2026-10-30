@@ -117,7 +117,7 @@ Bloom finite pool is 136 petals after legal stress reached 125 simultaneous peta
 
 **Decision:** Do not change production scheduler/DSP/runtime merely to manufacture a phase diff. P5a–P5f prove source-defined structural semantics end-to-end at the actual sounding DSP boundary. Because M3c + M4f/M4g already satisfy those contracts, Phase 5 adds tests/contracts/workflow gates but **no production musical or audio code**.
 
-**Evidence:** verification head `de3a0bdfc0831db502c186ca8808c46b46ee5c1a` passed core #357 and staged #346; the real target remained exact M4g: 100,944 B image, 87,336 B RAM, package `b4e74e8…eeca`, default PCM `6c3b8fff…aa2b`, cursor 123,648.
+**Evidence:** final head `17e7fd1247b0f5675261a7395b0558b5bbd6780d` passed core #363 and staged #352 and merged as `d677a887cf6dc8552634bde5a71fec0221c299b5`; the real target remained exact M4g.
 
 ## 2026-10-30 - Sounding identity stays in the layer that owns it
 
@@ -127,6 +127,28 @@ Bloom finite pool is 136 petals after legal stress reached 125 simultaneous peta
 
 ## 2026-10-30 - Phase 6 starts with topology + memory prototypes, not immediate reverb integration
 
-**Decision:** After Phase 5 merges, freeze the Study-126 Space/Cathedral contract and prototype at least compact modulated FDN and nested allpass/Schroeder candidates against the real 10,968 B static-RAM headroom before integrating a room into `app_audio()`.
+**Decision:** Freeze the Study-126 Space/Cathedral contract and compare compact modulated FDN and nested allpass/Schroeder candidates before integrating a room into `app_audio()`.
 
 The result must remain one shared room with five per-source sends. Delay-memory placement is an explicit design problem; do not assume a large unconditional BSS delay network fits.
+
+## 2026-10-30 - Phase 6 selects the compact 8-line modulated FDN
+
+**Decision:** Use the deterministic 8-line modulated FDN as the native Cathedral tail topology; reject the tested nested allpass/Schroeder candidate for this port iteration.
+
+**Why:** Across 4 / 8.4 / 12 s, the FDN tracks the Study-126 statistical proxy on decay endpoint, stereo decorrelation and HF density while keeping metallicity around 0.11. The Schroeder proxy measures roughly 0.69–0.73 metallicity and diverges strongly at long decay. The FDN also uses 38,340 B tail storage versus 50,900 B.
+
+Selected geometry is frozen in `docs/reference/P6_SPACE_PROTOTYPE_RESULTS.md`: delays `1871,1999,2137,2281,2441,2593,2767,2953`, +16 reserve per line, deterministic low-rate modulation and normalized Hadamard feedback.
+
+## 2026-10-30 - Space owns a dedicated pre-.pool NOLOAD region
+
+**Decision:** Long-lived Space delay memory must be placed in a dedicated NOLOAD `.apsis_space_pool` section immediately **before** Dinghy's ordinary `.pool`, within the same hardware POOL region. It must not be placed inside Dinghy's ordinary zeroed `.pool` range.
+
+**Why:** pinned Dinghy `fm1_cstart()` clears `[_pool_start, _pool_end)` at boot. Adding 274,716 B to ordinary `.pool` delayed startup by one 256-frame callback even with no room renderer active. A runtime-retention call was not the root cause; link-time retention inside ordinary `.pool` still produced cursor 123,392.
+
+With Space before `_pool_start`, real target accounting still sees the complete footprint through `_pool_end`, but Dinghy clears only its original pool. Gate head `11ce731a740d11262d988c352a79774bbea3103a` passed core #375 + staged #364 with image 100,944 B, RAM 87,336 B, pool 305,436 / 344,064 B, exact dry PCM `6c3b8fff…aa2b`, cursor 123,648 and frozen runtime trace.
+
+## 2026-10-30 - Space delay memory is self-initialising
+
+**Decision:** Production Space may not depend on CRT zeroing or perform a giant boot/start memset over its 274,716 B NOLOAD storage. Delay histories must track validity/fill and return silence for unwritten history until naturally filled.
+
+**Why:** this preserves the frozen dry startup/callback path and makes room activation cost explicit. Input history, echo and each FDN line own their write/fill state; unread NOLOAD bytes are never interpreted as audio.
