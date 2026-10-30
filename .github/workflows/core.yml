@@ -27,3 +27,5 @@ jobs:
         run: bash ci/test_bloom_audio_runtime.sh
       - name: M4g Bloom shared-runtime handoff
         run: bash ci/test_bloom_audio_live.sh
+      - name: M4g Bloom finite renderer and capacity probe
+        run: bash ci/test_bloom_dsp.sh
