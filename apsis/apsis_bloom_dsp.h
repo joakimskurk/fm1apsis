@@ -6,9 +6,11 @@
 
 #define APSIS_BLOOM_DSP_RATE 44100u
 #define APSIS_BLOOM_DSP_OSC_MAX 3u
-/* Provisional measurement capacity only. M4g stress must shrink/freeze this
- * from observed legal worst-case high-water before target integration. */
-#define APSIS_BLOOM_DSP_PETAL_CAP 160u
+/* Frozen from the legal 11-second worst-case probe: 125 simultaneous petals
+ * / 375 oscillators with zero drops. 136 leaves 11 petal slots of margin,
+ * enough for more than two complete five-petal occurrences beyond the measured
+ * high-water, without carrying the provisional 160-slot RAM cost to target. */
+#define APSIS_BLOOM_DSP_PETAL_CAP 136u
 
 typedef enum {
     APSIS_BLOOM_DSP_SINE = 0,
