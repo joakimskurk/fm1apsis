@@ -13,7 +13,19 @@ else
   VERSION=${APSIS_VERSION:-0.1-dev}
 fi
 
-( cd work/apsis && APSIS_PRODUCT="$PRODUCT" bash ./build.sh --release "$VERSION" ) 2>&1 | tee build/evidence/apsis_target.log
+# Phase 6's embedded Space wrapper advances the room at half the 44.1-kHz
+# source rate. Retiming is intentionally applied only to the generated FM-1
+# sources, never to the host/reference engine. Older phases have no target
+# bridge file and therefore pass through unchanged. Guard the patch so repeated
+# local target builds of the same generated tree remain harmless.
+if [[ -f work/apsis/firmware/src/apsis_space_target.c && \
+      -f work/apsis/firmware/src/apsis_space_room.c ]] && \
+   grep -q '#define ROOM_FAST_GUARD_HP_LP_ALPHA_Q15 784u' \
+      work/apsis/firmware/src/apsis_space_room.c; then
+  python3 ci/patch_apsis_p6_half_rate.py | tee -a build/evidence/apsis_target.log
+fi
+
+( cd work/apsis && APSIS_PRODUCT="$PRODUCT" bash ./build.sh --release "$VERSION" ) 2>&1 | tee -a build/evidence/apsis_target.log
 PKG="work/apsis/build/apsis-$VERSION.fwsc"
 [[ -f "$PKG" ]] || { echo "missing target package: $PKG" >&2; exit 4; }
 cp "$PKG" build/
