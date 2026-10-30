@@ -37,3 +37,5 @@ jobs:
         run: bash ci/test_phase5_mother_audio.sh
       - name: P5d Chain sounding boundary semantics
         run: bash ci/test_phase5_chain_audio.sh
+      - name: P5e Chain continuous morph sounding semantics
+        run: bash ci/test_phase5_chain_morph_audio.sh
