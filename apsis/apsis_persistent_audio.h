@@ -67,4 +67,15 @@ uint8_t apsis_persistent_audio_apply_through(ApsisPersistentAudioQueue *queue,
                                              ApsisStringDsp *string_dsp,
                                              ApsisDriftDsp *drift_dsp);
 
+/* Render persistent String + Drift across one callback, splitting only at
+ * queued structural-audio targets. The event sample itself belongs to the new
+ * target: frames before the boundary use the old target, then all events at
+ * that sample are applied before rendering the frame at the boundary. */
+void apsis_persistent_audio_render_block(ApsisPersistentAudioQueue *queue,
+                                         ApsisStringDsp *string_dsp,
+                                         ApsisDriftDsp *drift_dsp,
+                                         int32_t *out,
+                                         uint32_t frames,
+                                         uint64_t block_start);
+
 #endif
