@@ -22,6 +22,22 @@ uint8_t apsis_runtime_structural_audio_due(const ApsisRuntime *runtime,
                                            const ApsisChainSequence *chain_sequence,
                                            uint64_t end_sample);
 
+/* Phase-5 Gravity request wrapper. It preserves the frozen M3c request result.
+ * Only the immediate result has no future observation event, so M5a snapshots
+ * its persistent String/Drift target at now_sample here. Quantized and Mother-
+ * held requests remain owned by the normal shared-runtime observation path. */
+uint8_t apsis_runtime_request_gravity_structural_audio(
+                                     ApsisRuntime *runtime,
+                                     ApsisState *state,
+                                     ApsisMotherPending *mother_pending,
+                                     uint8_t degree,
+                                     uint8_t ring,
+                                     uint64_t now_sample,
+                                     uint32_t min_lead_samples,
+                                     ApsisPersistentAudioQueue *persistent_queue,
+                                     ApsisStringPitchMemory *pitch_memory,
+                                     ApsisStructuralAudioStats *stats);
+
 /* Phase-5 extension of the exact M4g coordinator. Shared state still mutates
  * at the existing M3c observation callbacks. After a structural change has
  * actually committed, this wrapper snapshots the resulting persistent
