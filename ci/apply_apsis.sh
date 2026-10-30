@@ -273,15 +273,13 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# Static BSS starts zero. Explicitly reset every new external M4f structure;
-# keep the already-frozen runtime_start call itself unchanged.
+# Spiral audio state is static BSS and firmware startup already zeroes it before
+# app_main. Do not spend a pre-runtime audio callback clearing the same 32-leg
+# pool and 64-slot snapshot runtime again. The explicit reset APIs remain used
+# and regression-tested for real stop/restart/lifecycle reset paths.
 start_anchor = '    apsis_runtime_start(&apsis_runtime);'
 if start_anchor not in s:
     raise SystemExit('FAIL: runtime start anchor missing')
-if spiral_dsp_enabled:
-    s = s.replace(start_anchor,
-                  '    apsis_spiral_audio_runtime_reset(&spiral_audio_runtime);\n'
-                  '    apsis_spiral_dsp_reset(&spiral_dsp);\n' + start_anchor, 1)
 
 p.write_text(s)
 PY
