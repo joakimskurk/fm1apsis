@@ -22,6 +22,18 @@ typedef struct {
     uint32_t first_nonzero;
 } RoomStats;
 
+static ApsisSpaceState default_space(void)
+{
+    ApsisSpaceState s;
+    s.mix_q15 = APSIS_Q15_MILLI(480);
+    s.decay_ms = 8400u;
+    s.predelay_ms = 72u;
+    s.damping_hz = 6200u;
+    s.echo_time_ms = 362u;
+    s.echo_feedback_q15 = APSIS_Q15_MILLI(180);
+    return s;
+}
+
 static int16_t clip16(int32_t x)
 {
     if (x > 32767) return 32767;
@@ -126,7 +138,7 @@ static RoomStats render_impulse(SpaceStorage *storage, int16_t garbage,
 static void test_storage_layout_and_no_clear(void)
 {
     ApsisSpaceRoom room;
-    ApsisState state;
+    ApsisSpaceState state = default_space();
     SpaceStorage s = storage_alloc();
     int32_t input[BLOCK * 2u] = {0};
     int32_t output[BLOCK * 2u];
@@ -147,13 +159,12 @@ static void test_storage_layout_and_no_clear(void)
     assert(s.echo[0] == (int16_t)0x4567);
     assert(s.fdn[0] == (int16_t)0x4567);
 
-    apsis_state_default(&state);
     while (done < 6000u) {
         uint32_t n = 6000u - done;
         uint32_t i;
         if (n > BLOCK) n = BLOCK;
         for (i = 0u; i < n * 2u; ++i) output[i] = 0;
-        apsis_space_room_render(&room, &state.space, input, output, n);
+        apsis_space_room_render(&room, &state, input, output, n);
         for (i = 0u; i < n * 2u; ++i) assert(output[i] == 0);
         done += n;
     }
@@ -162,13 +173,12 @@ static void test_storage_layout_and_no_clear(void)
 
 static void test_early_reflections_are_direct(void)
 {
-    ApsisState state;
+    ApsisSpaceState state = default_space();
     SpaceStorage s = storage_alloc();
     RoomStats early;
-    apsis_state_default(&state);
-    state.space.mix_q15 = 0u;
-    state.space.echo_feedback_q15 = 0u;
-    early = render_impulse(&s, (int16_t)0x2222, &state.space, 20000u);
+    state.mix_q15 = 0u;
+    state.echo_feedback_q15 = 0u;
+    early = render_impulse(&s, (int16_t)0x2222, &state, 20000u);
 
     /* 21 ms = 926.1 samples. History validity makes the first fractional tap
      * observable on the next complete sample; it must not arrive early. */
@@ -180,13 +190,12 @@ static void test_early_reflections_are_direct(void)
 
 static void test_room_determinism_and_controls(void)
 {
-    ApsisState state;
+    ApsisSpaceState state = default_space();
     SpaceStorage s = storage_alloc();
     RoomStats a, b, no_echo, dark;
-    apsis_state_default(&state);
 
-    a = render_impulse(&s, (int16_t)0x1111, &state.space, ROOM_FRAMES);
-    b = render_impulse(&s, (int16_t)0x6a5a, &state.space, ROOM_FRAMES);
+    a = render_impulse(&s, (int16_t)0x1111, &state, ROOM_FRAMES);
+    b = render_impulse(&s, (int16_t)0x6a5a, &state, ROOM_FRAMES);
     assert(a.hash == b.hash);
     assert(a.peak == b.peak);
     assert(a.late_energy == b.late_energy);
@@ -194,13 +203,13 @@ static void test_room_determinism_and_controls(void)
     assert(a.peak > 0);
     assert(a.late_energy > 0u);
 
-    state.space.echo_feedback_q15 = 0u;
-    no_echo = render_impulse(&s, (int16_t)0x3333, &state.space, ROOM_FRAMES);
+    state.echo_feedback_q15 = 0u;
+    no_echo = render_impulse(&s, (int16_t)0x3333, &state, ROOM_FRAMES);
     assert(no_echo.hash != a.hash);
 
-    apsis_state_default(&state);
-    state.space.damping_hz = 2200u;
-    dark = render_impulse(&s, (int16_t)0x4444, &state.space, ROOM_FRAMES);
+    state = default_space();
+    state.damping_hz = 2200u;
+    dark = render_impulse(&s, (int16_t)0x4444, &state, ROOM_FRAMES);
     assert(dark.hash != a.hash);
     assert(dark.late_energy != a.late_energy);
 
