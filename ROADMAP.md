@@ -63,22 +63,39 @@ Status: **active on `p6-space-cathedral` from merged Phase 5.**
 
 - [x] freeze Study-126 shared-room topology / source sends / parameter roles
 - [x] document browser convolution IR as perceptual target rather than literal FM-1 implementation
-- [x] freeze `.pool` as storage class for large delay memories; ordinary RAM only for small state
-- [~] prototype compact modulated FDN
-- [~] prototype nested allpass/Schroeder hybrid
-- [ ] compare diffusion / metallicity / decay / damping / transient response / deterministic hash / workload
-- [ ] select one candidate from evidence
-- [ ] silent real-target memory gate using exact selected `.pool` arrays
-- [ ] prove room-disabled target preserves frozen M4g/Phase-5 PCM/runtime
-- [ ] integrate one shared room with five source sends
-- [ ] host reference + sanitizer gate
-- [ ] real target + emulator gate and dry-bypass regression
+- [x] freeze POOL-region storage for large delay memories; ordinary RAM only for small state
+- [x] prototype compact modulated FDN
+- [x] prototype nested allpass/Schroeder hybrid
+- [x] compare diffusion / metallicity / decay / damping / deterministic hash / memory
+- [x] select compact 8-line modulated FDN from evidence
+- [x] silent real-target memory gate using exact selected arrays
+- [x] prove room-disabled target preserves frozen M4g/Phase-5 PCM/runtime
+- [x] prove dedicated pre-`.pool` NOLOAD Space storage avoids Dinghy boot-time pool clearing while retaining full POOL-budget accounting
+- [~] implement selected FDN as pure fixed-point host DSP with external self-initialising delay storage
+- [ ] add source-defined trim/guard/early/predelay/tail-damping/echo/wet topology around FDN
+- [ ] deterministic host impulse/decay/hash + ASAN/UBSAN gate
+- [ ] integrate one shared room with five post-Mother source sends
+- [ ] real target + emulator audible-room gate
+- [ ] room-disabled bypass regression returns exact frozen dry PCM/runtime
 
-Current resource envelope before Phase 6:
-- ordinary RAM headroom 10,968 B
-- pool headroom 313,344 B
+Selected memory envelope:
+- ordinary RAM stays **87,336 / 98,304 B** during silent storage probe
+- Space input history **24,696 B**
+- Space echo **211,680 B**
+- Space FDN tail **38,340 B**
+- total POOL-region use **305,436 / 344,064 B**
+- remaining pool headroom **38,628 B**
 
-Do **not** create unrelated per-source reverbs. Do **not** put large delay arrays in `.bss`.
+Silent target gate head `11ce731a740d11262d988c352a79774bbea3103a`:
+- core #375 PASS
+- staged #364 PASS
+- image 100,944 B
+- RAM 87,336 B
+- pool 305,436 B
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- cursor 123,648; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Do **not** create unrelated per-source reverbs. Do **not** put large delay arrays in `.bss`. Do **not** place Space delay storage inside Dinghy's ordinary zeroed `.pool` range; it must remain in the dedicated pre-`.pool` NOLOAD section and be self-initialised/validity-tracked by Space.
 
 ## Phase 7 - persistent KEEP / CHAIN storage
 
@@ -125,8 +142,8 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-1. Open a draft Phase-6 PR from `p6-space-cathedral`.
-2. Add a deterministic host prototype harness for both room candidates.
-3. Measure exact candidate delay/pool bytes plus impulse/decay/stereo/metallicity proxies at 4 / 8.4 / 12 s.
-4. Select a candidate only after those results exist.
-5. Put that candidate's exact delay arrays in `.pool` in a silent target-validation build before any audible room integration.
+1. Add `apsis_space_dsp.[ch]` as a pure host engine implementing the selected 8-line fixed-point FDN with externally supplied buffers.
+2. Use fill/valid counters so NOLOAD history is never read before it has been written; no giant startup memset.
+3. Port trim/guard/early/predelay/tail damping/echo/wet around that engine in deterministic testable slices.
+4. Add host reference + ASAN/UBSAN impulse/decay/hash tests before any `app_audio()` integration.
+5. Only then split the existing dry rendering into five source contributions, apply source-defined Mother/send routing, feed one shared room input, and add a room-disabled exact-dry bypass gate.
