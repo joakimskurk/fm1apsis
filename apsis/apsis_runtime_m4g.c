@@ -24,6 +24,19 @@ void apsis_runtime_stop_bloom_audio(ApsisRuntime *r,
     apsis_runtime_stop_spiral_audio(r, a, spiral_audio);
 }
 
+uint8_t apsis_runtime_bloom_occurrence_due(const ApsisRuntime *r,
+                                           uint64_t end_sample)
+{
+    uint16_t i;
+    if (!r) return 0u;
+    for (i = 0u; i < r->queue.count; ++i) {
+        const ApsisTransportEvent *e = &r->queue.events[i];
+        if (e->type == APSIS_EVENT_BLOOM_OCCURRENCE && e->sample < end_sample)
+            return 1u;
+    }
+    return 0u;
+}
+
 uint8_t apsis_runtime_process_bloom_audio(
                                      ApsisRuntime *r,
                                      ApsisState *s,
