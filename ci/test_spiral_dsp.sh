@@ -7,8 +7,10 @@ COMMON=(
   -std=c11 -Wall -Wextra -Werror -pedantic -Iapsis
   apsis/apsis_state.c
   apsis/apsis_harmony.c
+  apsis/apsis_gravity.c
   apsis/apsis_string.c
   apsis/apsis_string_dsp.c
+  apsis/apsis_string_transient.c
   apsis/apsis_drift.c
   apsis/apsis_spiral_audio.c
   apsis/apsis_spiral_dsp.c
