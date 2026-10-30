@@ -105,6 +105,7 @@ jobs:
           PY
 
       - name: Gate P6.5 - split-source dry-only path is bit-exact Phase 5
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
