@@ -130,6 +130,89 @@ jobs:
           cp build/evidence/m4g-default-SHA256SUMS build/SHA256SUMS
           rm -f build/m4g-default-fw-backup.fwsc
 
+      - name: Gate 5c - P6 silent selected-FDN pool layout preserves dry firmware behaviour
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp build/target_report.json build/evidence/p6-default-target-report.json
+          cp build/SHA256SUMS build/evidence/p6-default-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/p6-default-fw-backup.fwsc
+
+          APSIS_CI_SPACE_POOL_PROBE=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis_p6_probe.sh
+          APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
+          cp build/target_report.json build/evidence/p6-space-pool-target-report.json
+          cp build/SHA256SUMS build/evidence/p6-space-pool-SHA256SUMS
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          target = json.loads(Path('build/target_report.json').read_text())
+          base_pool = 30720
+          selected_space_bytes = 274716
+          minimum_pool = base_pool + selected_space_bytes
+          if target.get('product') != 'FM-1_972':
+              raise SystemExit(f"FAIL: P6 pool probe product {target.get('product')!r}")
+          if target.get('pool', 0) < minimum_pool:
+              raise SystemExit(
+                  f"FAIL: P6 pool probe retained only {target.get('pool')} B; expected at least {minimum_pool} B"
+              )
+          if target.get('pool', 0) > target.get('pool_max', 0):
+              raise SystemExit('FAIL: P6 pool probe exceeds Dinghy pool budget')
+          if target.get('ram', 0) > 87600:
+              raise SystemExit(
+                  f"FAIL: P6 pool probe consumed too much ordinary RAM: {target.get('ram')} B"
+              )
+          print(
+              'PASS: P6 selected-FDN pool storage fits real target '
+              f"pool={target.get('pool')}/{target.get('pool_max')} "
+              f"ram={target.get('ram')}/{target.get('ram_max')}"
+          )
+          PY
+
+          set -o pipefail
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee build/evidence/emulator_space_pool_probe.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-space-pool-probe
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('work/emu-smoke/report.json').read_text())
+          expected_pcm = '6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b'
+          if report.get('wav_raw_sha256') != expected_pcm:
+              raise SystemExit(
+                  'FAIL: silent P6 pool probe changed frozen M4g/Phase-5 PCM: '
+                  f"{report.get('wav_raw_sha256')} != {expected_pcm}"
+              )
+          if report.get('runtime_queue_high_water') != 28:
+              raise SystemExit(
+                  f"FAIL: P6 pool probe queue high-water {report.get('runtime_queue_high_water')} != 28"
+              )
+          if report.get('runtime_queue_overflowed') != 0:
+              raise SystemExit('FAIL: P6 pool probe runtime queue overflow')
+          if report.get('runtime_late_flags') != 0:
+              raise SystemExit(
+                  f"FAIL: P6 pool probe late flags {report.get('runtime_late_flags')}"
+              )
+          if report.get('runtime_cursor_low32') != 123648:
+              raise SystemExit(
+                  f"FAIL: P6 pool probe cursor {report.get('runtime_cursor_low32')} != 123648"
+              )
+          if report.get('runtime_late_trace_hash') != '811c9dc5':
+              raise SystemExit(
+                  'FAIL: P6 pool probe late trace '
+                  f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
+              )
+          print('PASS: silent P6 pool probe preserves frozen M4g/Phase-5 PCM/runtime')
+          PY
+
+          cp build/p6-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/p6-default-target-report.json build/target_report.json
+          cp build/evidence/p6-default-SHA256SUMS build/SHA256SUMS
+          rm -f build/p6-default-fw-backup.fwsc
+
       - name: Upload Phase 1 evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
