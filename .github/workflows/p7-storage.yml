@@ -14,16 +14,16 @@ jobs:
       - name: P7 project format and power-loss journal
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_keep.c apsis/apsis_chain.c \
-            apsis/apsis_project_store.c tests/test_project_store.c \
-            -o /tmp/test_project_store
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_project_store.c \
+            tests/test_project_store.c -o /tmp/test_project_store
           /tmp/test_project_store
       - name: P7 ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
             -fsanitize=address,undefined -Iapsis \
-            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_keep.c apsis/apsis_chain.c \
-            apsis/apsis_project_store.c tests/test_project_store.c \
-            -o /tmp/test_project_store_san
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_project_store.c \
+            tests/test_project_store.c -o /tmp/test_project_store_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_project_store_san
