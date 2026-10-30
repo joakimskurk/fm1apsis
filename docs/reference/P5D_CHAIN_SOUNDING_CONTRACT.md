@@ -18,9 +18,11 @@ Use:
 - Spiral rate 1x with one active route;
 - Bloom cycles 1, rate 1, trigger step 0, delay 0;
 - Chain scope CHORD enabled;
-- cell 0: KEEP slot 0, degree 0, length 3 fine pulses;
-- cell 1: KEEP slot 1, degree 4, length >= 3 fine pulses;
+- cell 0: KEEP slot 0, degree 0, length **1 Clock cycle = 3 pulses**;
+- cell 1: KEEP slot 1, degree 4, length **1 Clock cycle = 3 pulses**;
 - Chain starts on Clock-1.
+
+The one-cycle representation is deliberate. At `clock.n=3`, `fine_pulses` is normalized to at most `n−1 = 2`, so `fine_pulses=3` would not represent a 3-pulse cell.
 
 After the startup Clock-1 applies cell 0, the third following Chain pulse targets sample **11,025** and advances to cell 1 at the frozen M3c callback:
 - Spiral bind: **7,497** (`target−3,528`, 80 ms)
@@ -43,4 +45,4 @@ Normal + ASAN/UBSAN integration must prove with finite DSP voices:
 
 ## Continuous morph
 
-This slice gates discrete structural Chain application. Existing M3c tests already freeze the separate source rule that continuous Chain morph begins on the musical target rather than the target−24 ms discrete callback. Phase 5 will add one sounding continuous-lane test separately so this distinction is not collapsed.
+This slice gates discrete structural Chain application. P5e separately gates the frozen source rule that continuous Chain morph begins on the musical target rather than the target−24 ms discrete callback, so the two timing domains are not collapsed.
