@@ -17,3 +17,5 @@ jobs:
         run: make sanitize
       - name: M4f Spiral acoustic planning
         run: bash ci/test_spiral_audio_plan.sh
+      - name: M4f Spiral shared-runtime bridge
+        run: bash ci/test_spiral_audio_runtime.sh
