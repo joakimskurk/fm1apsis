@@ -60,9 +60,9 @@ Frozen M3c runtime: 21,928 B; 512-event shared heap; no module-private clocks.
 
 ### M4f - Spiral dry engine
 
-Merged `734229f4d23626a176a8366de82aab2c58c48cc9` via PR #12 after final documentation head `744559f89df733c4c167367efe30250b6dcdecdf` passed core #261 + staged #250.
-
-- [x] THREAD / GLASS / REED / HALO source topology
+- [x] merged `734229f4d23626a176a8366de82aab2c58c48cc9` via PR #12
+- [x] final docs head `744559f89df733c4c167367efe30250b6dcdecdf` passed core #261 + staged #250
+- [x] THREAD / GLASS / REED / HALO topology
 - [x] occurrence-time acoustic snapshot + existing M3c target−80 ms pitch bind
 - [x] external 64-slot bridge; no `ApsisRuntime` growth
 - [x] fixed 32-leg renderer
@@ -83,39 +83,59 @@ Merged M4f target:
 - RAM 58,056 B
 - pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- default PCM remains M4e because default Spiral route is empty
 
 ### M4g - Bloom dry engine
 
-Status: **active**.
+Status: **implementation complete; final documentation-head gate pending.**
 
 Branch `m4g-bloom`; draft PR #13; base is actual M4f merge `734229f4d23626a176a8366de82aab2c58c48cc9`.
 Normative reference: `docs/reference/M4G_BLOOM_CONTRACT.md`.
+Technically final implementation/CI head: `6c54d1cd5ca354543237a14c257b3ec28ab424d1`.
 
-Source-resolution complete:
-- [x] preserve existing M3c target / occurrence−45 ms / petal-bind timeline
-- [x] occurrence freezes plan-derived petal count, length/duration, unfurl/targets, width/pan, source-level/amplitude
+Completed:
+- [x] preserve existing M3c target / occurrence target−45 ms / petal-bind timeline
+- [x] occurrence freezes plan-derived petal count, length/duration, unfurl/targets, width/pan and source-level/amplitude
 - [x] petal bind re-reads target-aware Gravity/tuning + current voice/attack/brightness
-- [x] source-resolve VEIL / CHOIR / ORGAN / GLASS oscillator/filter/envelope topology
+- [x] VEIL / CHOIR / ORGAN / GLASS oscillator/filter/envelope topology
 - [x] preserve future-aware ordinary pending Gravity and frozen-plan petals across later DEPTH edits
+- [x] pure occurrence-time `apsis_bloom_audio` planner + source-vector tests
+- [x] external 64-slot M3c Bloom snapshot/bind bridge; no runtime growth
+- [x] fixed-point finite Bloom renderer
+- [x] legal worst-case capacity stress and evidence-based pool freeze at **136 petals**
+- [x] target integration with inactive/default callback-budget protection
+- [x] Bloom-DSP bypass returning exactly to frozen M4f target/PCM/runtime
+- [~] exact final documentation-head double gate + guarded squash merge
 
-Implementation sequence:
-- [ ] pure occurrence-time `apsis_bloom_audio` planner + source-vector tests
-- [ ] external 64-slot M3c Bloom snapshot/bind bridge; no runtime growth
-- [ ] fixed-point finite Bloom renderer
-- [ ] legal worst-case capacity stress and evidence-based pool freeze
-- [ ] target integration with inactive/default callback-budget protection
-- [ ] Bloom-DSP bypass returning to frozen M4f target/PCM/runtime
-- [ ] exact final documentation-head double gate + guarded squash merge
+Frozen host normal + ASAN/UBSAN:
+- VEIL 175 / `6177470f`
+- CHOIR 143 / `4b2969f8`
+- ORGAN 122 / `d54a68d9`
+- GLASS 129 / `ca1c3127`
+- worst stress: 186 triggers, **125/136 petals**, 375 oscillators, 0 drops, peak 266, hash `5881bb36`
 
-Required capacity stress:
-- 180 BPM, 1/16, max swing
-- Bloom cycles 1, rate 4
-- 5 petals, unfurl 3.6 s, length 6 s, source level 1.25
-- worst three-oscillator voice family
-- measure logical/oscillator high-water, steals/drops, deterministic hash and target RAM/image delta
+Technically final M4g target:
+- image **100,944 B**
+- RAM **87,336 B**
+- RAM headroom **10,968 B**
+- pool **30,720 B**
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
 
-No shared Space during initial dry-engine work.
+Pinned default emulator remains exact M4f because no Bloom occurrence becomes due during the three-second reference scenario:
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512
+- cursor 123,648
+- late trace `811c9dc5`
+
+Bloom bypass is exact frozen M4f target/package/PCM/runtime:
+- image/RAM/pool 95,804 / 58,056 / 30,720 B
+- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
+- same PCM/cursor/queue/trace as M4f
+
+Implementation-head gates:
+- core #292 PASS
+- staged #281 PASS all gates including real JieLi target, emulator and exact M4f bypass
+
+No shared Space during dry-engine work.
 
 ## Phase 5 - live structural behaviour / sounding-source integration
 
@@ -124,6 +144,8 @@ No shared Space during initial dry-engine work.
 - [ ] Mother held edits with audio engine
 - [ ] Chain changes with audio/event engine
 - [ ] prove M3c last-moment Spiral/Bloom binding drives sounding voices unchanged
+
+Phase 5 begins only after M4g is merged from an exact double-gated final documentation head.
 
 ## Phase 6 - shared Space / Cathedral
 
@@ -164,6 +186,8 @@ No shared Space during initial dry-engine work.
 - [ ] UI redraw load
 - [ ] Cathedral tuning
 
+M4g leaves only 10,968 B of static RAM headroom on the current target. Treat RAM as a first-class constraint in Phase 5/6; do not spend it casually before real-device timing/stack evidence exists.
+
 ## Phase 12 - hardware validation/release
 
 - [ ] physical FM-1 install
@@ -177,7 +201,7 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-1. Implement the pure occurrence-time Bloom acoustic planner only.
-2. Add default/min/max source-vector tests; no pitch/runtime/renderer in this slice.
-3. Gate normal + ASAN/UBSAN while all frozen M3/M4 references remain unchanged.
-4. Only after that, implement the external M3c Bloom token/snapshot bridge.
+1. Finish the M4g continuity/documentation freeze on top of `6c54d1cd5ca354543237a14c257b3ec28ab424d1`.
+2. Run core + full staged validation on the exact final documentation head.
+3. If both pass, update PR #13 metadata only, mark ready and squash-merge with the gated head SHA.
+4. Create the Phase-5 branch from the actual M4g squash merge and begin sounding-source structural integration; do **not** skip directly to Space/Cathedral.
