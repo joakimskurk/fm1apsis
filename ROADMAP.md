@@ -59,7 +59,7 @@ Phase 5 changed no production scheduler/DSP/runtime and consumed zero additional
 
 ## Phase 6 - shared Space / Cathedral
 
-Status: **active on `p6-space-cathedral` from merged Phase 5.**
+Status: **active on `p6-space-cathedral` from merged Phase 5. Pure host room engine complete; target/audible integration next.**
 
 - [x] freeze Study-126 shared-room topology / source sends / parameter roles
 - [x] document browser convolution IR as perceptual target rather than literal FM-1 implementation
@@ -71,12 +71,14 @@ Status: **active on `p6-space-cathedral` from merged Phase 5.**
 - [x] silent real-target memory gate using exact selected arrays
 - [x] prove room-disabled target preserves frozen M4g/Phase-5 PCM/runtime
 - [x] prove dedicated pre-`.pool` NOLOAD Space storage avoids Dinghy boot-time pool clearing while retaining full POOL-budget accounting
-- [~] implement selected FDN as pure fixed-point host DSP with external self-initialising delay storage
-- [ ] add source-defined trim/guard/early/predelay/tail-damping/echo/wet topology around FDN
-- [ ] deterministic host impulse/decay/hash + ASAN/UBSAN gate
-- [ ] integrate one shared room with five post-Mother source sends
+- [x] implement selected 8-line fixed-point FDN with external self-initialising delay storage
+- [x] implement source-defined trim / guard / early reflections / predelay / tail HP / FDN damping / filtered echo / wet return
+- [x] deterministic host reference + ASAN/UBSAN gates for FDN and full room front-end/topology
+- [~] split existing dry render into five post-Mother source contributions and feed one shared room-input accumulator
+- [ ] integrate `apsis_space_room_render()` into `app_audio()` using the already-proven dedicated NOLOAD storage
 - [ ] real target + emulator audible-room gate
-- [ ] room-disabled bypass regression returns exact frozen dry PCM/runtime
+- [ ] room-disabled bypass regression returns exact frozen dry PCM/runtime/cursor
+- [ ] freeze Phase-6 target/audio references and guarded merge
 
 Selected memory envelope:
 - ordinary RAM stays **87,336 / 98,304 B** during silent storage probe
@@ -94,6 +96,14 @@ Silent target gate head `11ce731a740d11262d988c352a79774bbea3103a`:
 - pool 305,436 B
 - PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 - cursor 123,648; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Current pure-room host head `014c6f843d6e8e7a15ac35e9bbc372e460756e9c`:
+- core #398 PASS normal + ASAN/UBSAN
+- staged #387 PASS existing dry target/emulator + silent storage gate
+- FDN default peak/hash **217 / `a190ca86`**
+- full room default peak/hash **47 / `1350a6da`**
+- full room first non-zero sample **927**
+- no-echo hash `97669507`; dark hash `5ff1f59a`
 
 Do **not** create unrelated per-source reverbs. Do **not** put large delay arrays in `.bss`. Do **not** place Space delay storage inside Dinghy's ordinary zeroed `.pool` range; it must remain in the dedicated pre-`.pool` NOLOAD section and be self-initialised/validity-tracked by Space.
 
@@ -142,8 +152,8 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-1. Add `apsis_space_dsp.[ch]` as a pure host engine implementing the selected 8-line fixed-point FDN with externally supplied buffers.
-2. Use fill/valid counters so NOLOAD history is never read before it has been written; no giant startup memset.
-3. Port trim/guard/early/predelay/tail damping/echo/wet around that engine in deterministic testable slices.
-4. Add host reference + ASAN/UBSAN impulse/decay/hash tests before any `app_audio()` integration.
-5. Only then split the existing dry rendering into five source contributions, apply source-defined Mother/send routing, feed one shared room input, and add a room-disabled exact-dry bypass gate.
+1. Refactor the target audio render so String, Drift, Clock, Spiral and Bloom are available as separate post-Mother stereo contributions **without changing their summed dry PCM**.
+2. Multiply those five contributions by the frozen source sends and sum them into one shared Space input.
+3. Bind the dedicated NOLOAD history/echo/FDN storage and call `apsis_space_room_render()` after dry source rendering.
+4. Add a CI-only room-disabled target variant requiring exact frozen Phase-5/M4g dry PCM/runtime/cursor.
+5. Add an audible-room target/emulator scenario and only then freeze Phase-6 references / merge PR #16.
