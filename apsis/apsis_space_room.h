@@ -19,8 +19,11 @@
 #define APSIS_SPACE_ROOM_BLOCK_MAX 256u
 
 typedef struct {
-    int32_t z1_q15;
-    int32_t z2_q15;
+    /* Transposed-DFII state in Q60. Q15 state quantization creates audible
+     * fixed-point limit cycles in the near-DC guard HP; keeping 15 guard bits
+     * beyond the Q15 signal makes an impulse decay cleanly to digital zero. */
+    int64_t z1_q60;
+    int64_t z2_q60;
 } ApsisSpaceBiquadState;
 
 typedef struct {
