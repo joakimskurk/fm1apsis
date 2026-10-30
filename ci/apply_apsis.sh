@@ -23,6 +23,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_drift_dsp.h apsis/apsis_drift_dsp.c \
    apsis/apsis_clock.h apsis/apsis_clock.c \
    apsis/apsis_clock_dsp.h apsis/apsis_clock_dsp.c \
+   apsis/apsis_target_div64.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
    apsis/apsis_bloom.h apsis/apsis_bloom.c \
    apsis/apsis_keep.h apsis/apsis_keep.c \
@@ -108,6 +109,8 @@ if drift_dsp_enabled:
 
 # M4e makes the already-frozen shared Clock events audible. The Clock DSP is a
 # passive finite consumer: no scheduler, queue, or musical RNG lives here.
+# JieLi's pi32v2 target omits libgcc DI-mode division, so include the exact
+# shift/subtract ABI shim immediately before Clock DSP whenever Clock is built.
 if clock_dsp_enabled:
     if '#include "apsis_clock_dsp.h"' not in s:
         hc_anchor = '#include "apsis_clock.h"'
@@ -118,7 +121,8 @@ if clock_dsp_enabled:
         cc_anchor = '#include "apsis_clock.c"'
         if cc_anchor not in s:
             raise SystemExit('FAIL: M4e Clock source anchor missing')
-        s = s.replace(cc_anchor, cc_anchor + '\n#include "apsis_clock_dsp.c"', 1)
+        s = s.replace(cc_anchor,
+                      cc_anchor + '\n#include "apsis_target_div64.c"\n#include "apsis_clock_dsp.c"', 1)
 
 # runtime_m4c.c includes the frozen M3c coordinator internally and appends only
 # the external Attractor-aware scheduler/process layer. Do not include
