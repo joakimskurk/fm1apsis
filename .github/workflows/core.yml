@@ -50,10 +50,10 @@ jobs:
       - name: P6 shared room front-end/topology
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            apsis/apsis_state.c apsis/apsis_space_dsp.c apsis/apsis_space_room.c \
+            apsis/apsis_space_dsp.c apsis/apsis_space_room.c \
             tests/test_space_room.c -o /tmp/test_space_room
           /tmp/test_space_room
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Iapsis \
-            apsis/apsis_state.c apsis/apsis_space_dsp.c apsis/apsis_space_room.c \
+            apsis/apsis_space_dsp.c apsis/apsis_space_room.c \
             tests/test_space_room.c -o /tmp/test_space_room_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/test_space_room_san
