@@ -33,3 +33,5 @@ jobs:
         run: bash ci/test_phase5_late_binding_audio.sh
       - name: P5b quantized Gravity sounding semantics
         run: bash ci/test_phase5_quantized_gravity_audio.sh
+      - name: P5c Mother sounding structural semantics
+        run: bash ci/test_phase5_mother_audio.sh
