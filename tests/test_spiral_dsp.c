@@ -8,6 +8,16 @@
 #define STRESS_SECONDS 8u
 #define STRESS_EVENT_CAP 2048u
 
+static const uint32_t M4F_REF_PEAK[4] = {1230u, 1157u, 967u, 1256u};
+static const uint32_t M4F_REF_HASH[4] = {
+    0xaef6c83eu, 0x9efa9bdcu, 0xe67a3c15u, 0xe7ed6161u
+};
+#define M4F_STRESS_HITS 384u
+#define M4F_STRESS_LOGICAL_HW 15u
+#define M4F_STRESS_LEG_HW 30u
+#define M4F_STRESS_OSC_HW 90u
+#define M4F_STRESS_HASH 0x02be4bc5u
+
 typedef struct {
     uint64_t target_sample;
     uint64_t interval_q32;
@@ -64,6 +74,7 @@ static void test_two_leg_and_late_cutoff_edge(void)
     ApsisSpiralAudioBinding b;
     uint64_t interval = (uint64_t)18375u << 32;
 
+    assert(APSIS_SPIRAL_DSP_LEG_CAP == 32u);
     apsis_state_default(&s);
     apsis_spiral_dsp_reset(&dsp);
     make_binding(&s, APSIS_SPIRAL_THREAD, APSIS_SPIRAL_HALO,
@@ -105,7 +116,8 @@ static void test_voice_references(void)
         apsis_spiral_dsp_render(&dsp, out, TEST_FRAMES);
         hash = hash_audio(2166136261u, out, TEST_FRAMES);
         peak = peak_audio(out, TEST_FRAMES);
-        assert(peak > 0u);
+        assert(peak == M4F_REF_PEAK[voice]);
+        assert(hash == M4F_REF_HASH[voice]);
         assert(dsp.steal_count == 0u);
         assert(dsp.drop_count == 0u);
         printf("M4F_REF voice=%u peak=%u hash=%08x legs=%u oscs=%u\n",
@@ -166,7 +178,7 @@ static void test_worst_case_capacity_probe(void)
     s.drift.width_q15 = APSIS_Q15_ONE;
     apsis_spiral_dsp_reset(&dsp);
     count = build_stress_events(ev, end_sample);
-    assert(count > 100u);
+    assert(count == M4F_STRESS_HITS);
 
     for (block_start = 0u; block_start < end_sample; block_start += 256u) {
         uint64_t block_end = block_start + 256u;
@@ -193,8 +205,13 @@ static void test_worst_case_capacity_probe(void)
     }
 
     assert(next == count);
+    assert(dsp.logical_high_water == M4F_STRESS_LOGICAL_HW);
+    assert(dsp.leg_high_water == M4F_STRESS_LEG_HW);
+    assert(dsp.oscillator_high_water == M4F_STRESS_OSC_HW);
+    assert(dsp.leg_high_water + 2u == APSIS_SPIRAL_DSP_LEG_CAP);
     assert(dsp.steal_count == 0u);
     assert(dsp.drop_count == 0u);
+    assert(hash == M4F_STRESS_HASH);
     printf("M4F_STRESS seconds=%u hits=%u logical_hw=%u leg_hw=%u osc_hw=%u steals=%u drops=%u hash=%08x\n",
            STRESS_SECONDS, count, dsp.logical_high_water, dsp.leg_high_water,
            dsp.oscillator_high_water, dsp.steal_count, dsp.drop_count, hash);
@@ -205,6 +222,6 @@ int main(void)
     test_two_leg_and_late_cutoff_edge();
     test_voice_references();
     test_worst_case_capacity_probe();
-    puts("PASS: APSIS M4f finite Spiral renderer and capacity probe");
+    puts("PASS: APSIS M4f frozen finite Spiral renderer and capacity gate");
     return 0;
 }
