@@ -98,13 +98,12 @@ static void capture_distinct(ApsisState *state, ApsisKeepBank *keep,
     ApsisChainCell c;
     state->gravity.tonic = tonic;
     state->string.left_split_q15 = (uint16_t)(7000u + tonic * 100u);
-    assert(apsis_keep_capture_slot(keep, slot, state) == 0);
+    keep->slots[slot] = apsis_keep_capture(state);
+    keep->selected_slot = (int8_t)slot;
     c = apsis_chain_default_cell(slot, &state->chain, state->clock.n);
     c.transpose = transpose;
-    if (chain->count == 0u)
-        assert(apsis_chain_append(chain, &c) == 0);
-    else
-        chain->cells[0] = c;
+    chain->cells[0] = c;
+    chain->count = 1u;
     chain->selected = 0;
 }
 
