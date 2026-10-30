@@ -46,8 +46,8 @@ jobs:
       - name: Gate 2 - unchanged Dinghy host and target
         run: bash ci/build_baseline.sh
 
-      - name: Gate 3 - APSIS M4g overlay and host shell
-        run: bash ci/apply_apsis_m4g.sh
+      - name: Gate 3 - APSIS M5a overlay and host shell
+        run: bash ci/apply_apsis_m5a.sh
 
       - name: Gate 4 - APSIS target package and identity
         run: bash ci/build_apsis_target.sh
@@ -63,9 +63,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp build/target_report.json build/evidence/m4g-default-target-report.json
-          cp build/SHA256SUMS build/evidence/m4g-default-SHA256SUMS
-          cp build/apsis-0.1-dev.fwsc build/m4g-default-fw-backup.fwsc
+          cp build/target_report.json build/evidence/m5a-default-target-report.json
+          cp build/SHA256SUMS build/evidence/m5a-default-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/m5a-default-fw-backup.fwsc
 
           APSIS_CI_BLOOM_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis_m4g.sh
           APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
@@ -125,10 +125,81 @@ jobs:
           print('PASS: M4g Bloom bypass exactly preserves frozen M4f target/PCM/runtime')
           PY
 
-          cp build/m4g-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
-          cp build/evidence/m4g-default-target-report.json build/target_report.json
-          cp build/evidence/m4g-default-SHA256SUMS build/SHA256SUMS
-          rm -f build/m4g-default-fw-backup.fwsc
+          cp build/m5a-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/m5a-default-target-report.json build/target_report.json
+          cp build/evidence/m5a-default-SHA256SUMS build/SHA256SUMS
+          rm -f build/m5a-default-fw-backup.fwsc
+
+      - name: Gate 5c - structural-audio bypass preserves frozen M4g target and PCM
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp build/target_report.json build/evidence/m5a-pre-bypass-target-report.json
+          cp build/SHA256SUMS build/evidence/m5a-pre-bypass-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/m5a-pre-bypass-fw-backup.fwsc
+
+          APSIS_CI_STRUCTURAL_AUDIO_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis_m5a.sh
+          APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
+          cp build/target_report.json build/evidence/m5a-structural-bypass-target-report.json
+          cp build/SHA256SUMS build/evidence/m5a-structural-bypass-SHA256SUMS
+
+          set -o pipefail
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee build/evidence/emulator_structural_audio_bypass.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-structural-audio-bypass
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          target = json.loads(Path('build/target_report.json').read_text())
+          expected_target = {
+              'image': 100944,
+              'ram': 87336,
+              'pool': 30720,
+              'package_sha256': 'b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca',
+              'product': 'FM-1_972',
+          }
+          for key, expected in expected_target.items():
+              actual = target.get(key)
+              if actual != expected:
+                  raise SystemExit(
+                      f'FAIL: M5a structural bypass target {key}={actual!r} != frozen M4g {expected!r}'
+                  )
+
+          report = json.loads(Path('work/emu-smoke/report.json').read_text())
+          expected_pcm = '6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b'
+          if report.get('wav_raw_sha256') != expected_pcm:
+              raise SystemExit(
+                  'FAIL: M5a structural bypass changed frozen M4g PCM: '
+                  f"{report.get('wav_raw_sha256')} != {expected_pcm}"
+              )
+          if report.get('runtime_queue_high_water') != 28:
+              raise SystemExit(
+                  f"FAIL: M5a bypass queue high-water {report.get('runtime_queue_high_water')} != 28"
+              )
+          if report.get('runtime_queue_overflowed') != 0:
+              raise SystemExit('FAIL: M5a bypass runtime queue overflow')
+          if report.get('runtime_late_flags') != 0:
+              raise SystemExit(
+                  f"FAIL: M5a bypass late flags {report.get('runtime_late_flags')}"
+              )
+          if report.get('runtime_cursor_low32') != 123648:
+              raise SystemExit(
+                  f"FAIL: M5a bypass cursor {report.get('runtime_cursor_low32')} != 123648"
+              )
+          if report.get('runtime_late_trace_hash') != '811c9dc5':
+              raise SystemExit(
+                  'FAIL: M5a bypass late trace '
+                  f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
+              )
+          print('PASS: M5a structural-audio bypass exactly preserves frozen M4g target/PCM/runtime')
+          PY
+
+          cp build/m5a-pre-bypass-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/m5a-pre-bypass-target-report.json build/target_report.json
+          cp build/evidence/m5a-pre-bypass-SHA256SUMS build/SHA256SUMS
+          rm -f build/m5a-pre-bypass-fw-backup.fwsc
 
       - name: Upload Phase 1 evidence
         if: always()
