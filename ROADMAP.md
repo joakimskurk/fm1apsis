@@ -2,7 +2,7 @@
 
 Short operational roadmap. Detailed parity-first phase descriptions remain in `docs/PLAN.md`.
 
-Status legend: `[x]` complete, `[~]` active/finalizing, `[ ]` not started.
+Status legend: `[x]` complete, `[~]` active, `[ ]` not started.
 
 ## Phase 0 — reference freeze
 - [x] Study 126 behavioural authority locked
@@ -62,7 +62,7 @@ Frozen Phase-6 target: image 107,352 B; RAM 87,780 B; POOL 309,532 B; audible PC
 
 ## Phase 7 — persistent KEEP / CHAIN storage
 
-Status: **[~] implementation complete on PR #17; final guarded merge pending.**
+Status: **[x] complete and merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.**
 
 - [x] freeze persisted data contract for 8 KEEP slots + 32 CHAIN cells/settings
 - [x] explicit little-endian versioned CRC records
@@ -78,6 +78,8 @@ Status: **[~] implementation complete on PR #17; final guarded merge pending.**
 - [x] real JieLi target build within image/RAM/POOL budgets
 - [x] audible emulator remains bit-exact P6
 - [x] dry-only emulator remains exact Phase 5
+- [x] final exact-head core + staged + P6-final + P7-storage + P7-target all PASS
+- [x] guarded PR #17 squash merge
 
 Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
 - image 110,848 / 581,564 B
@@ -89,7 +91,11 @@ Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
 - cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
 ## Phase 8 — native visual surfaces
+
+Status: **[~] active.**
+
 - [ ] freeze 240×240 layout/visual contract
+- [ ] inventory FM-1 graphics/update path and redraw budget
 - [ ] native bounded-cost graphics primitives
 - [ ] MOTHER / GRAVITY / STRING / CLOCK / SPIRAL / BLOOM / DRIFT-TUNING / CHAIN / KEEP / SPACE
 - [ ] String central veil + visible SPLIT anchors
@@ -99,6 +105,7 @@ Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
 - [ ] Gravity/Mother active mapping overlays
 - [ ] Chain/Keep readable non-generic treatment
 - [ ] visual comparison against locked APSIS/browser reference
+- [ ] deterministic visual regression evidence before Phase 9
 
 ## Phase 9 — physical interaction parity
 - [ ] direct FM-1 mappings for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER, SPACE
@@ -129,4 +136,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Finish the guarded Phase-7 merge, then begin Phase 8 by freezing the native 240×240 visual contract and reusable graphics primitives. Do not introduce UI shadow state or disturb the frozen audio/runtime/persistence paths.
+Begin Phase 8A from merged Phase 7: freeze the native 240×240 visual contract, inventory the pinned display path, and implement reusable bounded-cost graphics primitives. Do not introduce UI shadow state or disturb the frozen audio/runtime/persistence paths.

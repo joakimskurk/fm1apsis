@@ -4,13 +4,13 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 7 — persistent KEEP / CHAIN storage is technically complete on PR #17 and awaiting the final guarded merge. Phase 8 — native 240×240 visual surfaces is next.**
+**Phase 8 — native 240×240 visual surfaces is current. Phase 7 persistence is complete and merged.**
 
-Current Phase-7 technical candidate:
-- head `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
-- PR #17
-- P7 storage host/fake-NOR/ASAN-UBSAN gates: **PASS**
-- P7 target gates: **PASS all gates**
+Phase 7:
+- PR #17 merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285`
+- frozen technical firmware candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
+- final documentation/CI head `2fd054d90a49ff8e52544c092937dadc8e4097d9`
+- final exact-head gates: core, staged, P6-final, P7-storage and P7-target **all PASS**
 
 Phase 6 remains merged as `cd321e9f7999d0568d280d89e7e3574c3da66054` via PR #16.
 
@@ -134,14 +134,25 @@ P7 room-return-disabled regression:
 
 Reading project NOR from `app_main()` after FM-1 audio/DMA had already started changed only frames 1804..2047 of the first active block by at most 2 Q15 steps; runtime telemetry and all audio after frame 2048 were already identical. We did **not** accept this as a new baseline. Splitting boot into pre-audio NOR prefetch plus later RAM-only decode restored the full P6/Phase-5 hashes exactly.
 
-## Exact next action — Phase 8
+## Exact next action — Phase 8A
 
-After the guarded Phase-7 merge:
-1. freeze a 240×240 visual layout contract for all APSIS surfaces;
-2. build native reusable graphics primitives with bounded redraw cost;
-3. implement MOTHER / GRAVITY / STRING / CLOCK / SPIRAL / BLOOM / DRIFT-TUNING / CHAIN / KEEP / SPACE views from the Study-126 identity;
-4. retain the shared state graph as the only UI truth — no visual shadow state;
-5. compare native screens against the locked browser/source identity before Phase 9 control mapping.
+1. freeze a 240×240 visual/layout contract for all APSIS surfaces;
+2. inventory the pinned Dinghy/FM-1 graphics primitives, framebuffer cost and display update path;
+3. implement reusable bounded-cost native primitives without touching musical/audio/persistence state;
+4. render first static/state-driven reference surfaces from the existing APSIS state graph;
+5. add deterministic visual tests/evidence before expanding across all surfaces.
+
+Phase 8 target surface set:
+- MOTHER
+- GRAVITY
+- STRING
+- CLOCK
+- SPIRAL
+- BLOOM
+- DRIFT/TUNING
+- CHAIN
+- KEEP
+- SPACE
 
 ## Do not regress
 
@@ -155,4 +166,5 @@ After the guarded Phase-7 merge:
 - integrated P6/P7 scenario retains cursor 123,392 with zero late/overflow flags
 - P7 audible PCM remains exact P6; P7 dry-only remains exact Phase 5
 - project persistence stays versioned/journaled/CRC-protected and never blocks active audio
+- Phase 8 visuals consume the shared APSIS state graph; no UI shadow musical state
 - physical FM-1 and real ISR/storage power-cut behaviour remain unverified

@@ -2,9 +2,11 @@
 
 Date: 2026-10-30
 
-Status: **technical implementation complete; PR #17 guarded merge pending**
+Status: **complete and merged via PR #17 as `e9000b2b2f74d4fafe96df87f030cc55916a8285`**
 
-Firmware source candidate: `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
+Frozen firmware source candidate: `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
+
+Final documentation/CI head: `2fd054d90a49ff8e52544c092937dadc8e4097d9`
 
 ## Scope completed
 
@@ -106,14 +108,16 @@ Room-return-disabled:
 - cursor 123,392
 - late trace `811c9dc5`
 
-## CI at technical candidate
+## Final merge gate
 
-On `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
-- P7 storage: PASS (format/journal, fake FM-1 NOR, ASAN/UBSAN)
-- P7 target: PASS all gates (pinned upstream, generated target, real JieLi build, audible exact P6, dry exact Phase 5)
-- core regression: PASS
+On exact final documentation/CI head `2fd054d90a49ff8e52544c092937dadc8e4097d9`:
+- APSIS core #436: PASS
+- APSIS staged validation #425: PASS
+- APSIS Phase 6 final checkpoint #32: PASS
+- APSIS Phase 7 storage #19: PASS
+- APSIS Phase 7 target persistence #12: PASS
 
-The final documentation head must additionally complete the ordinary staged and P6-final regression suites before guarded merge.
+PR #17 was marked ready and squash-merged with an expected-head lock, producing merge commit `e9000b2b2f74d4fafe96df87f030cc55916a8285`.
 
 ## Verification boundary
 
@@ -126,4 +130,4 @@ Level 5 is reached for implementation/build and empty-flash emulator behaviour. 
 
 ## Handoff to Phase 8
 
-After PR #17 merges, Phase 8 should start from the frozen audio/runtime/persistence candidate and add native 240×240 visuals only. The first work package is a visual/layout contract + bounded-cost graphics primitives. UI rendering must consume the existing shared APSIS state graph rather than creating shadow musical state.
+Phase 8 starts from the frozen audio/runtime/persistence path and adds native 240×240 visuals only. The first work package is a visual/layout contract + bounded-cost graphics primitives. UI rendering must consume the existing shared APSIS state graph rather than creating shadow musical state.

@@ -2,9 +2,9 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-10-30 - Phase 7 persistent KEEP/CHAIN storage final checkpoint
+## 2026-10-30 - Phase 7 persistent KEEP/CHAIN storage merged
 
-PR #17 reached a technically complete persistence candidate at `e290813f5e67affc7404dcb9fc7af63d2c671a8c` and is awaiting the final documentation-head regression pass + guarded merge.
+PR #17 merged to `main` as `e9000b2b2f74d4fafe96df87f030cc55916a8285` after final documentation/CI head `2fd054d90a49ff8e52544c092937dadc8e4097d9` passed core #436, staged #425, P6-final #32, P7-storage #19 and P7-target #12.
 
 Completed:
 - explicit little-endian v1 project format for 8 KEEP slots, 32 CHAIN cells and behavioural CHAIN settings
@@ -20,6 +20,7 @@ Completed:
 - exact P6 audible PCM and exact Phase-5 dry PCM preserved
 
 Frozen technical candidate:
+- firmware source `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
 - image 110,848 / 581,564 B
 - RAM 88,628 / 98,304 B
 - POOL 309,532 / 344,064 B
@@ -30,7 +31,7 @@ Frozen technical candidate:
 
 A boot-time NOR read initially perturbed 202 frames of the first active audio block by at most two Q15 steps. The baseline was not relaxed: prefetch was moved before `fm1_audio_init()`, restoring full bit-exact PCM.
 
-Next after guarded merge: Phase 8 native 240×240 visual surfaces.
+Next phase: Phase 8 native 240×240 visual surfaces.
 
 ## 2026-10-30 - Phase 6 shared Space/Cathedral merged
 

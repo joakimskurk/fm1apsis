@@ -1,6 +1,6 @@
 # Phase 7 — KEEP / CHAIN persistent project contract
 
-Status: **final technical contract; PR #17 merge pending**
+Status: **final; merged via PR #17 as `e9000b2b2f74d4fafe96df87f030cc55916a8285`**
 
 This document freezes APSIS project persistence. It does not change the M3c scheduler, any source DSP, Space/Cathedral, or `ApsisRuntime`.
 
@@ -104,12 +104,13 @@ The current prototype gesture is SAVE while already on KEEP. Final physical inte
 
 ## Verification boundary
 
-Verified now:
+Verified:
 - desktop format/journal tests;
 - fake-NOR save/reboot/failure recovery;
 - ASAN/UBSAN;
 - real JieLi target compilation/link/resource accounting;
-- empty-flash pinned-emulator boot preserving frozen P6/Phase-5 PCM and runtime telemetry.
+- empty-flash pinned-emulator boot preserving frozen P6/Phase-5 PCM and runtime telemetry;
+- final exact-head core + staged + P6-final + P7-storage + P7-target regression suites before merge.
 
 Not verified without a physical FM-1:
 - real NOR timing;

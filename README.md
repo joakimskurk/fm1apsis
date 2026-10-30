@@ -25,8 +25,8 @@ The repository, not chat history, is the durable source of project state.
 - Phase 4 five dry source engines: complete and merged
 - Phase 5 sounding-source structural integration: complete and merged as `d677a887cf6dc8552634bde5a71fec0221c299b5`
 - Phase 6 shared Space/Cathedral: complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`
-- Phase 7 persistent KEEP/CHAIN storage: **implementation complete; PR #17 finalizing**
-- Phase 8 native 240×240 visual surfaces is next after the guarded Phase-7 merge
+- Phase 7 persistent KEEP/CHAIN storage: complete and merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285`
+- Phase 8 native 240×240 visual surfaces: **current phase**
 
 Physical FM-1 validation has not yet been performed. Real hardware ISR margin, real NOR power-interruption behaviour, DAC/listening quality and physical controls/display behaviour therefore remain unverified.
 
@@ -55,7 +55,7 @@ Historical M4/M5 emulator baseline remains cursor **123,648**. The integrated Ph
 
 ## Phase 7 — persistent KEEP / CHAIN project storage
 
-Phase 7 adds persistence without changing the frozen musical/audio engine:
+Phase 7 added persistence without changing the frozen musical/audio engine:
 
 - explicit little-endian v1 project record; native C struct padding is never persisted
 - 8 KEEP slots + KEEP selection
@@ -68,7 +68,7 @@ Phase 7 adds persistence without changing the frozen musical/audio engine:
 - boot project record is prefetched from NOR **before FM-1 audio/DMA starts**, then decoded from RAM after APSIS defaults are installed
 - save requests are deferred; erase/program runs only from the main loop with transport stopped and audio quiesced, never from `app_audio()`
 
-Final technical Phase-7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
+Frozen Phase-7 technical candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`, merged through PR #17 as `e9000b2b2f74d4fafe96df87f030cc55916a8285`:
 
 - image **110,848 / 581,564 B**
 - RAM **88,628 / 98,304 B**
@@ -80,10 +80,10 @@ Final technical Phase-7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
 - room-return-disabled PCM remains exact Phase 5: `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 - both variants retain cursor 123,392, queue 28/512, no overflow/late flags and trace `811c9dc5`
 
-The initial P7 target probe exposed a two-Q15-step perturbation confined to the first active DMA block when NOR was read after audio startup. That was treated as a regression, not a new baseline. Moving read-only project prefetch before `fm1_audio_init()` restored the full frozen PCM hashes exactly.
+The initial P7 target probe exposed a two-Q15-step perturbation confined to the first active audio block when NOR was read after audio startup. That was treated as a regression, not a new baseline. Moving read-only project prefetch before `fm1_audio_init()` restored the full frozen PCM hashes exactly.
 
 ## Important verification boundary
 
 The firmware builds for the real JieLi target and passes the pinned FM-1 emulator. A physical FM-1 is not currently available, so no claim is made yet about real DAC sound, true ISR-cycle headroom, physical UI behaviour or real power-cut storage robustness.
 
-After Phase 7 merges, the next implementation phase is **Phase 8 — native 240×240 visual surfaces**.
+The current implementation phase is **Phase 8 — native 240×240 visual surfaces**.
