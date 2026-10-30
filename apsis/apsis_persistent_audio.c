@@ -206,3 +206,40 @@ uint8_t apsis_persistent_audio_apply_through(ApsisPersistentAudioQueue *queue,
     }
     return applied;
 }
+
+void apsis_persistent_audio_render_block(ApsisPersistentAudioQueue *queue,
+                                         ApsisStringDsp *string_dsp,
+                                         ApsisDriftDsp *drift_dsp,
+                                         int32_t *out,
+                                         uint32_t frames,
+                                         uint64_t block_start)
+{
+    uint32_t offset = 0u;
+    uint64_t block_end;
+    if (!out || !frames) return;
+    block_end = block_start + frames;
+    if (block_end < block_start) block_end = ~(uint64_t)0;
+
+    while (offset < frames) {
+        uint64_t cursor = block_start + offset;
+        uint64_t boundary = 0u;
+        uint32_t segment;
+        if (!apsis_persistent_audio_next_boundary(queue, cursor, block_end, &boundary))
+            break;
+        if (boundary < cursor) boundary = cursor;
+        segment = (uint32_t)(boundary - cursor);
+        if (segment) {
+            if (string_dsp) apsis_string_dsp_render(string_dsp, out + offset * 2u, segment);
+            if (drift_dsp) apsis_drift_dsp_render(drift_dsp, out + offset * 2u, segment);
+            offset += segment;
+            cursor += segment;
+        }
+        (void)apsis_persistent_audio_apply_through(queue, cursor, string_dsp, drift_dsp);
+    }
+
+    if (offset < frames) {
+        uint32_t tail = frames - offset;
+        if (string_dsp) apsis_string_dsp_render(string_dsp, out + offset * 2u, tail);
+        if (drift_dsp) apsis_drift_dsp_render(drift_dsp, out + offset * 2u, tail);
+    }
+}
