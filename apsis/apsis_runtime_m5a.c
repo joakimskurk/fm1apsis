@@ -57,14 +57,6 @@ uint8_t apsis_runtime_process_structural_audio(
             r, s, bank, chain, mother_pending, bloom_voicing, frames,
             mother_apply, mother_user, a, spiral_audio, bloom_audio, observation);
     }
-    if (!bloom_audio) {
-        /* M5a target work is layered above the complete M4g engine. A caller
-         * deliberately omitting Bloom still gets the exact older path; it just
-         * cannot request structural-audio capture through this entry point. */
-        return apsis_runtime_process_bloom_audio(
-            r, s, bank, chain, mother_pending, bloom_voicing, frames,
-            mother_apply, mother_user, a, spiral_audio, bloom_audio, observation);
-    }
 
     if (observation) runtime_zero(observation, (uint32_t)sizeof(*observation));
     if (!r || !s || !frames) return 0u;
@@ -76,7 +68,7 @@ uint8_t apsis_runtime_process_structural_audio(
 
     if (a) apsis_string_attractor_begin_process(a);
     if (spiral_audio) apsis_spiral_audio_runtime_begin_process(spiral_audio);
-    apsis_bloom_audio_runtime_begin_process(bloom_audio);
+    if (bloom_audio) apsis_bloom_audio_runtime_begin_process(bloom_audio);
 
     lookahead = m3c_ms_samples(r->transport.sample_rate, APSIS_RUNTIME_LOOKAHEAD_MS);
     horizon = end + lookahead;
@@ -153,11 +145,13 @@ uint8_t apsis_runtime_process_structural_audio(
                 break;
             case APSIS_EVENT_BLOOM_OCCURRENCE:
                 m3c_handle_bloom_occurrence(r, s, bloom_voicing, &e);
-                apsis_bloom_audio_runtime_capture(bloom_audio, r, s);
+                if (bloom_audio)
+                    apsis_bloom_audio_runtime_capture(bloom_audio, r, s);
                 break;
             case APSIS_EVENT_BLOOM_BIND:
                 m3c_handle_bloom_bind(r, s, &e);
-                apsis_bloom_audio_runtime_bind(bloom_audio, r, s, &e);
+                if (bloom_audio)
+                    apsis_bloom_audio_runtime_bind(bloom_audio, r, s, &e);
                 break;
             case APSIS_EVENT_STRING_ATTRACTOR_BIND:
                 if (a)
