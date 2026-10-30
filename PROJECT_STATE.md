@@ -4,32 +4,20 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 5 — sounding-source structural integration: technically complete; final documentation-head double gate pending.**
+**Phase 6 — shared Space / Cathedral: source/topology freeze complete; native memory/candidate prototyping active.**
 
-Active branch: `p5-sounding-integration`  
-Draft PR: #15  
-Base: merged M4g `713a1e9ac746a1a4d19ba825a0e6765b337ba410`  
-Technically final Phase-5 verification head before documentation freeze: `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`.
+Active branch: `p6-space-cathedral`  
+Base: merged Phase 5 `d677a887cf6dc8552634bde5a71fec0221c299b5`  
+Phase-6 contract: `docs/reference/P6_SPACE_CATHEDRAL_CONTRACT.md`
 
-Phase 5 required **no production scheduler/DSP/runtime change**. The existing M3c shared runtime plus M4f/M4g sounding bridges already satisfy the source-defined structural semantics. Phase 5 therefore closes through explicit end-to-end sounding verification rather than manufacturing a production diff.
+Phase 5 was final-gated on `17e7fd1247b0f5675261a7395b0558b5bbd6780d`:
+- core #363 PASS
+- staged #352 PASS including real JieLi target, emulator and exact M4f Bloom-bypass
+- squash-merged through PR #15 as `d677a887cf6dc8552634bde5a71fec0221c299b5`
 
-Implementation-head evidence:
-- APSIS core #357 PASS, normal + ASAN/UBSAN
-- APSIS staged validation #346 PASS through pinned source/core, unchanged Dinghy, M4g single-TU overlay, real JieLi `FM-1_972` target, emulator smoke and exact M4f Bloom-bypass gate
-- all frozen M3/M4 references remain unchanged
+Phase 5 required no production scheduler/DSP/runtime change, so current firmware remains exact M4g.
 
 Physical FM-1 hardware is still unavailable. No real ISR-cycle-margin or hardware-listening claim is made.
-
-## Completed sounding Phase-5 slices
-
-- **P5a — structural late binding:** immediate structural edits between occurrence and bind reach actual sounding Spiral/Bloom DSP while occurrence-frozen acoustic data and target time remain unchanged.
-- **P5b — quantized Gravity:** the deliberate source asymmetry is audible: Spiral does not project ordinary pending Gravity; Bloom may project it target-aware under the +0.5 ms rule.
-- **P5c — Mother `->1`:** Mother-held Gravity remains inaudible to future-bound sources until the actual `->1` commit.
-- **P5d — Chain discrete:** Chain boundary state reaches sounding Spiral/Bloom in source order.
-- **P5e — Chain morph:** continuous Drift morph begins on the musical target and reaches the sounding Drift DSP.
-- **P5f — step-one free-run/resync:** RESYNC OFF preserves free-running Spiral attractor phase into sounding energy; source attractor identity is read from the frozen M3c slot rather than duplicated into the M4f acoustic snapshot.
-
-Normative starting contract: `docs/reference/P5A_SOUNDING_LATE_BINDING_CONTRACT.md`.
 
 ## Product/source invariant
 
@@ -41,9 +29,7 @@ Behavioural/state/timing/safety authority:
 
 String acoustic exception only:
 - Study 98 · Performance Architecture
-- raw LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
-- only String features that existed there use Study 98 acoustically
-- later Study-124/125/126 safety/de-click fixes override older engine mechanics
+- LF SHA-256 `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
 
 Pinned FM-1 baseline:
 - Dinghy `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
@@ -56,9 +42,9 @@ M3c remains the only musical scheduler/runtime timeline.
 
 Host invariants:
 - `sizeof(ApsisRuntime) = 21,928 B`
-- shared heap 512 events
+- heap 512 events
 - canonical queue 352/512; extreme 357/512
-- Spiral slots 59/64; Bloom slots 44/64
+- Spiral slots 59/64; Bloom 44/64
 - random trace `78771ff5`
 - late trace `0e6fc422`
 
@@ -69,67 +55,111 @@ Pinned emulator invariants:
 - cursor **123,648 exactly**
 - late trace `811c9dc5`
 
-No Phase-5 slice changed these values.
+## Current target baseline
 
-## M4g / Phase-5 real target baseline
-
-The Phase-5 staged build is byte-for-byte the merged M4g firmware because Phase 5 is verification-only:
+Current production image remains exact M4g / merged Phase 5:
 - image **100,944 / 581,564 B**
 - RAM **87,336 / 98,304 B**
-- static RAM headroom **10,968 B**
+- ordinary static-RAM headroom **10,968 B**
 - pool **30,720 / 344,064 B**
+- pool headroom **313,344 B**
 - package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- product `FM-1_972`
+- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
-Pinned default emulator:
-- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- peak 856; RMS 144/144; stereo delta 125; mean -2/-2
-- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+## Phase 6 source/topology freeze
 
-M4g Bloom bypass remains exact frozen M4f:
-- image/RAM/pool 95,804 / 58,056 / 30,720 B
-- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- same PCM/runtime invariants as M4f
+Study 126 defines **one shared room** fed by five post-source/post-Mother sends:
+- String 0.72
+- Drift 0.20
+- Clock 0.06
+- Spiral 0.62
+- Bloom 0.58
+
+Shared Space defaults already match native state:
+- wet return 0.48
+- decay 8.4 s
+- predelay 72 ms
+- damping 6200 Hz
+- echo 362 ms / 18 % feedback
+
+Frozen topology:
+1. per-source sends -> shared room input;
+2. trim 0.72;
+3. room guard HP/LP/compressor;
+4. four early reflection taps;
+5. predelay -> 190 Hz HP -> long diffuse Cathedral -> damping LP -> wet return;
+6. quiet filtered feedback echo feeds the same long-tail path;
+7. wet return remains separate from dry.
+
+Browser convolution IR is a perceptual target, not a literal FM-1 implementation requirement. Native must retain dense/dark/low-metallicity 4..12 s behaviour and source-send topology.
+
+Documented Study-126 live-audio dispositions:
+- effective live tail damping 2200..6800 Hz although UI exposes 2200..11000;
+- effective live echo feedback 0..0.48 although UI/storage exposes 0..0.58.
+
+## Phase 6 memory decision
+
+Pinned Dinghy provides a separate **336 KiB `.pool` specifically for large zeroed buffers**, including delay-line use.
+
+Therefore:
+- large predelay/echo/reverb delay lines belong in `.pool`;
+- small room/filter/control state stays in normal RAM;
+- do not consume the final 10,968 B ordinary RAM with delay arrays.
+
+Reference stereo int16 storage at 44.1 kHz:
+- predelay max 140 ms: ~24.7 kB
+- echo max 1.2 s: ~211.7 kB
+- current pool headroom before Phase 6: 313.3 kB
+
+This makes a compact algorithmic Cathedral feasible, but worst-case pool sizing must be measured before integration.
+
+## Candidate gate now active
+
+Prototype and compare, before `app_audio()` integration:
+1. compact modulated FDN;
+2. nested allpass/Schroeder hybrid.
+
+Both must preserve the contract and report:
+- pool bytes and ordinary state bytes;
+- deterministic impulse hash;
+- decay/energy behaviour at 4 / 8.4 / 12 s;
+- stereo decorrelation;
+- metallic/repeat proxy;
+- damping behaviour;
+- transient stability;
+- cost proxy.
+
+Then place the selected candidate's **exact delay buffers** in `.pool` in a silent target-validation build. The real target must fit and the old M4g/Phase-5 PCM/runtime must remain bit-identical while the room renderer is not called.
 
 ## Completed merged baselines
 
-- M3a transport `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
-- M3b runtime `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
-- M3c late binding `ec0dc0b350793572f19040efc938f00121128dc6`
-- M4a String persistent `2ea217f09c143d30385f136e84e2b29d582987a0`
-- M4b String finite/Rhythm `c96c00debf9a67948f1e874e36b090999dacadb9`
-- M4c String Attractor `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`
-- M4d Drift `d7e39e2481c33628f402bed51d761b8be8304bb3`
-- M4e Clock `db9d0b3ecbc7931be343cec7717103059d3c5160`
-- M4f Spiral `734229f4d23626a176a8366de82aab2c58c48cc9`
-- M4g Bloom `713a1e9ac746a1a4d19ba825a0e6765b337ba410`
-
-## Phase 6 constraint
-
-The next code phase is **shared Space / Cathedral**, not more Phase-5 scheduler work.
-
-Because only **10,968 B static RAM headroom** remains on the current target, Phase 6 must be prototype-first and memory-conscious:
-- compare compact modulated FDN and nested allpass/Schroeder candidates;
-- preserve one shared room with five per-source sends;
-- do not allocate a large unconditional delay/reverb BSS before target memory evidence;
-- do not sacrifice parity simply to hide memory use without a measured alternative.
+- M3a `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
+- M3b `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
+- M3c `ec0dc0b350793572f19040efc938f00121128dc6`
+- M4a `2ea217f09c143d30385f136e84e2b29d582987a0`
+- M4b `c96c00debf9a67948f1e874e36b090999dacadb9`
+- M4c `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`
+- M4d `d7e39e2481c33628f402bed51d761b8be8304bb3`
+- M4e `db9d0b3ecbc7931be343cec7717103059d3c5160`
+- M4f `734229f4d23626a176a8366de82aab2c58c48cc9`
+- M4g `713a1e9ac746a1a4d19ba825a0e6765b337ba410`
+- Phase 5 sounding integration `d677a887cf6dc8552634bde5a71fec0221c299b5`
 
 ## Exact next action
 
-1. Finish the Phase-5 continuity/documentation freeze on top of verified head `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`.
-2. Run **APSIS core** and full **APSIS staged validation** on the exact final documentation head.
-3. If both are green, update PR #15 metadata only, mark it ready and squash-merge with `expected_head_sha` equal to that gated documentation head.
-4. Create the Phase-6 Space/Cathedral branch from the actual Phase-5 squash merge commit.
-5. Do not start implementation of a room algorithm before the Phase-6 source/topology contract and target-memory prototype gate are written.
+1. Open the Phase-6 draft PR from `p6-space-cathedral` after the topology-contract commit.
+2. Add a deterministic host memory/impulse prototype for **both** room candidates.
+3. Measure candidate pool usage and acoustic proxies under 4 / 8.4 / 12 s settings.
+4. Select a candidate only from evidence, not preference.
+5. Before audible integration, validate its exact `.pool` layout on real JieLi target while room rendering remains disabled.
 
 ## Do not regress
 
-- Study 126 remains behavioural/state/timing/safety authority.
-- Study 98 remains narrow String acoustic authority only.
-- one shared Phase-3 scheduler; no module-private clocks.
-- `ApsisRuntime` remains 21,928 B unless an explicitly scoped later decision changes it.
-- M3c Spiral/Bloom late binding remains authoritative.
-- Phase 5 adds no production random draw, queue event, DSP pool or persistent BSS.
-- inactive engines may not reduce the exact emulator cursor.
-- shared Space/Cathedral is Phase 6 and must be one shared return, not per-source reverbs.
+- one shared Phase-3 scheduler; no module-private clocks;
+- one shared room with five source sends; no per-source reverbs;
+- Study 126 topology/parameter roles remain authoritative;
+- Study 98 remains narrow String acoustic authority only;
+- `ApsisRuntime` remains 21,928 B unless explicitly re-approved;
+- Phase-6 delay memory belongs in `.pool`, not ordinary BSS;
+- inactive room code may not change the exact emulator cursor or dry PCM;
 - physical FM-1 and real ISR timing remain unverified.
