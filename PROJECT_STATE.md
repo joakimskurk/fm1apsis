@@ -4,9 +4,9 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 4 / M4e — Clock dry engine.**
+**Phase 4 / M4f — Spiral dry engine.**
 
-Implementation is complete and verified through desktop, ASAN/UBSAN, real JieLi target build and FM-1 emulator. PR #11 is merge-pending only after an exact final documentation-head double gate. Physical FM-1 hardware has not been tested.
+Implementation is complete and verified through desktop, ASAN/UBSAN, real JieLi target build and FM-1 emulator. PR #12 is merge-pending only after an exact final documentation-head double gate. Physical FM-1 hardware has not been tested.
 
 Completed and merged baselines:
 - M3a transport: `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
@@ -16,14 +16,15 @@ Completed and merged baselines:
 - M4b finite String + Rhythm: `c96c00debf9a67948f1e874e36b090999dacadb9` via PR #8
 - M4c String Attractor: `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc` via PR #9
 - M4d persistent Drift: `d7e39e2481c33628f402bed51d761b8be8304bb3` via PR #10
+- M4e Clock: `db9d0b3ecbc7931be343cec7717103059d3c5160` via PR #11
 
 Active work:
-- branch `m4e-clock`
-- PR #11
-- base `d7e39e2481c33628f402bed51d761b8be8304bb3`
-- validated implementation head `285aacb5309fd9abaa51814e4ea6a09a3e480a10`
-- implementation gates: core #225 PASS; staged #214 PASS including real JieLi target, Clock-on emulator and dedicated Clock-DSP bypass regression
-- current task: freeze documentation, exact final documentation-head double gate, then squash-merge with expected-head guard
+- branch `m4f-spiral`
+- draft PR #12
+- base `db9d0b3ecbc7931be343cec7717103059d3c5160`
+- technically final implementation/CI head `11569371ea18bc8a5e06f28d09ddef90f9835e29`
+- implementation gates: core #260 PASS; staged #249 PASS including real JieLi target, default emulator, exact cursor invariant and Spiral-DSP bypass
+- current task: freeze continuity documentation, gate that exact documentation head, then squash-merge PR #12 with expected-head guard
 
 ## Product/source invariant
 
@@ -48,7 +49,7 @@ Physical FM-1: **not tested**.
 
 ## Frozen shared runtime baseline
 
-M3c remains the only scheduler/runtime timeline. M4a through M4e do not add module-private clocks or queues.
+M3c remains the only scheduler/runtime timeline. M4a through M4f do not add module-private clocks or queues.
 
 Frozen host invariants:
 - `sizeof(ApsisRuntime) = 21,928 B`
@@ -59,16 +60,16 @@ Frozen host invariants:
 - random trace `78771ff5`
 - late trace `0e6fc422`
 
-Live emulator invariants through M4e:
+Live emulator invariants through M4f:
 - queue 28/512
 - overflow 0
 - late flags 0
-- cursor 123,648
+- **cursor 123,648 exactly**
 - late trace `811c9dc5`
 
-M4c appends `APSIS_EVENT_STRING_ATTRACTOR_BIND` after the frozen M3c range while keeping Attractor state external to `ApsisRuntime`. M4d adds no event. M4e consumes the already-existing `CLOCK_MAIN`, `CLOCK_SNAP`, `CLOCK_INNER` and `CLOCK_GHOST` events passively and adds no scheduler event type.
+`ci/emulator_smoke.sh` now freezes the exact 123,648-sample cursor for the pinned three-second emulator scenario. A future dry engine may not silently consume one or more 256-frame callbacks while still passing a weaker non-zero health check.
 
-## Frozen Phase-4 references before M4e
+## Frozen Phase-4 references before M4f
 
 ### M4a String
 - Classic peak/hash 1477 / `b20610c1`
@@ -86,183 +87,164 @@ M4c appends `APSIS_EVENT_STRING_ATTRACTOR_BIND` after the frozen M3c range while
 - advances/mutations/binds 1470 / 1470 / 2884
 - random `b7a9a395`
 - late `e777a771`
-- final target image/RAM 85,564 / 44,680 B
-- package `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`
+- merged target image/RAM 85,564 / 44,680 B
 
 ### M4d Drift
-Merged as `d7e39e2481c33628f402bed51d761b8be8304bb3` via PR #10. Final pre-merge documentation head `82106c33…` passed core #214 + staged #203.
-
-Normative reference: `docs/reference/M4D_DRIFT_CONTRACT.md`.
-
-Frozen host Drift:
-- peak 488
-- hash `0aec6bc2`
-
-Final M4d target/emulator:
-- image 86,544 B
-- RAM 44,760 B
-- pool 30,720 B
-- package SHA `394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`
-- peak 433; RMS 135/135; stereo delta 125; mean -3/-3
+- host peak/hash 488 / `0aec6bc2`
+- merged target image/RAM 86,544 / 44,760 B
 - raw PCM `539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`
+
+### M4e Clock
+Merged as `db9d0b3ecbc7931be343cec7717103059d3c5160` via PR #11 after exact final-head core #231 + staged #220 gates.
+
+Frozen host Clock:
+- STONE accent 2081 / `edcc4a81`
+- GLASS accent 1880 / `0adf9829`
+- SNAP 738 / `04bc514a`
+- worst legal finite-pool high-water 23/32, 176 triggers, 0 drops
+
+Merged M4e target/emulator baseline:
+- image 90,684 B
+- RAM 49,128 B
+- pool 30,720 B
+- package `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- peak 856; RMS 144/144; stereo delta 125; mean -2/-2
 - queue 28/512; overflow 0; late flags 0; cursor 123,648; trace `811c9dc5`
 
-## M4e normative authority
+## M4f normative authority
 
 Normative reference:
-- `docs/reference/M4E_CLOCK_CONTRACT.md`
+- `docs/reference/M4F_SPIRAL_CONTRACT.md`
 
-Study 126 defines four Clock timbres and one shared event topology:
-- STONE
-- WOOD
-- GLASS
-- SOFT
-- pitch 0.50×..2.00× in 0.01 steps
-- MAIN at pulse target
-- SNAP at pulse +4 ms
-- INNER at half the current swung interval
-- GHOST at that same half interval when the already-frozen shared random decision schedules it
+Study 126 defines Spiral acoustics as a finite prepared voice around the already-frozen M3c occurrence/bind lifecycle. M4f does not create another scheduler event or rederive pitch.
 
-M4e corrects the old Phase-2 acoustic placeholder from STONE-only / integer pitch to four voice IDs plus `pitch_centi=50..200`, default 100. KEEP still stores only Clock geometry; timbre/pitch remain live global sound state.
+Planning-time acoustic identity freezes:
+- Attractor energy
+- note duration and noteLength
+- Spiral source level
+- Drift audible delta and width
+- THREAD/GLASS/REED/HALO oscillator topology
+- filter Q, attack/tail law
+- main/shadow topology and +8 ms shadow offset
 
-## M4e Clock architecture
+The existing M3c bind at target−80 ms remains authoritative for:
+- frozen route index resolved against current derived sequence
+- Gravity interpretation
+- register octave
+- tuning mode/strength/deviation
 
-Native `ApsisClockDsp` is external to `ApsisRuntime`:
-- fixed 32-slot finite pool, 44.1 kHz stereo Q15
-- passive observation of already-planned shared Clock events
-- sample delay inside the callback preserves original event target
-- deterministic first-block bootstrap only for deterministic pulse-0 Clock events before the shared queue has been filled; no transport mutation and no RNG draw
-- source-derived STONE/WOOD/GLASS/SOFT pitch/gain/duration profiles
-- GLASS accent extra overtone
-- source-derived Snap: three filtered/panned noise bursts plus pitched square edge
-- fixed-point exponential pitch/gain trajectories
-- Clock-local deterministic Snap-noise generator; no consumption of M3c/M4c shared musical RNG
-- no dynamic allocation and no target `libm`
-- no Clock dynamics routed through String, Drift or shared master gain
+Study 126's edge behaviour is preserved: oscillator topology/Q/envelope are planning-time voice data, while a voice change before bind may change the late filter-cutoff family.
 
-Study 126's browser Snap buffer is filled once with global unseeded `Math.random()` and then reused. Because that same global RNG also controls musical systems, native M4e explicitly treats Snap-buffer random consumption as unstable engine leakage rather than musical timing semantics. Native Snap noise is local and deterministic while preserving the one-buffer/reused-realization acoustic relationship.
+## M4f architecture
 
-## M4e frozen host evidence
+M4f adds no private clock, queue or `ApsisRuntime` field.
 
-Frozen deterministic references, identical normal + ASAN/UBSAN:
-- STONE accent: peak **2081**, hash **`edcc4a81`**
-- GLASS accent: peak **1880**, hash **`0adf9829`**
-- SNAP: peak **738**, hash **`04bc514a`**
+Native pieces:
+- `ApsisSpiralAudioPlan`: source-derived planning-time acoustic snapshot
+- `ApsisSpiralAudioRuntime`: external 64-slot token/snapshot bridge keyed to existing M3c Spiral slots/binds
+- `ApsisSpiralDsp`: fixed 32-leg finite renderer
+- `apsis_runtime_m4f`: wrapper around the frozen M4c/M3c process path; captures only existing Spiral lifecycle data
 
-Worst legal Clock stress:
-- GLASS
-- pitch 2.00×
-- source/inner/snap levels 1.25
-- Snap tone 8500 Hz
-- 180 BPM, 1/16 division, maximum swing
-- every main/inner/snap pulse enabled
-- every main treated as accent
-- every eligible Ghost forced on
+The +8 ms shadow is local finite-voice delay, not a shared event.
 
-Measured result:
-- high-water **23/32** physical voices
-- 176 triggers
-- 0 drops
+The target has an activation latch:
+- while the source-default Spiral route is empty, the callback uses the exact frozen M4e runtime/audio path and performs no Spiral runtime/renderer work;
+- the latch turns on only when Spiral has both sound and a non-empty route;
+- once active it remains active so already-planned binds and finite tails survive later route/mute edits.
 
-## M4e JieLi target compatibility
+This fixed a measured one-callback default-path regression (123,392 instead of 123,648) without changing Spiral DSP semantics.
 
-The host DSP uses exact integer 64-bit division when deriving fixed-point filter/envelope coefficients. JieLi pi32v2 links the target without libgcc's DI-mode division helpers, causing the first M4e target attempt to fail on `__divdi3` even though host/ASAN were green.
+## M4f frozen host evidence
 
-M4e therefore supplies `apsis_target_div64.c` only in the generated target overlay:
-- standard ABI `__divdi3` and `__udivdi3`
-- shift/compare/subtract restoring division
-- no `/`, `%`, allocation or state
-- preserves the exact C integer-division semantics used by the frozen host DSP rather than changing Clock mathematics to satisfy the linker
+All references agree under normal and ASAN/UBSAN:
+- THREAD: peak **1230**, hash **`aef6c83e`**, 2 legs / 4 oscillators
+- GLASS: peak **1157**, hash **`9efa9bdc`**, 2 legs / 6 oscillators
+- REED: peak **967**, hash **`e67a3c15`**, 2 legs / 6 oscillators
+- HALO: peak **1256**, hash **`e7ed6161`**, 2 legs / 6 oscillators
 
-This is target compatibility, not an audio-model simplification.
+Eight-second worst acoustic stress:
+- 384 logical hits
+- logical high-water **15**
+- leg high-water **30/32**
+- oscillator high-water **90**
+- steals **0**
+- drops **0**
+- deterministic hash **`02be4bc5`**
 
-## M4e implementation evidence
+All frozen M3c/M4a–M4e host references remain unchanged.
 
-Validated implementation head: `285aacb5309fd9abaa51814e4ea6a09a3e480a10`.
+## M4f target/emulator evidence
+
+Technically final head: `11569371ea18bc8a5e06f28d09ddef90f9835e29`.
 
 Exact gates:
-- core #225: PASS normal + ASAN/UBSAN
-- staged #214: PASS source/core, unchanged Dinghy, APSIS overlay, real JieLi target, default emulator and Clock-DSP bypass
+- core #260: PASS normal + ASAN/UBSAN + M4f planning/bridge/renderer suites
+- staged #249: PASS source/core, unchanged Dinghy, APSIS overlay, real JieLi target, default emulator, exact cursor invariant and Spiral-DSP bypass
 
-Default M4e target:
-- image **90,684 / 581,564 B**
-- image headroom 490,880 B
-- RAM **49,128 / 98,304 B**
-- RAM headroom 49,176 B
+Default M4f target:
+- image **95,804 / 581,564 B**
+- RAM **58,056 / 98,304 B**
 - pool **30,720 / 344,064 B**
-- pool headroom 313,344 B
+- RAM headroom **40,248 B**
 - package bytes 610,110 B
-- package SHA `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
+- package SHA **`77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`**
+- product `FM-1_972`
 
-M4e cost versus M4d default target:
-- +4,140 B app image
-- +4,368 B RAM
-- +0 B pool
-
-Default Clock-on emulator:
-- frames 124,928
+Default emulator:
+- route is source-default empty, so no Spiral voice is expected in this scenario
+- frames 124,928; stereo
 - peak **856**
-- RMS L/R **144/144**
+- RMS **144/144**
 - stereo delta **125**
-- mean L/R **-2/-2**
-- raw PCM **`6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`**
-- queue 28/512
-- overflow 0
-- late flags 0
-- cursor 123,648
+- mean **-2/-2**
+- raw PCM **`6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`** (exact frozen M4e PCM)
+- queue 28/512; overflow 0; late flags 0
+- cursor **123,648 exactly**
 - late trace `811c9dc5`
 
-The PCM change is expected because Clock sound is ON by default and all 12 main pulses are enabled by default. Runtime telemetry remains frozen.
+Because default `spiral.route_count == 0`, the emulator smoke proves target integration, idle callback budget and unchanged baseline, but it does **not** constitute an audible target Spiral listening test. Audible Spiral topology/timing is verified by deterministic host planning/bridge/renderer/full-chain tests plus real JieLi compile/link. Physical hardware remains unavailable.
 
-### Exact M4d audio/runtime bypass proof
+### Exact M4e bypass proof
 
-Staged Gate 5b regenerates the same target with only the new Clock DSP/consumer omitted. Source-correct Clock state representation remains present.
+Staged Gate 5b rebuilds with only the Spiral DSP/runtime consumer omitted.
 
-Bypass target/emulator:
-- image **86,544 B**
-- RAM **44,760 B**
+Bypass:
+- image **90,684 B**
+- RAM **49,128 B**
 - pool **30,720 B**
-- package SHA `3670d58da19a1ccad01a142ff328b6faf273901450b61b361dd436ad5041990f`
-- raw PCM **`539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`**
-- peak 433; RMS 135/135; stereo delta 125; mean -3/-3
+- package **`74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`**
+- PCM **`6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`**
 - queue 28/512; overflow 0; late flags 0; cursor 123,648; trace `811c9dc5`
 
-Image/RAM/pool and PCM/runtime return exactly to the frozen M4d values. Package SHA is not required to match M4d because M4e legitimately changes Clock acoustic state representation even when the DSP layer is omitted.
+This is bit-identical to frozen M4e target/PCM/runtime.
 
-## Deliberately deferred after M4e
+## Deliberately deferred after M4f
 
-- Spiral dry engine
-- Bloom dry engine
-- changing/removing historical Drift→String/Spiral cross-couplings
+- Bloom dry engine (M4g)
 - shared Space/Cathedral
-- physical Clock controls / final native UI mapping
+- final Mother dry/wet integration beyond frozen state behaviour
+- native Spiral UI/control mapping
 - physical FM-1 validation
 - real ISR worst-case timing
 
-Next Phase-4 dry engine in roadmap order: **Spiral**, after M4e is actually merged.
-
 ## Exact next action
 
-1. Finish/freeze continuity documentation on the M4e branch.
-2. Gate that exact final documentation head with both workflows.
-3. If both are green, update PR #11 metadata only; do not move the head.
-4. Mark PR #11 ready and squash-merge with `expected_head_sha` equal to that gated docs head.
-5. Start Spiral from the actual M4e merge commit.
+1. Freeze root continuity docs plus the M4f contract in one documentation commit on `m4f-spiral`.
+2. Gate that exact final documentation head with both `APSIS core` and `APSIS staged validation`.
+3. If both pass, update PR #12 metadata only; do not move the head.
+4. Mark PR #12 ready and squash-merge with `expected_head_sha` equal to the gated docs head.
+5. Create M4g/Bloom from the actual M4f merge commit and source-resolve Bloom acoustics before DSP work.
 
 ## Do not regress
 
 - Study 126 remains behavioural/state/timing/safety authority
-- Study 98 remains narrow String acoustic authority, not a behaviour rollback
+- Study 98 remains narrow String acoustic authority only
 - one shared Phase-3 scheduler; no module clocks
-- M3c runtime stays 21,928 B unless a later explicitly scoped phase changes it
-- KEEP / CHAIN / MOTHER semantics unchanged
-- Spiral/Bloom M3c late binding unchanged
-- M4c Attractor shared-heap order/capacity unchanged
-- M4e Clock consumes existing shared events and never draws another Ghost random value
-- Snap-noise RNG stays Clock-local and deterministic
-- Clock DSP bypass must preserve frozen M4d PCM/runtime
-- `stepOneResync` OFF by default
-- no broadband String noise
-- no hard-stop of audible sources
+- `ApsisRuntime` stays 21,928 B unless an explicitly scoped later phase changes it
+- M3c Spiral/Bloom late binding remains authoritative
+- M4f planning-time acoustic snapshot must not consume RNG or alter queue ordering
+- +8 ms Spiral shadow remains DSP-local
+- inactive dry engines must not silently reduce the frozen emulator cursor
 - no shared Space/Cathedral during initial dry-source work
 - do not claim physical hardware or real ISR timing without device evidence
