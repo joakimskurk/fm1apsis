@@ -23,6 +23,14 @@ cp apsis/apsis_bloom_audio.h apsis/apsis_bloom_audio.c \
 python3 - <<'PY'
 from pathlib import Path
 
+# Dinghy is one translation unit. apsis_bloom.c already has a private helper
+# named bloom_mul_q15; namespace the copied target-only DSP helper before the
+# single-TU include without changing the independently compiled host source.
+dsp = Path('work/apsis/firmware/src/apsis_bloom_dsp.c')
+ds = dsp.read_text()
+ds = ds.replace('bloom_mul_q15', 'bloom_dsp_mul_q15')
+dsp.write_text(ds)
+
 p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
 
