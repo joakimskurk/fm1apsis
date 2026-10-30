@@ -33,7 +33,7 @@ int main(void)
     ApsisPersistentAudioQueue queue;
     ApsisStringPitchMemory pitch;
     ApsisStructuralAudioStats stats;
-    uint64_t observe;
+    uint64_t target, observe;
 
     apsis_state_default(&s);
     apsis_runtime_reset(&r, 44100u, 0u, 0x4d35414fu);
@@ -52,7 +52,8 @@ int main(void)
     s.gravity.change_grid = 12u;
     assert(apsis_runtime_request_gravity(&r, &s, &mother, 5u, 1u,
                                          r.cursor_sample, 0u) == 3u);
-    observe = r.gravity_pending.target_sample - ms_samples(18u);
+    target = r.gravity_pending.target_sample;
+    observe = target - ms_samples(18u);
     while (r.cursor_sample < observe) {
         uint64_t remain = observe - r.cursor_sample;
         uint32_t frames = remain > 256u ? 256u : (uint32_t)remain;
@@ -64,9 +65,9 @@ int main(void)
 
     assert(stats.gravity_captures == 1u);
     assert(stats.capture_drops == 0u);
+    assert(r.gravity_pending.active == 0u);
     assert(queue.count == 1u);
-    assert(queue.event[0].sample == r.gravity_pending.target_sample ||
-           r.gravity_pending.active == 0u);
+    assert(queue.event[0].sample == target);
     assert(queue.overflowed == 0u);
     puts("PASS: APSIS M5a structural capture works with Bloom audio observer absent");
     return 0;
