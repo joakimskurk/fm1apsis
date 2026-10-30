@@ -1,0 +1,25 @@
+name: APSIS Phase 8 visuals
+
+on:
+  push:
+    branches: [p8-visuals]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  visual-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P8A deterministic visual primitives
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_visual.c tests/test_visual.c -o /tmp/test_visual
+          /tmp/test_visual
+      - name: P8A ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_visual.c tests/test_visual.c -o /tmp/test_visual_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_visual_san
