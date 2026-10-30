@@ -62,8 +62,6 @@ if '#include "apsis_string_dsp.c"' not in s:
     s = s.replace(c_anchor, c_anchor + '\n#include "apsis_string_dsp.c"', 1)
 
 # M4b1 compiles the finite transient engine against a separate pool object.
-# The wrapper includes the already-validated transient implementation while
-# preserving ApsisStringDsp's exact M4a layout.
 transient_anchor = '#include "apsis_string_dsp.c"'
 if '#include "apsis_string_transient_pool.c"' not in s:
     if transient_anchor not in s:
@@ -178,21 +176,24 @@ s = s.replace(state_anchor, state_extra, 1)
 
 # Keep all M4 finite state outside the frozen ApsisRuntime layout. String owns
 # its 80+32 transient pool; Spiral owns an external snapshot/bind runtime and
-# the separately-frozen 32-leg dry pool.
+# the separately-frozen 32-leg dry pool. The one-byte latch keeps the exact M4e
+# callback path until Spiral can actually produce audio; once set it remains set
+# so pending binds and finite tails survive later route/mute edits.
 pool_anchor = 'static volatile uint32_t apsis_runtime_probe[6];'
 pool_decl = (pool_anchor +
              '\nstatic ApsisStringTransientPool string_transient_pool;'
              '\nstatic ApsisStringAttractorRuntime string_attractor_runtime;')
 if spiral_dsp_enabled:
-    pool_decl += '\nstatic ApsisSpiralAudioRuntime spiral_audio_runtime;'
+    pool_decl += ('\nstatic ApsisSpiralAudioRuntime spiral_audio_runtime;'
+                  '\nstatic uint8_t spiral_audio_started;')
 if pool_anchor not in s:
     raise SystemExit('FAIL: M4 finite-state declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
 # Shared callback handoff. Clock observes due shared events before Phase-3
-# consumes them. Spiral uses the existing target-80 ms M3c bind: after runtime
-# consumes a bind, M4f instantiates a finite voice with the exact remaining
-# target delay relative to this callback's start, then renders the same block.
+# consumes them. Spiral uses the existing target-80 ms M3c bind. While the
+# source-default route is empty, use the exact frozen M4e runtime path and do no
+# Spiral renderer work; this preserves the proven idle callback budget.
 audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);'''
@@ -212,21 +213,40 @@ clock_collect = '''        apsis_clock_collect_block(&apsis_runtime, &apsis, n, 
 ''' if clock_dsp_enabled else ''
 clock_render = '        apsis_clock_dsp_render(&clock_dsp, out, n);\n' if clock_dsp_enabled else ''
 spiral_decl = '''        uint8_t spiral_ix;
-        uint64_t spiral_block_start = apsis_runtime.cursor_sample;
+        uint64_t spiral_block_start;
 ''' if spiral_dsp_enabled else ''
 if spiral_dsp_enabled:
-    runtime_process = '''        apsis_runtime_process_spiral_audio(
-            &apsis_runtime, &apsis, &keep_bank, &chain_sequence,
-            &mother_pending, &bloom_voicing_state, n, 0, 0,
-            (string_attractor_runtime.length ||
-             apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR)
-                ? &string_attractor_runtime : 0,
-            &spiral_audio_runtime, &rhythm_observation);
-        for (spiral_ix = 0u; spiral_ix < spiral_audio_runtime.binding_count; ++spiral_ix)
-            (void)apsis_spiral_dsp_trigger_binding(
-                &spiral_dsp, &apsis, &spiral_audio_runtime.binding[spiral_ix],
-                spiral_block_start);
-        apsis_spiral_dsp_render(&spiral_dsp, out, n);
+    runtime_process = '''        if (!spiral_audio_started && apsis.spiral.sound && apsis.spiral.route_count)
+            spiral_audio_started = 1u;
+        if (spiral_audio_started) {
+            spiral_block_start = apsis_runtime.cursor_sample;
+            apsis_runtime_process_spiral_audio(
+                &apsis_runtime, &apsis, &keep_bank, &chain_sequence,
+                &mother_pending, &bloom_voicing_state, n, 0, 0,
+                (string_attractor_runtime.length ||
+                 apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR)
+                    ? &string_attractor_runtime : 0,
+                &spiral_audio_runtime, &rhythm_observation);
+            for (spiral_ix = 0u; spiral_ix < spiral_audio_runtime.binding_count; ++spiral_ix)
+                (void)apsis_spiral_dsp_trigger_binding(
+                    &spiral_dsp, &apsis, &spiral_audio_runtime.binding[spiral_ix],
+                    spiral_block_start);
+            if (spiral_dsp.hit_trigger_count)
+                apsis_spiral_dsp_render(&spiral_dsp, out, n);
+        } else if (string_attractor_runtime.length ||
+                   apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
+            apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
+                                                     &keep_bank, &chain_sequence,
+                                                     &mother_pending,
+                                                     &bloom_voicing_state, n, 0, 0,
+                                                     &string_attractor_runtime,
+                                                     &rhythm_observation);
+        } else {
+            apsis_runtime_process_observed(&apsis_runtime, &apsis, &keep_bank,
+                                           &chain_sequence, &mother_pending,
+                                           &bloom_voicing_state, n, 0, 0,
+                                           &rhythm_observation);
+        }
 '''
 else:
     runtime_process = '''        if (string_attractor_runtime.length ||
@@ -273,10 +293,9 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# Spiral audio state is static BSS and firmware startup already zeroes it before
-# app_main. Do not spend a pre-runtime audio callback clearing the same 32-leg
-# pool and 64-slot snapshot runtime again. The explicit reset APIs remain used
-# and regression-tested for real stop/restart/lifecycle reset paths.
+# The FM-1 CRT zeroes .bss before audio init/IRQ enable. Spiral external state
+# therefore starts clean without spending a pre-runtime audio callback on an
+# explicit reset. Reset APIs remain regression-tested for lifecycle use.
 start_anchor = '    apsis_runtime_start(&apsis_runtime);'
 if start_anchor not in s:
     raise SystemExit('FAIL: runtime start anchor missing')
