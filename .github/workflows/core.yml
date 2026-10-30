@@ -39,3 +39,5 @@ jobs:
         run: bash ci/test_phase5_chain_audio.sh
       - name: P5e Chain continuous morph sounding semantics
         run: bash ci/test_phase5_chain_morph_audio.sh
+      - name: P5f step-one free-run sounding semantics
+        run: bash ci/test_phase5_step_one_audio.sh
