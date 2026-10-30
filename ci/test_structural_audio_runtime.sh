@@ -54,3 +54,14 @@ cc -O1 -g -fsanitize=address,undefined "${COMMON[@]}" \
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 UBSAN_OPTIONS=halt_on_error=1 \
   build/san_structural_audio_capacity
+
+cc -O2 "${COMMON[@]}" tests/test_structural_audio_optional_bloom.c \
+  -o build/test_structural_audio_optional_bloom
+build/test_structural_audio_optional_bloom
+
+cc -O1 -g -fsanitize=address,undefined "${COMMON[@]}" \
+  tests/test_structural_audio_optional_bloom.c \
+  -o build/san_structural_audio_optional_bloom
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+UBSAN_OPTIONS=halt_on_error=1 \
+  build/san_structural_audio_optional_bloom
