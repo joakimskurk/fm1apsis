@@ -20,7 +20,7 @@ Physical FM-1 is not currently available. Nothing below is promoted to level 6.
 - APSIS product `FM-1_972`
 - target image budget 581,564 B
 - RAM `.data + .bss` budget 98,304 B
-- pool budget 344,064 B
+- POOL-region budget 344,064 B
 - 44.1 kHz, 256-frame callback
 
 ## Frozen Phase-3 runtime
@@ -76,11 +76,11 @@ Pinned emulator invariants:
   - GLASS 129 / `ca1c3127`
   - stress 186 triggers, 125/136 petals, 375 oscillators, 0 drops, peak 266, `5881bb36`
 
-## M4g real target baseline
+## Frozen M4g / merged Phase-5 dry target
 
-Final M4g documentation head `f3633cec98a71108bc64d57049ed24064f9632a3` passed core #299 + staged #288 before merge via PR #13.
+M4g merged through PR #13. Phase 5 later verified the live structural/sounding contracts and squash-merged through PR #15 as `d677a887cf6dc8552634bde5a71fec0221c299b5` without changing production scheduler/DSP/runtime.
 
-Real target:
+Real target baseline:
 - image **100,944 / 581,564 B**
 - RAM **87,336 / 98,304 B**
 - RAM headroom **10,968 B**
@@ -100,65 +100,100 @@ Bloom bypass exactly returns to frozen M4f:
 
 ## Phase 5 — sounding-source structural integration
 
-Active PR #15, branch `p5-sounding-integration`, base merged M4g `713a1e9a…`.
+Final Phase-5 head `17e7fd1247b0f5675261a7395b0558b5bbd6780d` passed core #363 + staged #352 and was merged via PR #15 as `d677a887cf6dc8552634bde5a71fec0221c299b5`.
 
-Technically final verification head before docs freeze:
-- `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`
-- APSIS core #357 PASS
-- APSIS staged validation #346 PASS
+Verified normal + ASAN/UBSAN:
+- P5a immediate structural late binding reaches sounding Spiral/Bloom DSP;
+- P5b quantized Gravity asymmetry reaches sounding Spiral/Bloom DSP;
+- P5c Mother-held Gravity reaches sounding sources only after `->1` commit;
+- P5d Chain discrete boundary reaches sounding Spiral/Bloom in source order;
+- P5e Chain continuous Drift morph begins on target and reaches sounding DSP;
+- P5f step-one RESYNC OFF free-runs into sounding Spiral energy.
 
-### P5a — structural late binding
+Phase 5 consumed **0 additional static RAM** and did not change target audio/runtime identity.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5a structural late binding reaches sounding Spiral/Bloom DSP`
-- verifies structural state mutation through existing M3c bind to actual finite Spiral/Bloom oscillator phase increment
-- occurrence token, target sample and occurrence-frozen acoustic values remain unchanged
+## Phase 6 — candidate comparison
 
-### P5b — quantized Gravity
+Branch `p6-space-cathedral`, draft PR #16.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5b quantized Gravity asymmetry reaches sounding Spiral/Bloom DSP`
-- Spiral uses committed state only at its target−80 ms bind
-- Bloom may project ordinary pending Gravity target-aware under the frozen +0.5 ms rule
+Deterministic host prototype `tools/p6_space_prototype.c` compares:
+- Study-126 statistical reference proxy;
+- compact 8-line modulated FDN;
+- nested allpass/Schroeder hybrid.
 
-### P5c — Mother `->1`
+Normal + ASAN/UBSAN candidate runs pass.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5c Mother held Gravity reaches sounding sources only after ->1 commit`
-- Mother-held future state is not projected by Spiral or Bloom before the structural commit
+Selected candidate: **compact 8-line modulated FDN**.
 
-### P5d — Chain discrete
+Selected FDN:
+- delays `1871,1999,2137,2281,2441,2593,2767,2953` samples;
+- +16 samples reserve each;
+- mod rates `.071,.083,.097,.109,.127,.139,.157,.181 Hz`;
+- ~±9 sample modulation;
+- normalized 8x8 Hadamard feedback;
+- one-pole damping per line.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5d Chain discrete boundary reaches sounding Spiral/Bloom in source order`
-- verifies existing early Chain observation and subsequent M3c late-bound sounding consumers without another scheduler
+Evidence across 4 / 8.4 / 12 s:
+- endpoint within 3 dB of deterministic Study-126 reference;
+- `abs(L/R corr) < 0.10`;
+- HF proxy within 0.06;
+- FDN metallicity ~0.11 and <0.20;
+- Schroeder metallicity roughly 0.69..0.73;
+- FDN tail 38,340 B vs Schroeder 50,900 B.
 
-### P5e — Chain continuous morph
+Conservative selected memory model:
+- existing Dinghy pool 30,720 B;
+- stereo 140 ms input history 24,696 B;
+- stereo 1.2 s echo 211,680 B;
+- FDN tail 38,340 B;
+- total 305,436 B;
+- headroom 38,628 B.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5e Chain continuous Drift morph begins on target and reaches sounding DSP`
-- verifies source-defined continuous morph timing reaches the actual persistent Drift renderer
+## Phase 6 — silent real-target memory gate
 
-### P5f — step-one free-run/resync
+### Failed intermediate layouts
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5f step-one RESYNC OFF free-runs into sounding Spiral energy`
-- source trigger position is taken from the existing frozen M3c Spiral slot/token; M4f acoustic snapshots are not expanded to duplicate scheduler identity
+Two intentionally strict intermediate gates exposed a startup issue:
+1. keeping the Space arrays in ordinary `.pool` and calling a retention function before `runtime_ready` produced cursor 123,392;
+2. removing that call and retaining the arrays only with linker `KEEP(*(.pool*))` restored image 100,944 B but cursor still stayed 123,392.
 
-### Phase-5 production-impact proof
+Root cause was verified in pinned Dinghy: `fm1_cstart()` zeroes `[_pool_start, _pool_end)` at boot. Clearing the added 274,716 B shifted startup/audio callback cadence by one 256-frame callback.
 
-Phase 5 required no production scheduler/DSP/runtime change.
+The cursor invariant was **not** relaxed.
 
-Staged #346 rebuilt the exact M4g target:
-- image **100,944 B**
-- RAM **87,336 B**
-- pool **30,720 B**
-- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+### Accepted memory layout
 
-The same staged run passed the exact frozen M4f Bloom-bypass gate. Therefore Phase 5 consumed **0 additional static RAM** and did not change target audio/runtime identity.
+Validated head: `11ce731a740d11262d988c352a79774bbea3103a`.
+
+The CI-only copied linker script places Phase-6 storage in a separate NOLOAD `.apsis_space_pool` section immediately before ordinary `.pool`. `_pool_end` remains after both sections so real POOL-region accounting still includes all storage; `_pool_start` begins after Space so Dinghy clears only the original pool.
+
+Core #375: **PASS**.
+
+Staged #364: **PASS**, including real target, default emulator, Bloom bypass and Gate 5c silent Space storage.
+
+Real target with exact selected Space storage retained:
+- image **100,944 / 581,564 B**
+- RAM **87,336 / 98,304 B**
+- pool **305,436 / 344,064 B**
+- pool headroom **38,628 B**
+- package `5db84c9e09c76d1434abd3e01e55abd4e5e85afa4b39124869fe87d3bb02ffed`
+- product `FM-1_972`
+
+Room renderer is still disabled in this gate.
+
+Emulator remains exact frozen dry behaviour:
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- peak 856; RMS 144/144; stereo delta 125
+- queue 28/512
+- overflow 0
+- late flags 0
+- cursor **123,648**
+- late trace `811c9dc5`
+
+CI conclusions:
+- `PASS: P6 selected-FDN pool storage fits real target pool=305436/344064 ram=87336/98304`
+- `PASS: silent P6 pool probe preserves frozen M4g/Phase-5 PCM/runtime`
 
 ## Next verification
 
-Run core + full staged validation on the exact Phase-5 final documentation head. If both pass, merge PR #15 with a guarded squash merge. Only then begin Phase 6 Space/Cathedral prototyping from the actual merge commit.
+Implement the selected FDN as a **pure host fixed-point engine first**, using externally supplied delay storage and validity/fill counters so NOLOAD memory is never read before being written. Add deterministic reference and sanitizer tests before any `app_audio()` integration. Only then integrate the five post-Mother source sends into one shared room and require a room-disabled exact-dry target/emulator bypass gate.
