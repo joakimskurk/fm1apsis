@@ -44,16 +44,16 @@ typedef struct {
     int32_t compressor_gain_q15;
     int32_t wet_q15;
     int32_t target_wet_q15;
-    int32_t predelay_frames_q16;
-    int32_t target_predelay_frames_q16;
+    uint32_t predelay_frames_q16;
+    uint32_t target_predelay_frames_q16;
     int32_t decay_ms_q16;
     int32_t target_decay_ms_q16;
     int32_t damping_hz_q16;
     int32_t target_damping_hz_q16;
     int32_t guard_lp_hz_q16;
     int32_t target_guard_lp_hz_q16;
-    int32_t echo_delay_frames_q16;
-    int32_t target_echo_delay_frames_q16;
+    uint32_t echo_delay_frames_q16;
+    uint32_t target_echo_delay_frames_q16;
     int32_t echo_feedback_q15;
     int32_t target_echo_feedback_q15;
 
