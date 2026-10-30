@@ -13,6 +13,15 @@ typedef struct {
 
 void apsis_structural_audio_stats_reset(ApsisStructuralAudioStats *stats);
 
+/* Cheap target-side activation probe. It only asks whether an existing shared
+ * structural observation event due before end_sample could produce a persistent
+ * String/Drift target: Gravity always; Mother only with pending state; Chain
+ * only while Chain is actually playing. No event is inserted or consumed. */
+uint8_t apsis_runtime_structural_audio_due(const ApsisRuntime *runtime,
+                                           const ApsisMotherPending *mother_pending,
+                                           const ApsisChainSequence *chain_sequence,
+                                           uint64_t end_sample);
+
 /* Phase-5 extension of the exact M4g coordinator. Shared state still mutates
  * at the existing M3c observation callbacks. After a structural change has
  * actually committed, this wrapper snapshots the resulting persistent
