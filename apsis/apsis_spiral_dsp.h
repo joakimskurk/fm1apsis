@@ -6,9 +6,10 @@
 
 #define APSIS_SPIRAL_DSP_RATE 44100u
 #define APSIS_SPIRAL_DSP_OSC_MAX 3u
-/* Provisional analysis ceiling. M4f freezes the final value only after the
- * required 180 BPM / 1/16 / 4x / HALO worst-case stress has measured it. */
-#define APSIS_SPIRAL_DSP_LEG_CAP 64u
+/* Frozen after the contract worst-case probe measured 30 simultaneous legs
+ * (15 logical two-leg hits / 90 oscillators) with zero steals/drops. Keep one
+ * complete two-leg hit of reserve above that observed high-water. */
+#define APSIS_SPIRAL_DSP_LEG_CAP 32u
 
 typedef enum {
     APSIS_SPIRAL_DSP_SINE = 0,
