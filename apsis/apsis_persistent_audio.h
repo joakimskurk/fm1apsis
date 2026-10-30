@@ -5,9 +5,11 @@
 #include "apsis_string_dsp.h"
 #include "apsis_drift_dsp.h"
 
-/* Provisional until M5a runtime stress measures the real structural-audio
- * pending high-water. Do not treat this as a frozen product capacity yet. */
-#define APSIS_PERSISTENT_AUDIO_QUEUE_CAP 8u
+/* M5a legal shared-runtime capacity proof: same-target Mother/Chain/Gravity
+ * reaches 3 entries. The shortest legal adjacent Clock pulse is still longer
+ * than the largest 26 ms structural observation lead, so adjacent targets
+ * cannot overlap. Freeze one full-entry margin above the measured bound. */
+#define APSIS_PERSISTENT_AUDIO_QUEUE_CAP 4u
 
 typedef struct {
     ApsisStringDspTargets string_targets;
