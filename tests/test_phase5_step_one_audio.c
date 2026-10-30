@@ -48,7 +48,8 @@ static StepOneResult run_case(uint8_t resync)
     ApsisSpiralDsp dsp;
     StepOneResult out;
     uint32_t guard, i;
-    uint8_t leg;
+    uint8_t leg, found_occurrence = 0u;
+    uint32_t target_token = 0u;
     const uint64_t target = 11025u;
 
     memset(&out, 0, sizeof(out));
@@ -81,6 +82,22 @@ static StepOneResult run_case(uint8_t resync)
     apsis_spiral_dsp_reset(&dsp);
     apsis_runtime_start_spiral_audio(&r, &s, 0, &audio);
 
+    /* The first callback fills lookahead. Read the source attractor identity
+     * from the existing frozen M3c slot; M4f intentionally carries only its
+     * acoustic consequence (energy), not trigger_pos, into the audio binding. */
+    (void)apsis_runtime_process_spiral_audio(&r, &s, &bank, &chain, &mother,
+                                             &bloom, 256u, 0, 0, 0,
+                                             &audio, 0);
+    for (i = 0u; i < APSIS_RUNTIME_SPIRAL_SLOTS; ++i) {
+        if (r.spiral_slots[i].active && r.spiral_slots[i].target_sample == target) {
+            out.trigger_pos = r.spiral_slots[i].trigger_pos;
+            target_token = r.spiral_slots[i].token;
+            found_occurrence = 1u;
+            break;
+        }
+    }
+    assert(found_occurrence == 1u);
+
     for (guard = 0u; guard < 80u && !out.valid; ++guard) {
         uint64_t block_start = r.cursor_sample;
         (void)apsis_runtime_process_spiral_audio(&r, &s, &bank, &chain, &mother,
@@ -88,10 +105,8 @@ static StepOneResult run_case(uint8_t resync)
                                                  &audio, 0);
         for (i = 0u; i < audio.binding_count; ++i) {
             const ApsisSpiralAudioBinding *b = &audio.binding[i];
-            uint8_t slot;
-            if (!b->valid || b->target_sample != target) continue;
+            if (!b->valid || b->target_sample != target || b->token != target_token) continue;
             out.valid = 1u;
-            out.trigger_pos = b->trigger_pos;
             out.energy_q15 = b->acoustic.energy_q15;
             out.pitch_step = b->pitch.step;
             out.bind_sample = b->bind_sample;
@@ -101,17 +116,6 @@ static StepOneResult run_case(uint8_t resync)
             assert(leg < APSIS_SPIRAL_DSP_LEG_CAP);
             out.phase_inc = dsp.leg[leg].osc[0].phase_inc;
             out.peak_gain_q15 = dsp.leg[leg].peak_gain_q15;
-
-            /* The external runtime snapshot and emitted binding must agree on
-             * the planning-time attractor identity. */
-            for (slot = 0u; slot < APSIS_RUNTIME_SPIRAL_SLOTS; ++slot) {
-                if (audio.snapshot[slot].active &&
-                    audio.snapshot[slot].token == b->token) {
-                    assert(audio.snapshot[slot].trigger_pos == out.trigger_pos);
-                    assert(audio.snapshot[slot].acoustic.energy_q15 == out.energy_q15);
-                    break;
-                }
-            }
             break;
         }
     }
