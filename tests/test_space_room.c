@@ -152,7 +152,7 @@ static void test_storage_layout_and_no_clear(void)
     storage_fill(&s, (int16_t)0x4567);
     assert(!apsis_space_room_bind(&room,
         s.history, APSIS_SPACE_HISTORY_STORAGE_SAMPLES - 1u,
-        s.echo, APSIS_SPACE_ECHO_STORAGE_STORAGE_SAMPLES,
+        s.echo, APSIS_SPACE_ECHO_STORAGE_SAMPLES,
         s.fdn, APSIS_SPACE_FDN_STORAGE_SAMPLES));
     bind_room(&room, &s);
     assert(s.history[0] == (int16_t)0x4567);
