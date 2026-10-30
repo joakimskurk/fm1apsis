@@ -15,6 +15,13 @@ void apsis_runtime_stop_bloom_audio(ApsisRuntime *runtime,
                                     ApsisSpiralAudioRuntime *spiral_audio,
                                     ApsisBloomAudioRuntime *bloom_audio);
 
+/* Read-only target activation probe. It never mutates the shared heap and only
+ * reports an already-planned M3c BLOOM_OCCURRENCE whose callback belongs to the
+ * current audio block. This lets the FM-1 target keep the exact frozen M4f path
+ * until Bloom genuinely needs the M4g consumer. */
+uint8_t apsis_runtime_bloom_occurrence_due(const ApsisRuntime *runtime,
+                                           uint64_t end_sample);
+
 /* M4g extends the proven M4f coordinator only with passive Bloom acoustic
  * capture/bind hooks around the existing M3c occurrence and petal-bind handlers.
  * NULL bloom_audio is exactly the M4f path. */
