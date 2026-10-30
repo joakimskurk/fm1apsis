@@ -23,89 +23,93 @@ Physical FM-1 is not currently available. Nothing below is level 6.
 - POOL budget 344,064 B
 - source/output rate 44.1 kHz, 256-frame callback
 
-## Frozen Phase-3 runtime
+## Frozen runtime/audio regressions
 
+M3c host runtime:
 - `sizeof(ApsisRuntime)=21,928 B`
 - queue 352/512 canonical; 357/512 extreme
-- Spiral slots 59/64
-- Bloom slots 44/64
-- random `78771ff5`
-- late `0e6fc422`
-- normal + ASAN/UBSAN agree
+- Spiral slots 59/64; Bloom slots 44/64
+- random `78771ff5`; late `0e6fc422`
 
-## Frozen Phase-5 / M4g target
-
-- image 100,944 B
-- RAM 87,336 B
-- pool 30,720 B
-- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- dry PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512
-- overflow 0
-- late flags 0
+Historical M4/M5 target scenario:
 - cursor **123,648**
-- late trace `811c9dc5`
+- queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-M4f Bloom-bypass remains independently frozen:
-- image 95,804 B
-- RAM 58,056 B
-- pool 30,720 B
-- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- same dry PCM/runtime telemetry and cursor 123,648
+Integrated P6/P7 target scenario:
+- cursor **123,392**
+- queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-## Phase 6 host/reference evidence
+Frozen Phase-5 dry PCM:
+`6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
-Selected compact 8-line modulated FDN:
-- default peak 217 / hash `a190ca86` / late 2,646,000
-- decay4 1,455,300
-- decay12 3,507,773
-- dark `7d4c13e3`
-- bright `7e1a4d9e`
+Frozen Phase-6 audible PCM:
+`c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 
-Full host room:
-- default peak 47
-- hash `1350a6da`
-- late 1,278,900
-- first non-zero sample 927
-- no-echo `97669507`
-- dark `5ff1f59a`
+## Phase 6 target evidence retained
 
-Normal and ASAN/UBSAN gates are clean. The host/reference room remains 44.1 kHz.
+Audible P6:
+- image 107,352 B
+- RAM 87,780 B
+- POOL 309,532 B
+- audible PCM exact hash above
 
-## Phase 6 target architecture
+Room-return-disabled P6:
+- exact Phase-5 PCM
+- same integrated cursor 123,392
 
-One shared post-Mother room with sends:
-- String 0.72
-- Drift 0.20
-- Clock 0.06
-- Spiral 0.62
-- Bloom 0.58
+The generated target Cathedral remains 11.025 kHz internally while source DSP, scheduler and output remain 44.1 kHz. Long Space storage remains in dedicated pre-`.pool` NOLOAD memory.
 
-Long storage is in dedicated pre-`.pool` NOLOAD memory and self-initialises through fill/valid counters.
+## Phase 7 desktop/storage verification
 
-The generated FM-1 target uses a quarter-rate room renderer at **11.025 kHz**. Source engines, scheduler and final output remain 44.1 kHz. Target-only retiming preserves room milliseconds, early taps, predelay, echo delay, FDN decay/damping and modulation rate.
+`p7-storage.yml` verifies:
+- standard CRC-32/IEEE check vector
+- explicit v1 payload encode/decode and canonical re-encode
+- transient CHAIN runtime is not persisted
+- payload/header/version corruption rejection
+- erased second slot recovery
+- payload-only interrupted save recovery
+- partial-header interrupted save recovery
+- newest valid generation selection
+- later corruption fallback to older valid record
+- generation wraparound
+- fake FM-1 NOR save A -> save B -> reboot/load newest
+- failed commit-header write keeps older project bootable
+- corrupted payload readback aborts before commit header
+- unavailable flash path is non-destructive
+- normal plus ASAN/UBSAN execution
 
-## Final technical Phase-6 verification head
+These are desktop/fake-NOR tests, not physical power-cut verification.
 
-Head before final documentation freeze: `0ec9915f9d994454aa079a5be107765844534666`.
+## Phase 7 target architecture verification
 
-- core #416: **PASS**
-- staged #405: **PASS all gates**
-- P6 final #14: **PASS all gates**
+Project sectors:
+- A `0x000F4000`
+- B `0x000F5000`
+- Dinghy settings `0x000FC000` is not used for APSIS projects
 
-The staged multi-variant reporter was corrected on this head to parse the final resource summary in the append-only target log. This restored truthful M4f Bloom-bypass reporting without changing firmware bytes.
+Static/generated-target guards prove:
+- only the two project sectors are added to the pinned flash allow-list
+- project NOR prefetch is called before `fm1_audio_init()`
+- project decode after defaults is RAM-only
+- `fl_erase4k`, `fl_write` and project-save service are not reachable from `app_audio()`
+- save service requires stopped transport and explicitly quiesces/restarts audio
 
-### Real target, audible P6
+## Final technical Phase-7 candidate
 
+Firmware source head: `e290813f5e67affc7404dcb9fc7af63d2c671a8c`.
+
+Real JieLi target, audible:
 - product `FM-1_972`
-- image **107,352 / 581,564 B**
-- RAM **87,780 / 98,304 B**
-- RAM headroom 10,524 B
+- image **110,848 / 581,564 B**
+- RAM **88,628 / 98,304 B**
+- RAM headroom **9,676 B**
 - POOL **309,532 / 344,064 B**
-- POOL headroom 34,532 B
+- POOL headroom **34,532 B**
+- package 610,110 B
+- package SHA-256 `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
 
-Pinned emulator:
-- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+Pinned emulator, audible:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93` — **bit-exact P6**
 - peak 856
 - RMS 144/144
 - stereo delta 126
@@ -115,33 +119,30 @@ Pinned emulator:
 - cursor **123,392**
 - late trace `811c9dc5`
 
-### P6 dry-only regression
+P7 room-return-disabled target:
+- image **106,192 B**
+- RAM **88,628 B**
+- POOL **309,532 B**
+- package SHA-256 `36524423cc5744988abaa49970d8134ada531c514517104dbb9ac50050b2ee29`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b` — **exact Phase 5**
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-The same P6 target/source-split/storage path with final room return omitted produces:
-- exact Phase-5 PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512
-- overflow 0
-- late flags 0
-- cursor **123,392**
-- late trace `811c9dc5`
+## Regression caught during P7
 
-The shared 123,392 value for audible and dry-only P6 variants is treated as the explicit Phase-6 boot-to-stop scenario baseline. It is one 256-frame callback below the historical M4g scenario but does not coincide with late flags, queue overflow, trace divergence, or a scheduler change.
-
-### Historical silent-storage gate
-
-Before audible integration, the selected 44.1-kHz conservative storage probe used 305,436 / 344,064 B POOL and preserved the old 123,648 dry cursor. This proved the pre-`.pool` NOLOAD placement itself does not perturb boot timing.
+The first target integration read project NOR from `app_main()` after ALNK0 audio/DMA had started. Runtime telemetry remained exact, and P7/P6 audio was bit-identical after frame 2048, but 202 frames in the first active block differed by at most 2 Q15 steps. This was rejected as a regression. Moving read-only project prefetch before audio/DMA startup restored the complete P6 audible and Phase-5 dry hashes.
 
 ## Current verification boundary
 
-Phase 6 is verified through level 5: implementation, desktop/reference tests, sanitizers, real JieLi target build and pinned emulator.
+Phase 7 is verified through level 5 for the empty-flash boot path: implementation, desktop tests, sanitizers, real JieLi target build and pinned emulator.
 
-Still unverified until physical hardware exists:
+Persistence save/reload logic is verified with deterministic desktop fake-NOR tests and target compilation, but the current emulator gate does not emulate a user save/reboot sequence. Still unverified until physical hardware exists:
 - real ISR-cycle margin
 - actual DAC/audio listening quality
+- real NOR erase/program timing
+- physical power interruption during project writes
 - full physical controls/LED/display behaviour
 - worst-case combined UI/audio load
-- power-loss persistence behaviour
 
 ## Next verification
 
-Run the same core + staged + P6-final gates on the final documentation head, then guarded-merge PR #16.
+Run core + staged + P6-final + P7-storage + P7-target on the final documentation head, then guarded-merge PR #17.

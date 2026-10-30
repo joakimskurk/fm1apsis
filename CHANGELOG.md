@@ -2,6 +2,36 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
+## 2026-10-30 - Phase 7 persistent KEEP/CHAIN storage final checkpoint
+
+PR #17 reached a technically complete persistence candidate at `e290813f5e67affc7404dcb9fc7af63d2c671a8c` and is awaiting the final documentation-head regression pass + guarded merge.
+
+Completed:
+- explicit little-endian v1 project format for 8 KEEP slots, 32 CHAIN cells and behavioural CHAIN settings
+- 24-byte CRC header + 816-byte payload; native struct padding is never persisted
+- dedicated 4 KiB project sectors at `0x000F4000` and `0x000F5000`, outside Dinghy settings
+- alternating generation journal with payload-first/header-last commit semantics
+- torn-write/corruption/wraparound desktop tests
+- fake FM-1 NOR save/reboot/failure/recovery tests and ASAN/UBSAN gates
+- narrow pinned-Dinghy flash allow-list extension only for the two APSIS sectors
+- boot NOR prefetch moved before audio/DMA startup; later project apply is RAM-only
+- deferred main-loop save with stopped transport and quiesced audio; no flash write from `app_audio()`
+- real JieLi target build within budgets
+- exact P6 audible PCM and exact Phase-5 dry PCM preserved
+
+Frozen technical candidate:
+- image 110,848 / 581,564 B
+- RAM 88,628 / 98,304 B
+- POOL 309,532 / 344,064 B
+- package `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
+- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- dry-only PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+A boot-time NOR read initially perturbed 202 frames of the first active audio block by at most two Q15 steps. The baseline was not relaxed: prefetch was moved before `fm1_audio_init()`, restoring full bit-exact PCM.
+
+Next after guarded merge: Phase 8 native 240×240 visual surfaces.
+
 ## 2026-10-30 - Phase 6 shared Space/Cathedral merged
 
 PR #16 merged to `main` as `cd321e9f7999d0568d280d89e7e3574c3da66054` after the final guarded head `cfdfff673204d4fa36208508e343c6297a37ff37` passed core #424, staged #413 and P6-final #22.
