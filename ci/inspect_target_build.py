@@ -13,10 +13,18 @@ ap.add_argument('--out', type=Path, required=True)
 a = ap.parse_args()
 text = a.log.read_text(errors='replace')
 
-m = re.search(r'image (\d+) B of (\d+); RAM \.data\+\.bss (\d+) B of (\d+); pool (\d+) B of (\d+)', text)
-if not m:
+# apsis_target.log is intentionally append-only within a workflow so evidence
+# from earlier variants remains available. A staged job may therefore build the
+# default target and then a bypass/probe target in the same workspace. Inspect
+# the final resource summary, which belongs to the package passed below, rather
+# than the first summary from an earlier variant.
+resource_matches = re.findall(
+    r'image (\d+) B of (\d+); RAM \.data\+\.bss (\d+) B of (\d+); pool (\d+) B of (\d+)',
+    text,
+)
+if not resource_matches:
     raise SystemExit('FAIL: Dinghy resource summary missing from build log')
-image, image_max, ram, ram_max, pool, pool_max = map(int, m.groups())
+image, image_max, ram, ram_max, pool, pool_max = map(int, resource_matches[-1])
 if not a.package.is_file():
     raise SystemExit('FAIL: package missing')
 data = a.package.read_bytes()
