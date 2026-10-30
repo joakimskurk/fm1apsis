@@ -157,19 +157,20 @@ static void test_late_boundary_and_apply_order(void)
     assert(dd.voice[0].target_gain_q23 == ((int32_t)202u << 8));
 }
 
-static void test_provisional_capacity_is_visible(void)
+static void test_frozen_capacity_is_visible(void)
 {
     ApsisPersistentAudioQueue q;
     ApsisPersistentAudioTargets t = marker_targets(1u);
     uint8_t i;
     apsis_persistent_audio_queue_reset(&q);
+    assert(APSIS_PERSISTENT_AUDIO_QUEUE_CAP == 4u);
     for (i = 0u; i < APSIS_PERSISTENT_AUDIO_QUEUE_CAP; ++i)
         assert(apsis_persistent_audio_queue_push(&q, (uint64_t)i, &t));
     assert(q.high_water == APSIS_PERSISTENT_AUDIO_QUEUE_CAP);
     assert(!q.overflowed);
     assert(!apsis_persistent_audio_queue_push(&q, 999u, &t));
     assert(q.overflowed);
-    assert(sizeof(q) < 1024u);
+    assert(sizeof(q) < 512u);
 }
 
 int main(void)
@@ -177,8 +178,8 @@ int main(void)
     test_direct_update_equivalence();
     test_queue_order_and_boundary();
     test_late_boundary_and_apply_order();
-    test_provisional_capacity_is_visible();
-    printf("M5a persistent audio PASS queue_bytes=%zu provisional_cap=%u\n",
+    test_frozen_capacity_is_visible();
+    printf("M5a persistent audio PASS queue_bytes=%zu frozen_cap=%u\n",
            sizeof(ApsisPersistentAudioQueue),
            (unsigned)APSIS_PERSISTENT_AUDIO_QUEUE_CAP);
     return 0;
