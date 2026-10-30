@@ -15,3 +15,9 @@ jobs:
         run: make test
       - name: ASAN/UBSAN
         run: make sanitize
+      - name: M4f Spiral acoustic planning
+        run: bash ci/test_spiral_audio_plan.sh
+      - name: M4f Spiral shared-runtime bridge
+        run: bash ci/test_spiral_audio_runtime.sh
+      - name: M4f Spiral finite renderer and capacity probe
+        run: bash ci/test_spiral_dsp.sh

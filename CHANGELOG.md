@@ -2,38 +2,60 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-10-30 - M4e Clock implementation complete
+## 2026-10-30 - M4f Spiral implementation complete
 
-Active branch: `m4e-clock`; draft PR #11.
+Active branch: `m4f-spiral`; draft PR #12.
 
 Completed and implementation-gated:
-- source-correct STONE / WOOD / GLASS / SOFT Clock acoustic state
-- 0.50×..2.00× pitch represented as `pitch_centi=50..200`
-- passive consumption of existing shared MAIN / SNAP / INNER / GHOST events
-- fixed 32-slot Clock finite pool; measured worst legal stress 23/32, 176 triggers, 0 drops
-- source-derived four kick profiles, GLASS accent overtone and Snap topology
-- deterministic Clock-local Snap noise that does not perturb shared musical RNG
-- target-only JieLi `__divdi3` / `__udivdi3` compatibility shim preserving exact integer DSP arithmetic
-- deterministic host references: STONE 2081/`edcc4a81`, GLASS 1880/`0adf9829`, SNAP 738/`04bc514a`
-- core #225 PASS normal + ASAN/UBSAN
-- staged #214 PASS through real JieLi target + default emulator + Clock-DSP bypass
+- source-correct THREAD / GLASS / REED / HALO acoustic topology
+- planning-time capture of energy, duration/noteLength, source level, Drift delta/width, voice topology and envelope/filter identity
+- reuse of existing M3c Spiral token/slot and target−80 ms late bind; no new scheduler event or random draw
+- external 64-slot acoustic snapshot/bind bridge; `ApsisRuntime` remains 21,928 B
+- fixed 32-leg finite renderer with DSP-local +8 ms shadow
+- deterministic host references: THREAD 1230/`aef6c83e`, GLASS 1157/`9efa9bdc`, REED 967/`e67a3c15`, HALO 1256/`e7ed6161`
+- eight-second worst acoustic stress: 15 logical, 30/32 legs, 90 oscillators, 0 steals, 0 drops, hash `02be4bc5`
+- real JieLi target and default FM-1 emulator
+- exact M4e target/PCM/runtime Spiral-DSP bypass
+- default route-empty callback-path fix restoring the frozen emulator cursor from 123,392 to 123,648
+- permanent emulator assertion requiring cursor 123,648
 
-Implementation-head target:
+Technically final implementation/CI head: `11569371ea18bc8a5e06f28d09ddef90f9835e29`.
+- core #260 PASS
+- staged #249 PASS all gates
+
+Technically final M4f target:
+- image 95,804 B
+- RAM 58,056 B
+- pool 30,720 B
+- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
+
+Default emulator uses the source-default empty Spiral route, so PCM remains exact M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`; audible Spiral is verified by host/full-chain tests plus real target compile/link rather than this default listening scenario.
+
+Status: implementation complete; exact final documentation-head double gate and PR #12 merge remain.
+
+## 2026-10-30 - M4e Clock merged
+
+PR #11 squash-merged to `main` as `db9d0b3ecbc7931be343cec7717103059d3c5160` after final documentation head `ba3c05e4…` passed core #231 + staged #220.
+
+Frozen host Clock:
+- STONE 2081 / `edcc4a81`
+- GLASS 1880 / `0adf9829`
+- SNAP 738 / `04bc514a`
+
+Merged M4e target:
 - image 90,684 B
 - RAM 49,128 B
 - pool 30,720 B
-- package SHA `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
-- Clock-on PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- package `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
-Clock-DSP bypass returns image/RAM/pool and PCM/runtime exactly to frozen M4d behavior; bypass PCM is `539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`.
-
-Status: implementation complete; exact final documentation-head double gate and PR #11 merge remain.
+Clock-DSP bypass preserves frozen M4d PCM/runtime. Clock-local deterministic Snap noise does not perturb shared musical RNG.
 
 ## 2026-10-30 - M4d Drift merged
 
 PR #10 squash-merged to `main` as `d7e39e2481c33628f402bed51d761b8be8304bb3` after exact final-head core #214 + staged #203 gates.
 
-Frozen host Drift reference: peak 488 / `0aec6bc2`.
+Frozen host Drift: 488 / `0aec6bc2`.
 Final default M4d PCM: `539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`.
 Dedicated Drift-DSP bypass proved exact M4c package/PCM/runtime preservation.
 
@@ -41,98 +63,36 @@ Dedicated Drift-DSP bypass proved exact M4c package/PCM/runtime preservation.
 
 PR #9 merged as `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`.
 
-Completed:
-- deterministic String Attractor S&H planner and shared-heap bind events
-- source random-order preservation before Spiral/Clock ghost
-- finite BODY/WIRE/Classic excitation through the shared String transient pool
-- legal stress: shared heap 415/512, pending 60/64, zero overflow/starvation
-- frozen random/late traces `b7a9a395` / `e777a771`
-- real target + emulator regression
+Completed deterministic String Attractor S&H planning, shared-heap target−45 ms binds, source random-order preservation, finite BODY/WIRE/Classic excitation, legal capacity stress and real target/emulator regression.
 
 ## 2026-10-29 - M4b finite String + Rhythm merged
 
 PR #8 merged as `c96c00debf9a67948f1e874e36b090999dacadb9`.
 
-Added fixed finite String transients, Study-126 BODY/composite behavior and passive shared `STRING_RHYTHM` audio handoff.
+Added fixed finite String transients, Study-126 BODY/composite behaviour and passive shared `STRING_RHYTHM` audio handoff.
 
 ## 2026-10-29 - M4a persistent String merged
 
 PR #7 merged as `2ea217f09c143d30385f136e84e2b29d582987a0`.
 
-Added the first persistent dry source engine with frozen Classic/Dual host references and FM-1 emulator audio.
+Added the first persistent dry source engine with Study-98 Classic/Foundation acoustic identity, Study-126 Dual preservation, frozen host references and FM-1 emulator audio.
 
-## 2026-10-23 - M3a checkpoint started
+## 2026-10-29 - Phase 3 completed
 
-Active branch: `m3-transport-core`.
+- M3a merged `fe2911c43fd69e63839220482e50bb10c7a2e4c2`
+- M3b merged `a61a40dc83c9b52129f7d3f920da26a9a61837d9`
+- M3c merged `ec0dc0b350793572f19040efc938f00121128dc6`
 
-Added / in progress:
-- sample-referenced APSIS transport core
-- fixed 256-entry event min-heap
-- long-running whole-sample + Q32 fractional timeline
-- browser swing/division/Clock-cycle semantics
-- event generation for Clock-linked APSIS systems
-- Gravity boundary prediction
-- transport regression test suite
-- native String timing-state representation corrections found during scheduler audit
+M3c froze the 21,928-byte runtime, 512-entry shared heap, 64 Spiral slots, 64 Bloom slots and long deterministic random/late traces before DSP work began.
 
-Status at that checkpoint: implemented/committed but not yet fully CI-validated or target/emulator integrated.
+## 2026-10-23 - Phase 2 completed
 
-## 2026-10-23 - M2c merged
-
-Merge commit: `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361`.
-
-Completed Phase 2 state semantics for:
-- KEEP partial musical memory
-- CHAIN cell/lane/morph model
-- MOTHER held structural-change queue and horizon behaviour
-
-Verification:
-- strict desktop tests PASS
-- ASAN/UBSAN PASS
-- unchanged Dinghy baseline PASS
-- APSIS single-TU host PASS
-- real JieLi target PASS
-- emulator smoke PASS
-
-M2c package SHA-256: `5d318396d34cae6fd7c0fea4d175b1931ebf637194eb60bce7bf514433a94d02`.
-
-## 2026-10-23 - M2b completed
-
-Added source-derived:
-- Gravity point defaults/model
-- ring/voicing helpers
-- Bloom voice-leading planner
-- related regression coverage
-
-## 2026-10-23 - M2a completed
-
-Added source-derived:
-- complete initial APSIS state/defaults
-- scale/tuning helpers
-- String pitch model
-- Drift delta model
-- Clock structural model
-- Spiral route and derived sequence
-- deterministic attractor state
+M2c merge `4f690260c5d4d45ff10ab8eef2360b3bb0a3d361` completed pure state semantics for KEEP, CHAIN, MOTHER and the earlier musical modules. Desktop, ASAN/UBSAN, real target and emulator gates passed.
 
 ## 2026-10-23 - Phase 1 completed
 
-Established:
-- pinned Dinghy baseline
-- APSIS overlay shell
-- unique target identity `FM-1_972`
-- host build
-- real JieLi FM-1 target build
-- staged CI
-- FM-1 emulator smoke
+Established pinned Dinghy baseline, APSIS overlay shell, product `FM-1_972`, host build, real JieLi target build, staged CI and FM-1 emulator smoke.
 
 ## 2026-10-23 - Project reference freeze
 
-Locked:
-- browser `apsis.html` as behavioural source
-- source SHA-256 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
-- port contract
-- architecture direction
-- parity matrix
-- source/behaviour maps
-- FM-1 UI-mapping proposals
+Locked Study 126 behavioural source SHA `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`, port contract, architecture direction, parity matrix and source behaviour maps. Study 98 was later locked only as the narrow String acoustic reference.
