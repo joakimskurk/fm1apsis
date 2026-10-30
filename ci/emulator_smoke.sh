@@ -111,8 +111,11 @@ if queue_overflowed != 0:
     raise SystemExit(f'FAIL: live runtime queue overflow flag={queue_overflowed}')
 if late_flags != 0:
     raise SystemExit(f'FAIL: live late-binding starvation flags={late_flags:#x}')
-if cursor_low32 == 0:
-    raise SystemExit('FAIL: runtime sample cursor did not advance')
+# The 3-second pinned-emulator scenario has a stable callback budget. Freeze
+# the exact cursor so a new dry engine cannot silently cost one or more 256-frame
+# callbacks while still passing the older non-zero-health check.
+if cursor_low32 != 123648:
+    raise SystemExit(f'FAIL: default runtime cursor {cursor_low32} != frozen 123648')
 if late_trace_hash == 0:
     raise SystemExit('FAIL: late-binding telemetry hash is zero')
 
