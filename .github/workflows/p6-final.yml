@@ -1,0 +1,171 @@
+name: APSIS Phase 6 final checkpoint
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  p6-final:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P6.1 - pinned upstream and source core
+        run: bash ci/prepare_dinghy.sh
+
+      - name: Gate P6.2 - integrated shared Space target
+        run: bash ci/apply_apsis_p6.sh
+
+      - name: Gate P6.3 - real JieLi target with production Space storage
+        run: |
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json build/evidence/p6-audible-target-report.json
+          cp build/SHA256SUMS build/evidence/p6-audible-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/p6-audible-fw-backup.fwsc
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          target = json.loads(Path('build/target_report.json').read_text())
+          minimum_pool = 30720 + 274716 + 4096
+          if target.get('product') != 'FM-1_972':
+              raise SystemExit(f"FAIL: P6 product {target.get('product')!r}")
+          if target.get('pool', 0) < minimum_pool:
+              raise SystemExit(
+                  f"FAIL: P6 production storage pool={target.get('pool')} < {minimum_pool}"
+              )
+          if target.get('pool', 0) > target.get('pool_max', 0):
+              raise SystemExit('FAIL: P6 production Space exceeds POOL budget')
+          if target.get('ram', 0) > target.get('ram_max', 0):
+              raise SystemExit('FAIL: P6 production Space exceeds ordinary RAM budget')
+          print(
+              'PASS: P6 production Space fits target: '
+              f"pool={target.get('pool')}/{target.get('pool_max')} "
+              f"ram={target.get('ram')}/{target.get('ram_max')}"
+          )
+          PY
+
+      - name: Gate P6.4 - audible shared-room emulator scenario
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee build/evidence/emulator_p6_audible.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-p6-audible
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('work/emu-smoke/report.json').read_text())
+          frozen_dry = '6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b'
+          pcm = report.get('wav_raw_sha256')
+          if not pcm or pcm == frozen_dry:
+              raise SystemExit(f'FAIL: P6 audible room did not change dry PCM: {pcm!r}')
+          if report.get('runtime_queue_high_water') != 28:
+              raise SystemExit(f"FAIL: P6 audible queue high-water {report.get('runtime_queue_high_water')} != 28")
+          if report.get('runtime_queue_overflowed') != 0:
+              raise SystemExit('FAIL: P6 audible runtime queue overflow')
+          if report.get('runtime_late_flags') != 0:
+              raise SystemExit(f"FAIL: P6 audible late flags {report.get('runtime_late_flags')}")
+          if report.get('runtime_cursor_low32') != 123648:
+              raise SystemExit(f"FAIL: P6 audible cursor {report.get('runtime_cursor_low32')} != 123648")
+          if report.get('runtime_late_trace_hash') != '811c9dc5':
+              raise SystemExit(
+                  'FAIL: P6 audible late trace '
+                  f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
+              )
+          print(f'PASS: audible P6 room PCM={pcm}, frozen runtime unchanged')
+          PY
+
+      - name: Gate P6.5 - split-source dry-only path is bit-exact Phase 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          APSIS_CI_SPACE_DRY_ONLY=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis_p6.sh
+          APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
+          cp build/target_report.json build/evidence/p6-dry-only-target-report.json
+          cp build/SHA256SUMS build/evidence/p6-dry-only-SHA256SUMS
+          set -o pipefail
+          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee build/evidence/emulator_p6_dry_only.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-p6-dry-only
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          target = json.loads(Path('build/target_report.json').read_text())
+          minimum_pool = 30720 + 274716 + 4096
+          if target.get('pool', 0) < minimum_pool or target.get('pool', 0) > target.get('pool_max', 0):
+              raise SystemExit(
+                  f"FAIL: P6 dry-only production storage pool={target.get('pool')}/{target.get('pool_max')}"
+              )
+          report = json.loads(Path('work/emu-smoke/report.json').read_text())
+          expected_pcm = '6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b'
+          if report.get('wav_raw_sha256') != expected_pcm:
+              raise SystemExit(
+                  'FAIL: P6 split-source dry path changed frozen Phase-5 PCM: '
+                  f"{report.get('wav_raw_sha256')} != {expected_pcm}"
+              )
+          expected = {
+              'runtime_queue_high_water': 28,
+              'runtime_queue_overflowed': 0,
+              'runtime_late_flags': 0,
+              'runtime_cursor_low32': 123648,
+              'runtime_late_trace_hash': '811c9dc5',
+          }
+          for key, value in expected.items():
+              if report.get(key) != value:
+                  raise SystemExit(f'FAIL: P6 dry-only {key}={report.get(key)!r} != {value!r}')
+          print('PASS: P6 split-source dry-only path is exact frozen Phase-5 PCM/runtime')
+          PY
+
+          cp build/p6-audible-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/p6-audible-target-report.json build/target_report.json
+          cp build/evidence/p6-audible-SHA256SUMS build/SHA256SUMS
+          rm -f build/p6-audible-fw-backup.fwsc
+
+      - name: Upload Phase 6 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p6-final-evidence
+          path: build/evidence
+          if-no-files-found: warn
+
+      - name: Upload integrated Phase 6 firmware
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: apsis-p6-firmware
+          path: |
+            build/apsis-0.1-dev.fwsc
+            build/SHA256SUMS
+            build/target_report.json
+          if-no-files-found: error
