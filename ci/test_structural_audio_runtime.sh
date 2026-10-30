@@ -33,12 +33,24 @@ SRC=(
   apsis/apsis_runtime_m5a.c
   apsis/apsis_runtime_m5a_probe.c
 )
-COMMON=(-std=c11 -Wall -Wextra -Werror -pedantic -Iapsis "${SRC[@]}" tests/test_structural_audio_runtime.c)
+COMMON=(-std=c11 -Wall -Wextra -Werror -pedantic -Iapsis "${SRC[@]}")
 
-cc -O2 "${COMMON[@]}" -o build/test_structural_audio_runtime
+cc -O2 "${COMMON[@]}" tests/test_structural_audio_runtime.c \
+  -o build/test_structural_audio_runtime
 build/test_structural_audio_runtime
 
-cc -O1 -g -fsanitize=address,undefined "${COMMON[@]}" -o build/san_structural_audio_runtime
+cc -O1 -g -fsanitize=address,undefined "${COMMON[@]}" \
+  tests/test_structural_audio_runtime.c -o build/san_structural_audio_runtime
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 UBSAN_OPTIONS=halt_on_error=1 \
   build/san_structural_audio_runtime
+
+cc -O2 "${COMMON[@]}" tests/test_structural_audio_capacity.c \
+  -o build/test_structural_audio_capacity
+build/test_structural_audio_capacity
+
+cc -O1 -g -fsanitize=address,undefined "${COMMON[@]}" \
+  tests/test_structural_audio_capacity.c -o build/san_structural_audio_capacity
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+UBSAN_OPTIONS=halt_on_error=1 \
+  build/san_structural_audio_capacity
