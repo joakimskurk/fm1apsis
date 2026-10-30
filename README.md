@@ -20,13 +20,22 @@ The repository, not chat history, is the durable source of project state.
 - Phase 0 reference freeze: complete
 - Phase 1 pinned FM-1 skeleton/build/emulator pipeline: complete
 - Phase 2 pure musical/state core: complete and merged
-- Phase 3 deterministic transport: active
-- current unfinished branch: `m3-transport-core`
-- current draft PR: #4
-- DSP remains intentionally deferred until the shared transport is proven
+- Phase 3 deterministic shared transport/runtime: complete and merged
+- Phase 4 dry sources:
+  - M4a String persistent: merged
+  - M4b String finite/Rhythm: merged
+  - M4c String Attractor: merged
+  - M4d Drift persistent: merged
+  - M4e Clock dry engine: implementation complete, PR #11 final documentation gate pending
+  - Spiral: not started
+  - Bloom: not started
+- active branch: `m4e-clock`
+- active draft PR: #11
+- validated M4e implementation head: `285aacb5309fd9abaa51814e4ea6a09a3e480a10`
+- core #225 and staged #214 passed, including real JieLi target, Clock-on emulator and Clock-DSP bypass back to frozen M4d PCM/runtime
 - physical FM-1 validation has not yet been performed
 
-See `PROJECT_STATE.md` for the exact continuation point. Do not assume the current M3 transport is merge-ready merely because earlier target/emulator gates pass.
+See `PROJECT_STATE.md` for the exact continuation point. The next implementation slice after M4e merge is the Spiral dry engine.
 
 ## Core rule
 
@@ -68,6 +77,8 @@ The exact pin is recorded in `UPSTREAM.lock.json`.
 
 For the pinned Dinghy generation, the application audio callback runs at **44.1 kHz with 256-frame blocks**, about 5.80 ms per callback. APSIS initially targets comfortably below the full deadline under worst-case load, with <= ~50% of callback time as the provisional engineering target until hardware measurements justify another budget.
 
+No real ISR-cycle margin is claimed yet because physical hardware is not available.
+
 ## Project documents
 
 Root continuity files:
@@ -77,7 +88,7 @@ Root continuity files:
 - `TESTING.md`
 - `CHANGELOG.md`
 
-Detailed design/reference files:
+Detailed design/reference files include:
 - `docs/PORT_CONTRACT.md` - what 1:1 means and what may / may not change
 - `docs/ARCHITECTURE.md` - native engine decomposition
 - `docs/UI_MAPPING.md` - FM-1 physical interaction model
@@ -85,6 +96,8 @@ Detailed design/reference files:
 - `docs/PARITY_MATRIX.md` - feature-by-feature audit checklist
 - `docs/reference/SOURCE_LOCK.md` - frozen browser source identity/landmarks
 - `docs/reference/BEHAVIOR_MAP.md` - source-derived behaviour/default map
+- `docs/reference/M4D_DRIFT_CONTRACT.md` - persistent Drift parity disposition/contract
+- `docs/reference/M4E_CLOCK_CONTRACT.md` - Clock dry-engine acoustic/timing/random contract
 
 ## Important design consequence
 
@@ -96,3 +109,5 @@ The browser `apsis.html` supplied to the project is the behavioural source of tr
 
 Frozen reference SHA-256:
 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
+
+Study 98 is separately locked only as the narrow String acoustic reference; it does not supersede Study 126 behavior/timing/state authority.

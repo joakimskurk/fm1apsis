@@ -201,16 +201,6 @@ Status: **verified through target + emulator and merged**.
 Normative reference:
 - `docs/reference/M4C_STRING_ATTRACTOR_CONTRACT.md`
 
-Verified planner/runtime behavior:
-- explicit LEFT/RIGHT/ALTERNATE/BOTH target, default ALTERNATE
-- deterministic local seeded LCG; no shared draw on reset
-- legal 0.5/1/2/4/8 rates on the shared Phase-3 timeline
-- FILTER-only advances/mutates; SUSTAIN draws/schedules nothing
-- active random order Attractor -> Spiral -> Clock ghost
-- planning freezes surface/route/value/position/gate/base level
-- `STRING_ATTRACTOR_BIND` is shared-heap, not a private scheduler
-- external Attractor runtime preserves `sizeof(ApsisRuntime)=21,928 B`
-
 Worst legal 60-second shared-timeline stress:
 - shared heap 415/512
 - pending sides 60/64
@@ -220,13 +210,6 @@ Worst legal 60-second shared-timeline stress:
 - late `e777a771`
 - zero pending/binding/queue/Spiral/Bloom overflow/starvation
 - deterministic repeat; normal + ASAN/UBSAN agree
-
-Acoustic/late-bind verification:
-- left BODY: 720 ms, pan -0.30, attack 30 ms, no audible root shadow
-- right WIRE: 420 ms, pan +0.30, ×0.92, Foundation root .05
-- Classic: BODY ×.66 at target; WIRE ×.78 at +4 ms
-- right `norm>.52` octave accent preserved
-- all finite audio shares M4b's 80+32 pool
 
 Full shared-timeline handoff:
 - target 36,750
@@ -239,7 +222,6 @@ Final M4c target:
 - RAM 44,680 / 98,304 B
 - pool 30,720 / 344,064 B
 - package SHA `c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`
-- product `FM-1_972`
 
 Final M4c emulator:
 - Attractor OFF
@@ -253,110 +235,156 @@ Final M4c emulator:
 
 ## Phase 4 / M4d — persistent dry Drift
 
-Branch `m4d-drift`; PR #10.
-Base: M4c merge `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`.
-Validated implementation head: `0b2a351b17adfa7556c217f24af8a08c1c708d2c`.
+Merged as `d7e39e2481c33628f402bed51d761b8be8304bb3` via PR #10.
+Final pre-merge documentation head `82106c33…`; final gates core #214 + staged #203 PASS.
 
-Status: **implementation verified through real target + emulator; merge pending exact final documentation-head gate**.
+Status: **verified through target + emulator and merged**.
 
 Normative reference:
 - `docs/reference/M4D_DRIFT_CONTRACT.md`
 
-### Source disposition
-
-Study 126 still defines the identity-bearing Drift field through `beatDelta()` / `beatPair()` and auditions it through `probeBeat()`, but the transport path no longer instantiates that pair as an independent persistent `beat` source. Existing Drift state is also cross-coupled into already-frozen String/Spiral behavior.
-
-The project port contract explicitly requires DRIFT as its own paired beating field around the Gravity root. M4d therefore repairs the missing persistent wiring while preserving the old cross-couplings for a separately scoped later decision.
-
-### Host DSP verification
-
-Native `ApsisDriftDsp`:
-- two persistent sine voices around the live tuned Gravity root
-- base delta `0.05 + 3.95 * amount^1.65` Hz
-- audible separation scales by `max(0.15, depth)` and source level
-- per-voice gain `.013 * level`
-- historical `STEREO WIDTH` law `-0.34*width / +0.34*width`
-- equal-power pan
-- 25 ms pitch/gain/pan smoothing
-- gain smoothing uses fractional internal precision
-- fixed 44.1 kHz stereo Q15, allocation-free and no target `libm`
-- no event, private queue, scheduler or RNG changes
-
-`tests/test_drift_dsp.c` proves the amount endpoints, default symmetric pair, mute/depth law, Equal/Just/Pythagorean carrier movement, tuning strength, width center/full behavior and deterministic 25 ms smoothing.
-
-Frozen 2-second default Drift reference:
-- peak **488 Q15**
-- hash **`0aec6bc2`**
+Frozen host reference:
+- peak 488
+- hash `0aec6bc2`
 - normal + ASAN/UBSAN agree
+
+Final M4d target:
+- image 86,544 / 581,564 B
+- RAM 44,760 / 98,304 B
+- pool 30,720 / 344,064 B
+- package bytes 610,110 B
+- package SHA `394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`
+
+Default Drift-on emulator:
+- frames 124,928
+- peak 433
+- RMS L/R 135/135
+- stereo delta 125
+- mean L/R -3/-3
+- raw PCM `539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`
+- queue 28/512, overflow 0, late flags 0, cursor 123,648, late trace `811c9dc5`
+
+Dedicated Drift-DSP bypass returned exactly to final M4c target/package/PCM/runtime.
+
+## Phase 4 / M4e — Clock dry engine
+
+Branch `m4e-clock`; PR #11.
+Base: M4d merge `d7e39e2481c33628f402bed51d761b8be8304bb3`.
+Validated implementation head: `285aacb5309fd9abaa51814e4ea6a09a3e480a10`.
+
+Status: **implementation verified through real target + emulator; merge pending exact final documentation-head gate**.
+
+Normative reference:
+- `docs/reference/M4E_CLOCK_CONTRACT.md`
+
+### Host/state verification
+
+Verified source-correct acoustic state:
+- STONE / WOOD / GLASS / SOFT
+- `pitch_centi=50..200`, default 100
+- unchanged KEEP Clock-memory semantics (geometry only)
+
+Verified shared timing handoff:
+- existing `CLOCK_MAIN`, `CLOCK_SNAP`, `CLOCK_INNER`, `CLOCK_GHOST` events only
+- no private Clock scheduler/queue
+- passive block observer does not mutate runtime or draw musical RNG
+- pulse-0 bootstrap only fills deterministic first-block Clock events before initial shared scheduler fill
+- per-event sample delay preserves the original shared target sample inside the callback
+
+Verified acoustic topology:
+- all four source kick profiles
+- GLASS accent overtone
+- INNER normal profile × current inner level
+- GHOST ghost profile ×0.55 with no second random draw
+- Snap three deterministic filtered/panned noise bursts + pitched square edge
+- Clock-local Snap RNG; shared musical RNG remains frozen
+
+Frozen host references, identical normal + ASAN/UBSAN:
+- STONE accent peak/hash **2081 / `edcc4a81`**
+- GLASS accent peak/hash **1880 / `0adf9829`**
+- SNAP peak/hash **738 / `04bc514a`**
+
+Legal worst-case Clock pool stress:
+- 180 BPM, 1/16, max swing
+- GLASS, pitch 2.00×
+- main/inner/snap all enabled, all mains accented, all eligible Ghosts forced
+- source/inner/snap levels 1.25, Snap 8500 Hz
+- result **23/32 high-water, 176 triggers, 0 drops**
+
+### JieLi target compatibility
+
+The first target integration linked all host code but failed on missing pi32v2/libgcc `__divdi3`, emitted by exact 64-bit Clock coefficient arithmetic.
+
+The accepted implementation supplies target-only `__divdi3` / `__udivdi3` through `apsis_target_div64.c` using shift/compare/subtract restoring division. Clock arithmetic and frozen host references were not weakened or changed to accommodate the linker.
 
 ### Implementation-head gates
 
-Core #210 on `0b2a351b17adfa7556c217f24af8a08c1c708d2c`:
+Core #225 on `285aacb5309fd9abaa51814e4ea6a09a3e480a10`:
 - PASS normal suite
 - PASS ASAN/UBSAN
-- all frozen M3/M4a/M4b/M4c references unchanged
+- frozen M3/M4a/M4b/M4c/M4d references unchanged
 
-Staged #199 on the same head:
+Staged #214 on the same head:
 - Gate 1 source/core PASS
 - Gate 2 unchanged Dinghy host/target PASS
 - Gate 3 APSIS overlay/host PASS
 - Gate 4 real JieLi target/package PASS
-- Gate 5 default FM-1 emulator PASS
-- Gate 5b dedicated Drift-DSP bypass PASS
+- Gate 5 default Clock-on FM-1 emulator PASS
+- Gate 5b dedicated Clock-DSP bypass PASS
 
-Default M4d target:
-- image **86,544 / 581,564 B**
-- RAM **44,760 / 98,304 B**
+Default M4e target:
+- image **90,684 / 581,564 B**
+- RAM **49,128 / 98,304 B**
 - pool **30,720 / 344,064 B**
 - package bytes 610,110 B
-- package SHA `394bda661be55021b2b520c9f2490cb93a96446a118723162e60d26dd4a0a7d4`
+- package SHA `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
 - product `FM-1_972`
 
-Cost versus M4c:
-- +980 B app image
-- +80 B RAM
+Cost versus M4d:
+- +4,140 B app image
+- +4,368 B RAM
 - +0 B pool
 
-Default Drift-on emulator:
+Default Clock-on emulator:
 - frames 124,928
-- peak **433**
-- RMS L/R **135/135**
+- peak **856**
+- RMS L/R **144/144**
 - stereo delta **125**
-- mean L/R **-3/-3**
-- raw PCM **`539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`**
+- mean L/R **-2/-2**
+- raw PCM **`6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`**
 - queue 28/512
 - overflow 0
 - late flags 0
 - cursor 123,648
 - late trace `811c9dc5`
 
-The PCM change is expected because Drift is ON by default; the frozen scheduling/runtime telemetry remains unchanged.
+The PCM change is expected because Clock is ON and all 12 main pulses are enabled by default. Runtime telemetry remains frozen.
 
-### Exact M4c bypass gate
+### Exact M4d PCM/runtime bypass gate
 
-Muting Drift state itself is not a clean isolation test because old String/Spiral code already consumes Drift state. Gate 5b instead rebuilds the same `0.1-dev` target with only `ApsisDriftDsp` omitted.
+Gate 5b rebuilds the same target with only the new Clock DSP/consumer omitted. The source-correct Clock state remains.
 
 Bypass target/emulator:
-- image **85,564 B**
-- RAM **44,680 B**
+- image **86,544 B**
+- RAM **44,760 B**
 - pool **30,720 B**
-- package SHA **`c609e3cf4dfb4338e933b978ef7be038c0979880a989e28ae6d437f783b61bf8`**
-- raw PCM **`10e361083954aee154eb8aa4c77868dacde090988cf4080b5b42727103c34f64`**
-- peak 317; RMS 101/100; stereo delta 63; mean -2/-2
-- queue 28/512; overflow 0; late flags 0; late trace `811c9dc5`
+- package SHA `3670d58da19a1ccad01a142ff328b6faf273901450b61b361dd436ad5041990f`
+- raw PCM **`539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7`**
+- peak 433; RMS 135/135; stereo delta 125; mean -3/-3
+- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
 
-Both the package SHA and PCM SHA exactly equal the frozen final M4c references. This proves the M4d target delta is isolated to the new persistent Drift DSP layer.
+Image/RAM/pool, PCM and runtime telemetry exactly return to frozen M4d values. Exact package SHA is intentionally not required because M4e source-corrects Clock acoustic state representation even in the DSP-bypass build.
 
-### M4d verification interpretation
+### M4e verification interpretation
 
 Verified through level 5:
-- source-derived Drift identity/laws under the explicit wiring-defect disposition
-- fixed-point persistent DSP
-- smoothing and stereo law
-- target linkage/budgets
-- default Drift-on emulator audio
-- exact pre-M4d target/PCM preservation when the new Drift DSP layer is omitted
-- unchanged shared runtime telemetry
+- source-derived Clock acoustic topology
+- shared-event timing consumption with no new scheduler
+- deterministic finite pool and local Snap RNG
+- fixed-point renderer + target compatibility shim
+- real JieLi target linkage/budgets
+- default Clock-on emulator audio
+- exact pre-M4e M4d PCM/runtime preservation when Clock DSP is omitted
 
 Not verified:
 - physical FM-1 listening

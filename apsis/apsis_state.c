@@ -101,7 +101,7 @@ void apsis_state_default(ApsisState *s)
     s->clock.sound = 1u;
     s->clock.level_q15 = APSIS_Q15_MILLI(780);
     s->clock.voice = APSIS_CLOCK_STONE;
-    s->clock.pitch = 1;
+    s->clock.pitch_centi = 100u;
     s->clock.inner_level_q15 = APSIS_Q15_MILLI(660);
     s->clock.snap_level_q15 = APSIS_Q15_MILLI(620);
     s->clock.snap_tone_hz = 4200u;
