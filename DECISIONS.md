@@ -141,3 +141,15 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 **Decision:** `inspect_target_build.py` reads the last resource summary from the append-only target build log.
 
 **Why:** staged workflows intentionally build several variants in one workspace. Reading the first summary misreported a correct 95,804 B M4f Bloom-bypass as the preceding 100,944 B M4g build. Package bytes were correct; only reporting was stale.
+
+## 2026-10-30 - Phase-7 project sectors and commit protocol are frozen
+
+**Decision:** APSIS owns two 4 KiB project sectors at `0x000F4000` and `0x000F5000`. Project records use explicit little-endian v1 encoding, CRC-protected header/payload, wrap-safe generations and payload-first/header-last commit. Dinghy's `0x000FC000` settings sector remains separate.
+
+**Why:** Two validatable generations let a torn/corrupt new save fall back to the prior project, while explicit serialization prevents compiler layout from becoming the storage ABI.
+
+## 2026-10-30 - Project NOR is never touched by active audio
+
+**Decision:** Boot project NOR prefetch happens before `fm1_audio_init()` / ALNK0 DMA. Runtime project saves are deferred to `app_main()`, require stopped transport and explicitly quiesce audio before erase/program. No project flash mutation may occur from `app_audio()`.
+
+**Why:** A post-audio-start boot read measurably perturbed 202 frames in the first active block by up to two Q15 steps even though later PCM and runtime were exact. The project rejected a new baseline and restored bit-exact P6 behaviour by moving the read before audio startup.

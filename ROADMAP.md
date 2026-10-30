@@ -55,32 +55,50 @@ Status: **[x] complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`.
 - [x] retime generated FM-1 room to 11.025 kHz internal rate while sources/output stay 44.1 kHz
 - [x] real JieLi target build fits image/RAM/POOL
 - [x] audible-room emulator gate
-- [x] explicit Phase-6 boot-to-stop runtime baseline with zero late/overflow flags
-- [x] fix multi-variant target report to inspect the latest build summary
-- [x] final documentation-head core #424 + staged #413 + P6-final #22
+- [x] explicit P6 boot-to-stop runtime baseline with zero late/overflow flags
 - [x] guarded PR #16 squash merge
 
-Frozen Phase-6 target:
-- image 107,352 / 581,564 B
-- RAM 87,780 / 98,304 B
-- POOL 309,532 / 344,064 B
-- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- P6 dry-only PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- P6 cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+Frozen Phase-6 target: image 107,352 B; RAM 87,780 B; POOL 309,532 B; audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`; dry PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`; integrated cursor 123,392.
 
 ## Phase 7 — persistent KEEP / CHAIN storage
 
-Status: **[ ] next phase.**
+Status: **[~] implementation complete on PR #17; final guarded merge pending.**
 
-- [ ] freeze persisted data contract for 8 KEEP slots + 32 CHAIN cells
-- [ ] versioned CRC records
-- [ ] dedicated project storage selection/validation
-- [ ] two-slot/journal recovery
-- [ ] deferred/non-audio-thread writes
-- [ ] power-loss/corruption tests
+- [x] freeze persisted data contract for 8 KEEP slots + 32 CHAIN cells/settings
+- [x] explicit little-endian versioned CRC records
+- [x] dedicated project sectors at `0x000F4000` / `0x000F5000`
+- [x] alternating two-slot generation journal with header-last commit
+- [x] canonical decode/range validation; transient CHAIN transport excluded
+- [x] desktop torn-write/corruption/generation-wrap tests
+- [x] fake FM-1 NOR save/reboot/failure/recovery tests
+- [x] ASAN/UBSAN persistence gates
+- [x] pre-audio boot prefetch + later RAM-only project apply
+- [x] deferred main-loop saves with transport stopped and audio quiesced
+- [x] static guard: no erase/program/service path reachable from `app_audio()`
+- [x] real JieLi target build within image/RAM/POOL budgets
+- [x] audible emulator remains bit-exact P6
+- [x] dry-only emulator remains exact Phase 5
+
+Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
+- image 110,848 / 581,564 B
+- RAM 88,628 / 98,304 B
+- POOL 309,532 / 344,064 B
+- package `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
+- audible PCM exact P6 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- dry PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
 ## Phase 8 — native visual surfaces
+- [ ] freeze 240×240 layout/visual contract
+- [ ] native bounded-cost graphics primitives
 - [ ] MOTHER / GRAVITY / STRING / CLOCK / SPIRAL / BLOOM / DRIFT-TUNING / CHAIN / KEEP / SPACE
+- [ ] String central veil + visible SPLIT anchors
+- [ ] Clock orbit/timeline trace
+- [ ] Spiral route on spiral geometry
+- [ ] Bloom probability/cluster density
+- [ ] Gravity/Mother active mapping overlays
+- [ ] Chain/Keep readable non-generic treatment
+- [ ] visual comparison against locked APSIS/browser reference
 
 ## Phase 9 — physical interaction parity
 - [ ] direct FM-1 mappings for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER, SPACE
@@ -111,4 +129,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Begin Phase 7 with the persistence contract and storage-medium validation. Do not touch the frozen Phase-6 musical/audio path unless a measured target constraint requires it.
+Finish the guarded Phase-7 merge, then begin Phase 8 by freezing the native 240×240 visual contract and reusable graphics primitives. Do not introduce UI shadow state or disturb the frozen audio/runtime/persistence paths.

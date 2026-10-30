@@ -1,8 +1,6 @@
 name: APSIS Phase 7 storage
 
 on:
-  push:
-    branches: [p7-persistence]
   pull_request:
   workflow_dispatch:
 

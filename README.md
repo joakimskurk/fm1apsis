@@ -11,7 +11,8 @@ For a new ChatGPT chat or returning contributor, read these first in order:
 3. `DECISIONS.md` — durable architecture/product decisions
 4. `TESTING.md` — what is actually verified
 5. `CHANGELOG.md` — milestone history
-6. `docs/reference/P6_FINAL_CHECKPOINT.md` — Phase-6 final technical evidence
+6. `docs/reference/P7_FINAL_CHECKPOINT.md` — Phase-7 final technical evidence
+7. `docs/reference/P7_STORAGE_CONTRACT.md` — frozen project-storage format
 
 The repository, not chat history, is the durable source of project state.
 
@@ -23,10 +24,11 @@ The repository, not chat history, is the durable source of project state.
 - Phase 3 deterministic shared transport/runtime: complete and merged
 - Phase 4 five dry source engines: complete and merged
 - Phase 5 sounding-source structural integration: complete and merged as `d677a887cf6dc8552634bde5a71fec0221c299b5`
-- Phase 6 shared Space/Cathedral: **complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`**
-- Phase 7 persistent KEEP/CHAIN storage is the next implementation phase
+- Phase 6 shared Space/Cathedral: complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`
+- Phase 7 persistent KEEP/CHAIN storage: **implementation complete; PR #17 finalizing**
+- Phase 8 native 240×240 visual surfaces is next after the guarded Phase-7 merge
 
-Physical FM-1 validation has not yet been performed. Real hardware ISR margin and listening quality therefore remain unverified.
+Physical FM-1 validation has not yet been performed. Real hardware ISR margin, real NOR power-interruption behaviour, DAC/listening quality and physical controls/display behaviour therefore remain unverified.
 
 ## Core rule
 
@@ -49,36 +51,39 @@ The source instrument is one shared musical state seen through STRING, DRIFT/TUN
 - `sizeof(ApsisRuntime)=21,928 B`
 - one 512-event shared heap; no module-private musical clocks
 
-Phase-5/M4g frozen default emulator baseline remains cursor **123,648**, queue 28/512, no overflow/late flags, trace `811c9dc5`, dry PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`.
+Historical M4/M5 emulator baseline remains cursor **123,648**. The integrated Phase-6/7 scenario remains separately frozen at cursor **123,392**, queue 28/512, overflow 0, late flags 0 and trace `811c9dc5`.
 
-## Phase 6 — shared Space/Cathedral
+## Phase 7 — persistent KEEP / CHAIN project storage
 
-Phase 6 is integrated and merged into `main`:
+Phase 7 adds persistence without changing the frozen musical/audio engine:
 
-- five post-source/post-Mother sends feed one shared room
-- selected compact modulated 8-line FDN
-- large room memories live in dedicated pre-`.pool` NOLOAD storage
-- host/reference room remains 44.1 kHz
-- generated FM-1 Cathedral runs internally at **11.025 kHz** using 4:1 send averaging/wet hold, with its delay/filter/decay/modulation constants retimed to preserve real-time behaviour
-- dry source engines and final output remain 44.1 kHz
+- explicit little-endian v1 project record; native C struct padding is never persisted
+- 8 KEEP slots + KEEP selection
+- 32 CHAIN cells + count/editor selection + CHAIN behavioural settings
+- transient CHAIN transport/runtime state is deliberately excluded
+- 24-byte CRC-protected header + 816-byte payload = 840-byte record
+- two dedicated 4 KiB sectors at `0x000F4000` and `0x000F5000`
+- payload-first / header-last alternating journal with generation counter and wrap-safe newest selection
+- desktop corruption, interrupted-write, generation-wrap and fake-NOR reboot/recovery tests
+- boot project record is prefetched from NOR **before FM-1 audio/DMA starts**, then decoded from RAM after APSIS defaults are installed
+- save requests are deferred; erase/program runs only from the main loop with transport stopped and audio quiesced, never from `app_audio()`
 
-Frozen Phase-6 target candidate:
+Final technical Phase-7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`:
 
-- image **107,352 / 581,564 B**
-- RAM **87,780 / 98,304 B**
+- image **110,848 / 581,564 B**
+- RAM **88,628 / 98,304 B**
+- RAM headroom **9,676 B**
 - POOL **309,532 / 344,064 B**
 - POOL headroom **34,532 B**
-- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- dry-only PCM remains exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- Phase-6 boot-to-stop cursor **123,392** for both audible and dry-only variants
-- queue 28/512, overflow 0, late flags 0, late trace `811c9dc5`
+- package SHA-256 `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
+- audible PCM remains bit-exact P6: `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- room-return-disabled PCM remains exact Phase 5: `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- both variants retain cursor 123,392, queue 28/512, no overflow/late flags and trace `811c9dc5`
 
-The one-callback cursor difference from the older Phase-5 scenario is an explicit Phase-6 scenario baseline, not a scheduler rewrite. Both audible and room-return-disabled P6 variants land on the same cursor and retain healthy runtime telemetry.
-
-Final pre-merge head `cfdfff673204d4fa36208508e343c6297a37ff37` passed core #424, staged #413 and P6-final #22 before squash merge.
+The initial P7 target probe exposed a two-Q15-step perturbation confined to the first active DMA block when NOR was read after audio startup. That was treated as a regression, not a new baseline. Moving read-only project prefetch before `fm1_audio_init()` restored the full frozen PCM hashes exactly.
 
 ## Important verification boundary
 
-The firmware builds for the real JieLi target and passes the pinned FM-1 emulator. No physical FM-1 is currently available, so no claim is made yet about real DAC sound, physical controls, display behaviour under full load, or true ISR-cycle headroom.
+The firmware builds for the real JieLi target and passes the pinned FM-1 emulator. A physical FM-1 is not currently available, so no claim is made yet about real DAC sound, true ISR-cycle headroom, physical UI behaviour or real power-cut storage robustness.
 
-The next implementation phase is **Phase 7 — persistent KEEP / CHAIN storage**.
+After Phase 7 merges, the next implementation phase is **Phase 8 — native 240×240 visual surfaces**.
