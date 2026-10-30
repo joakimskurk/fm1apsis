@@ -148,12 +148,12 @@ static void configure_chain(ApsisState *s, ApsisKeepBank *bank,
 
     chain->count = 2u;
     chain->cells[0] = apsis_chain_default_cell(0u, &s->chain, s->clock.n);
-    chain->cells[0].cycles = 0u;
-    chain->cells[0].fine_pulses = 3u;
+    chain->cells[0].cycles = 1u;
+    chain->cells[0].fine_pulses = 0u;
     chain->cells[0].morph_quarters = APSIS_CHAIN_MORPH_NONE;
     chain->cells[1] = apsis_chain_default_cell(1u, &s->chain, s->clock.n);
-    chain->cells[1].cycles = 0u;
-    chain->cells[1].fine_pulses = 3u;
+    chain->cells[1].cycles = 1u;
+    chain->cells[1].fine_pulses = 0u;
     chain->cells[1].morph_quarters = APSIS_CHAIN_MORPH_NONE;
 }
 
