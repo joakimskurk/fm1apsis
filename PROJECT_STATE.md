@@ -4,18 +4,15 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 6 — shared Space / Cathedral: source/topology freeze complete; native memory/candidate prototyping active.**
+**Phase 6 — shared Space / Cathedral: FDN selected and silent real-target memory gate complete; production room DSP is next.**
 
 Active branch: `p6-space-cathedral`  
+Draft PR: #16  
 Base: merged Phase 5 `d677a887cf6dc8552634bde5a71fec0221c299b5`  
-Phase-6 contract: `docs/reference/P6_SPACE_CATHEDRAL_CONTRACT.md`
+Phase-6 contract: `docs/reference/P6_SPACE_CATHEDRAL_CONTRACT.md`  
+Candidate evidence: `docs/reference/P6_SPACE_PROTOTYPE_RESULTS.md`
 
-Phase 5 was final-gated on `17e7fd1247b0f5675261a7395b0558b5bbd6780d`:
-- core #363 PASS
-- staged #352 PASS including real JieLi target, emulator and exact M4f Bloom-bypass
-- squash-merged through PR #15 as `d677a887cf6dc8552634bde5a71fec0221c299b5`
-
-Phase 5 required no production scheduler/DSP/runtime change, so current firmware remains exact M4g.
+Phase 5 was final-gated on `17e7fd1247b0f5675261a7395b0558b5bbd6780d` and squash-merged through PR #15 as `d677a887cf6dc8552634bde5a71fec0221c299b5`.
 
 Physical FM-1 hardware is still unavailable. No real ISR-cycle-margin or hardware-listening claim is made.
 
@@ -55,14 +52,13 @@ Pinned emulator invariants:
 - cursor **123,648 exactly**
 - late trace `811c9dc5`
 
-## Current target baseline
+## Frozen dry target baseline
 
-Current production image remains exact M4g / merged Phase 5:
+Merged Phase 5 remains exact M4g on the dry path:
 - image **100,944 / 581,564 B**
 - RAM **87,336 / 98,304 B**
 - ordinary static-RAM headroom **10,968 B**
-- pool **30,720 / 344,064 B**
-- pool headroom **313,344 B**
+- ordinary Dinghy pool **30,720 / 344,064 B**
 - package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
 - default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
@@ -83,13 +79,14 @@ Shared Space defaults already match native state:
 - echo 362 ms / 18 % feedback
 
 Frozen topology:
-1. per-source sends -> shared room input;
-2. trim 0.72;
-3. room guard HP/LP/compressor;
-4. four early reflection taps;
-5. predelay -> 190 Hz HP -> long diffuse Cathedral -> damping LP -> wet return;
-6. quiet filtered feedback echo feeds the same long-tail path;
-7. wet return remains separate from dry.
+1. each source passes through its Mother mix/mute before both dry and send;
+2. five sends feed one shared room input;
+3. trim 0.72;
+4. room guard HP/LP/compressor;
+5. four early reflection taps;
+6. predelay -> 190 Hz HP -> long diffuse Cathedral -> damping LP -> wet return;
+7. quiet filtered feedback echo feeds the same long-tail path;
+8. wet return remains separate from dry.
 
 Browser convolution IR is a perceptual target, not a literal FM-1 implementation requirement. Native must retain dense/dark/low-metallicity 4..12 s behaviour and source-send topology.
 
@@ -97,39 +94,62 @@ Documented Study-126 live-audio dispositions:
 - effective live tail damping 2200..6800 Hz although UI exposes 2200..11000;
 - effective live echo feedback 0..0.48 although UI/storage exposes 0..0.58.
 
-## Phase 6 memory decision
+## Selected Phase-6 room algorithm
 
-Pinned Dinghy provides a separate **336 KiB `.pool` specifically for large zeroed buffers**, including delay-line use.
+The deterministic candidate comparison is complete.
 
-Therefore:
-- large predelay/echo/reverb delay lines belong in `.pool`;
-- small room/filter/control state stays in normal RAM;
-- do not consume the final 10,968 B ordinary RAM with delay arrays.
+**Selected:** compact 8-line modulated FDN.
 
-Reference stereo int16 storage at 44.1 kHz:
-- predelay max 140 ms: ~24.7 kB
-- echo max 1.2 s: ~211.7 kB
-- current pool headroom before Phase 6: 313.3 kB
+Selected geometry:
+- delays: `1871, 1999, 2137, 2281, 2441, 2593, 2767, 2953` samples;
+- +16 samples reserve per line;
+- modulation rates `.071, .083, .097, .109, .127, .139, .157, .181 Hz`;
+- approximately ±9 samples modulation;
+- normalized 8x8 Hadamard feedback mix;
+- one-pole damping per line;
+- decorrelated signed stereo output with small crossmix.
 
-This makes a compact algorithmic Cathedral feasible, but worst-case pool sizing must be measured before integration.
+Host prototype evidence at 4 / 8.4 / 12 s:
+- FDN decay endpoint remains within the frozen reference tolerance;
+- stereo correlation remains near zero;
+- HF proxy tracks the Study-126 proxy closely;
+- metallicity stays around 0.11;
+- rejected Schroeder candidate measures roughly 0.69..0.73 metallicity;
+- FDN tail storage 38,340 B versus 50,900 B for Schroeder.
 
-## Candidate gate now active
+## Real target memory gate — complete
 
-Prototype and compare, before `app_audio()` integration:
-1. compact modulated FDN;
-2. nested allpass/Schroeder hybrid.
+Conservative exact selected storage classes at 44.1 kHz:
+- shared stereo 140 ms input history: **24,696 B**;
+- stereo 1.2 s echo: **211,680 B**;
+- 8-line FDN tail: **38,340 B**;
+- existing Dinghy pool: **30,720 B**;
+- total POOL-region footprint: **305,436 / 344,064 B**;
+- remaining pool headroom: **38,628 B**.
 
-Both must preserve the contract and report:
-- pool bytes and ordinary state bytes;
-- deterministic impulse hash;
-- decay/energy behaviour at 4 / 8.4 / 12 s;
-- stereo decorrelation;
-- metallic/repeat proxy;
-- damping behaviour;
-- transient stability;
-- cost proxy.
+Exact validated gate head: `11ce731a740d11262d988c352a79774bbea3103a`.
 
-Then place the selected candidate's **exact delay buffers** in `.pool` in a silent target-validation build. The real target must fit and the old M4g/Phase-5 PCM/runtime must remain bit-identical while the room renderer is not called.
+Evidence:
+- core #375 PASS;
+- staged #364 PASS;
+- real target image **100,944 B**;
+- ordinary RAM **87,336 B**;
+- pool **305,436 B**;
+- probe package `5db84c9e09c76d1434abd3e01e55abd4e5e85afa4b39124869fe87d3bb02ffed`;
+- emulator PCM remains exact frozen dry `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`;
+- queue 28/512, overflow 0, late flags 0, cursor **123,648**, late trace `811c9dc5`.
+
+### Dinghy pool-startup discovery
+
+Pinned Dinghy `fm1_cstart()` clears the complete range `[_pool_start, _pool_end)` at boot. Placing the new 274,716 B Space storage inside ordinary `.pool` therefore delayed startup by one 256-frame callback even when no Space code ran.
+
+The accepted layout places Space storage in a dedicated NOLOAD `.apsis_space_pool` section **immediately before** Dinghy's ordinary `.pool` in the POOL memory region:
+- linker capacity/reporting still accounts the full 305,436 B footprint because `_pool_end` remains after both sections;
+- `_pool_start` begins after Space storage, so Dinghy clears only its original pool;
+- no Phase-6 runtime call executes while the room is disabled;
+- dry PCM/runtime/cursor remain bit-identical.
+
+Production Space must therefore explicitly initialise/validate its own NOLOAD delay memory before first use. Prefer validity/fill counters over a giant boot-time memset so inactive Space preserves the frozen startup/callback path.
 
 ## Completed merged baselines
 
@@ -147,11 +167,11 @@ Then place the selected candidate's **exact delay buffers** in `.pool` in a sile
 
 ## Exact next action
 
-1. Open the Phase-6 draft PR from `p6-space-cathedral` after the topology-contract commit.
-2. Add a deterministic host memory/impulse prototype for **both** room candidates.
-3. Measure candidate pool usage and acoustic proxies under 4 / 8.4 / 12 s settings.
-4. Select a candidate only from evidence, not preference.
-5. Before audible integration, validate its exact `.pool` layout on real JieLi target while room rendering remains disabled.
+1. Implement the selected 8-line FDN as a pure fixed-point host engine (`apsis_space_dsp.[ch]`) with external delay storage; do **not** put large arrays in the DSP struct.
+2. Port the source-defined front end in testable slices: room trim/guard -> early taps -> predelay -> tail HP/FDN/damping -> filtered feedback echo -> wet return.
+3. Use self-initialising/fill-counted delay histories so untouched NOLOAD memory is never read before being written.
+4. Add deterministic impulse/decay/hash tests and ASAN/UBSAN before touching `app_audio()`.
+5. Only after the pure engine is green, integrate the five post-Mother source sends into one shared room-input accumulator and add a room-disabled bypass gate requiring exact frozen dry PCM/runtime.
 
 ## Do not regress
 
@@ -160,6 +180,6 @@ Then place the selected candidate's **exact delay buffers** in `.pool` in a sile
 - Study 126 topology/parameter roles remain authoritative;
 - Study 98 remains narrow String acoustic authority only;
 - `ApsisRuntime` remains 21,928 B unless explicitly re-approved;
-- Phase-6 delay memory belongs in `.pool`, not ordinary BSS;
+- Phase-6 long delay memory belongs in the dedicated POOL-region Space section, not ordinary BSS;
 - inactive room code may not change the exact emulator cursor or dry PCM;
 - physical FM-1 and real ISR timing remain unverified.
