@@ -31,7 +31,7 @@ PROBE_ADDR=$(awk '$NF == "apsis_runtime_probe" { found="0x" $1 } END { if (found
 
 python3 - <<'PY'
 from pathlib import Path
-import hashlib, json, math, re, struct, wave
+import hashlib, json, math, os, re, struct, wave
 
 root = Path('work/emu-smoke')
 for p in Path('work').glob('lcd_*.bmp'):
@@ -111,11 +111,15 @@ if queue_overflowed != 0:
     raise SystemExit(f'FAIL: live runtime queue overflow flag={queue_overflowed}')
 if late_flags != 0:
     raise SystemExit(f'FAIL: live late-binding starvation flags={late_flags:#x}')
-# The 3-second pinned-emulator scenario has a stable callback budget. Freeze
-# the exact cursor so a new dry engine cannot silently cost one or more 256-frame
-# callbacks while still passing the older non-zero-health check.
-if cursor_low32 != 123648:
-    raise SystemExit(f'FAIL: default runtime cursor {cursor_low32} != frozen 123648')
+# Default remains the frozen Phase-5/M4g budget. Later phases may explicitly
+# freeze their own boot-to-stop cursor because --ms is a fixed CPU-cycle window
+# from boot, so added initialization can legitimately move this number without
+# implying an audio deadline miss. All callers must opt in explicitly.
+expected_cursor = int(os.environ.get('APSIS_EMU_EXPECT_CURSOR', '123648'), 0)
+if cursor_low32 != expected_cursor:
+    raise SystemExit(
+        f'FAIL: default runtime cursor {cursor_low32} != frozen {expected_cursor}'
+    )
 if late_trace_hash == 0:
     raise SystemExit('FAIL: late-binding telemetry hash is zero')
 
@@ -137,6 +141,7 @@ report = {
     'runtime_late_flags': late_flags,
     'runtime_late_trace_hash': f'{late_trace_hash:08x}',
     'runtime_cursor_low32': cursor_low32,
+    'runtime_expected_cursor': expected_cursor,
 }
 (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, sort_keys=True))
