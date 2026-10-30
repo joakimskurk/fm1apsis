@@ -8,10 +8,11 @@
  * - the eight FDN lines plus 16 samples of interpolation/modulation reserve
  *   per line, packed into one contiguous tail store.
  *
- * The arrays deliberately live in Dinghy's large .pool section rather than
- * ordinary .bss. No Phase-6 renderer reads them yet. The CI-only copied linker
- * script wraps .pool in KEEP(), so these arrays require no runtime retention
- * access and therefore cannot perturb startup or audio-callback cadence.
+ * They live in a dedicated NOLOAD section placed immediately before Dinghy's
+ * ordinary .pool. Dinghy's fm1_cstart() zeroes only [_pool_start, _pool_end),
+ * so this CI probe proves the full hardware memory footprint without adding
+ * hundreds of kilobytes to boot-time clearing. The future production Space
+ * engine must explicitly initialise this storage before first audible use.
  */
 #define APSIS_SPACE_PROBE_INPUT_FRAMES 6174u
 #define APSIS_SPACE_PROBE_ECHO_FRAMES 52920u
@@ -28,8 +29,8 @@
      APSIS_SPACE_PROBE_FDN_BYTES)
 
 static int16_t apsis_space_probe_input_history[APSIS_SPACE_PROBE_INPUT_SAMPLES]
-    __attribute__((section(".pool"), used));
+    __attribute__((section(".apsis_space_pool"), used));
 static int16_t apsis_space_probe_echo[APSIS_SPACE_PROBE_ECHO_SAMPLES]
-    __attribute__((section(".pool"), used));
+    __attribute__((section(".apsis_space_pool"), used));
 static int16_t apsis_space_probe_fdn[APSIS_SPACE_PROBE_FDN_SAMPLES]
-    __attribute__((section(".pool"), used));
+    __attribute__((section(".apsis_space_pool"), used));
