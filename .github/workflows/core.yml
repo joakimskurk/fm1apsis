@@ -29,3 +29,5 @@ jobs:
         run: bash ci/test_bloom_audio_live.sh
       - name: M4g Bloom finite renderer and capacity probe
         run: bash ci/test_bloom_dsp.sh
+      - name: P5a sounding late-binding integration
+        run: bash ci/test_phase5_late_binding_audio.sh
