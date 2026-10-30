@@ -122,11 +122,12 @@ static int32_t space_room_biquad(ApsisSpaceBiquadState *s,
                                  const SpaceRoomBiquadCoeff *c,
                                  int32_t x)
 {
+    const int64_t q30 = (int64_t)1 << 30;
     int32_t y;
     int64_t z;
     if (!s || !c) return x;
-    y = space_room_shift_q30((int64_t)c->b0 * x + ((int64_t)s->z1_q15 << 30));
-    z = (int64_t)c->b1 * x - (int64_t)c->a1 * y + ((int64_t)s->z2_q15 << 30);
+    y = space_room_shift_q30((int64_t)c->b0 * x + (int64_t)s->z1_q15 * q30);
+    z = (int64_t)c->b1 * x - (int64_t)c->a1 * y + (int64_t)s->z2_q15 * q30;
     s->z1_q15 = space_room_shift_q30(z);
     z = (int64_t)c->b2 * x - (int64_t)c->a2 * y;
     s->z2_q15 = space_room_shift_q30(z);
