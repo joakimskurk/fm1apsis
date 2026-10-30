@@ -41,8 +41,27 @@ s = s.replace(h_anchor,
 c_anchor = '#include "apsis_space_target.c"'
 if c_anchor not in s:
     raise SystemExit('FAIL: P7 Phase-6 source anchor missing')
-s = s.replace(c_anchor,
-              c_anchor + '\n#include "apsis_project_store.c"\n#include "apsis_project_fm1.c"', 1)
+
+# Dinghy intentionally builds the application as one translation unit by
+# textually including module .c files. Namespace every private helper in the
+# project-format implementation so generic names (for example clamp_q15) can
+# never collide with helpers from Spiral or another frozen APSIS module.
+helper_names = (
+    'project_zero', 'clamp_u8', 'clamp_i8', 'clamp_q15',
+    'put_u16', 'put_u32', 'get_u16', 'get_u32', 'put_i8', 'get_i8',
+    'normalize_keep', 'encode_keep', 'decode_keep',
+    'normalize_cell', 'encode_cell', 'decode_cell',
+    'normalize_chain_settings', 'encode_chain_settings',
+    'decode_chain_settings',
+)
+wrapped = [c_anchor]
+for name in helper_names:
+    wrapped.append(f'#define {name} apsis_p7_{name}')
+wrapped.append('#include "apsis_project_store.c"')
+for name in reversed(helper_names):
+    wrapped.append(f'#undef {name}')
+wrapped.append('#include "apsis_project_fm1.c"')
+s = s.replace(c_anchor, '\n'.join(wrapped), 1)
 
 state_anchor = 'static ApsisSpaceTarget space_target;'
 if state_anchor not in s:
@@ -101,6 +120,7 @@ grep -q 'APSIS_PROJECT_FLASH_LO 0x000F4000u' work/apsis/firmware/src/platform.c
 grep -q 'APSIS_PROJECT_FLASH_HI 0x000F6000u' work/apsis/firmware/src/platform.c
 grep -q 'apsis_project_fm1_load' work/apsis/firmware/src/dinghy.c
 grep -q 'project_store.save_pending && !apsis_runtime.transport.running' work/apsis/firmware/src/dinghy.c
+grep -q '#define clamp_q15 apsis_p7_clamp_q15' work/apsis/firmware/src/dinghy.c
 python3 - <<'PY'
 from pathlib import Path
 s = Path('work/apsis/firmware/src/dinghy.c').read_text()
