@@ -25,6 +25,9 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_clock_dsp.h apsis/apsis_clock_dsp.c \
    apsis/apsis_target_div64.c \
    apsis/apsis_spiral.h apsis/apsis_spiral.c \
+   apsis/apsis_spiral_audio.h apsis/apsis_spiral_audio.c \
+   apsis/apsis_spiral_audio_runtime.h apsis/apsis_spiral_audio_runtime.c \
+   apsis/apsis_spiral_dsp.h apsis/apsis_spiral_dsp.c \
    apsis/apsis_bloom.h apsis/apsis_bloom.c \
    apsis/apsis_keep.h apsis/apsis_keep.c \
    apsis/apsis_chain.h apsis/apsis_chain.c \
@@ -32,7 +35,7 @@ cp apsis/apsis_state.h apsis/apsis_state.c \
    apsis/apsis_transport.h apsis/apsis_transport.c \
    apsis/apsis_late_binding.h apsis/apsis_late_binding.c \
    apsis/apsis_runtime.h apsis/apsis_runtime.c apsis/apsis_runtime_m3c.c \
-   apsis/apsis_runtime_m4c.c \
+   apsis/apsis_runtime_m4c.c apsis/apsis_runtime_m4f.h apsis/apsis_runtime_m4f.c \
    work/apsis/firmware/src/
 
 python3 - <<'PY'
@@ -42,6 +45,7 @@ p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
 drift_dsp_enabled = os.environ.get('APSIS_CI_DRIFT_DSP_OFF') != '1'
 clock_dsp_enabled = os.environ.get('APSIS_CI_CLOCK_DSP_OFF') != '1'
+spiral_dsp_enabled = os.environ.get('APSIS_CI_SPIRAL_DSP_OFF') != '1'
 
 # Older checked-in overlays did not yet include M4a. Keep the generator
 # backwards-safe, but never duplicate a .c include once the live M4a overlay
@@ -109,8 +113,8 @@ if drift_dsp_enabled:
 
 # M4e makes the already-frozen shared Clock events audible. The Clock DSP is a
 # passive finite consumer: no scheduler, queue, or musical RNG lives here.
-# JieLi's pi32v2 target omits libgcc DI-mode division, so include the exact
-# shift/subtract ABI shim immediately before Clock DSP whenever Clock is built.
+# JieLi's pi32v2 target omits libgcc DI-mode division. Clock owns the shim when
+# it is enabled; M4f inserts the same one before Spiral only when Clock is off.
 if clock_dsp_enabled:
     if '#include "apsis_clock_dsp.h"' not in s:
         hc_anchor = '#include "apsis_clock.h"'
@@ -124,16 +128,38 @@ if clock_dsp_enabled:
         s = s.replace(cc_anchor,
                       cc_anchor + '\n#include "apsis_target_div64.c"\n#include "apsis_clock_dsp.c"', 1)
 
-# runtime_m4c.c includes the frozen M3c coordinator internally and appends only
-# the external Attractor-aware scheduler/process layer. Do not include
-# runtime_final.c separately or the lifecycle symbols would be duplicated.
+# M4f consumes the already-frozen M3c Spiral slot/bind lifecycle. The acoustic
+# snapshot/runtime and finite renderer are external to ApsisRuntime. No new
+# scheduler event is created; +8 ms shadow timing remains DSP-local.
+if spiral_dsp_enabled:
+    if '#include "apsis_spiral_audio.h"' not in s:
+        hs_anchor = '#include "apsis_spiral.h"'
+        if hs_anchor not in s:
+            raise SystemExit('FAIL: M4f Spiral header anchor missing')
+        s = s.replace(hs_anchor,
+                      hs_anchor + '\n#include "apsis_spiral_audio.h"\n#include "apsis_spiral_audio_runtime.h"\n#include "apsis_spiral_dsp.h"\n#include "apsis_runtime_m4f.h"', 1)
+    if '#include "apsis_spiral_audio.c"' not in s:
+        cs_anchor = '#include "apsis_spiral.c"'
+        if cs_anchor not in s:
+            raise SystemExit('FAIL: M4f Spiral source anchor missing')
+        div64 = '' if clock_dsp_enabled else '\n#include "apsis_target_div64.c"'
+        s = s.replace(cs_anchor,
+                      cs_anchor + div64 +
+                      '\n#include "apsis_spiral_audio.c"'
+                      '\n#include "apsis_spiral_audio_runtime.c"'
+                      '\n#include "apsis_spiral_dsp.c"', 1)
+
+# M4f includes the proven M4c coordinator internally. With the Spiral DSP CI
+# bypass, keep the exact M4e runtime include path so Gate 5b can prove isolation.
 old = '#include "apsis_runtime.c"'
-new = '#include "apsis_late_binding.c"\n#include "apsis_runtime_m4c.c"'
+new = ('#include "apsis_late_binding.c"\n#include "apsis_runtime_m4f.c"'
+       if spiral_dsp_enabled else
+       '#include "apsis_late_binding.c"\n#include "apsis_runtime_m4c.c"')
 if old not in s:
     raise SystemExit('FAIL: runtime include anchor missing from Dinghy overlay')
 s = s.replace(old, new, 1)
 s = s.replace('M3b instantiates the shared transport/runtime coordinator',
-              'M4e retains the M4c shared coordinator and adds dry Drift/Clock audio', 1)
+              'M4f retains the shared coordinator and adds dry Drift/Clock/Spiral audio', 1)
 s = s.replace('static volatile uint32_t apsis_runtime_probe[4];',
               'static volatile uint32_t apsis_runtime_probe[6];', 1)
 
@@ -146,23 +172,27 @@ if drift_dsp_enabled:
     state_extra += '\nstatic ApsisDriftDsp drift_dsp;'
 if clock_dsp_enabled:
     state_extra += '\nstatic ApsisClockDsp clock_dsp;'
+if spiral_dsp_enabled:
+    state_extra += '\nstatic ApsisSpiralDsp spiral_dsp;'
 s = s.replace(state_anchor, state_extra, 1)
 
-# Keep all M4 finite state outside the frozen ApsisRuntime layout. The String
-# transient pool is shared by Rhythm + Attractor; Clock owns a separate small
-# finite dry pool because its acoustic primitives/tails are unrelated.
+# Keep all M4 finite state outside the frozen ApsisRuntime layout. String owns
+# its 80+32 transient pool; Spiral owns an external snapshot/bind runtime and
+# the separately-frozen 32-leg dry pool.
 pool_anchor = 'static volatile uint32_t apsis_runtime_probe[6];'
 pool_decl = (pool_anchor +
              '\nstatic ApsisStringTransientPool string_transient_pool;'
              '\nstatic ApsisStringAttractorRuntime string_attractor_runtime;')
+if spiral_dsp_enabled:
+    pool_decl += '\nstatic ApsisSpiralAudioRuntime spiral_audio_runtime;'
 if pool_anchor not in s:
-    raise SystemExit('FAIL: M4 String state declaration anchor missing')
+    raise SystemExit('FAIL: M4 finite-state declaration anchor missing')
 s = s.replace(pool_anchor, pool_decl, 1)
 
 # Shared callback handoff. Clock observes due shared events before Phase-3
-# consumes them, instantiates sample-delayed finite voices, and renders those
-# voices inside the same callback so MAIN/SNAP/INNER/GHOST keep their original
-# target sample. The observer never mutates the runtime or draws RNG.
+# consumes them. Spiral uses the existing target-80 ms M3c bind: after runtime
+# consumes a bind, M4f instantiates a finite voice with the exact remaining
+# target delay relative to this callback's start, then renders the same block.
 audio_old = '''        apsis_string_dsp_render(&string_dsp, out, n);
         apsis_runtime_process(&apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                               &mother_pending, &bloom_voicing_state, n, 0, 0);'''
@@ -181,11 +211,25 @@ clock_collect = '''        apsis_clock_collect_block(&apsis_runtime, &apsis, n, 
                                                 clock_block_start);
 ''' if clock_dsp_enabled else ''
 clock_render = '        apsis_clock_dsp_render(&clock_dsp, out, n);\n' if clock_dsp_enabled else ''
-audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
-        uint8_t attr_ix;
-''' + clock_decl + drift_lines + clock_collect + '''        apsis_string_dsp_render(&string_dsp, out, n);
-''' + drift_render + clock_render + '''        apsis_string_transient_render(&string_transient_pool, out, n);
-        if (string_attractor_runtime.length ||
+spiral_decl = '''        uint8_t spiral_ix;
+        uint64_t spiral_block_start = apsis_runtime.cursor_sample;
+''' if spiral_dsp_enabled else ''
+if spiral_dsp_enabled:
+    runtime_process = '''        apsis_runtime_process_spiral_audio(
+            &apsis_runtime, &apsis, &keep_bank, &chain_sequence,
+            &mother_pending, &bloom_voicing_state, n, 0, 0,
+            (string_attractor_runtime.length ||
+             apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR)
+                ? &string_attractor_runtime : 0,
+            &spiral_audio_runtime, &rhythm_observation);
+        for (spiral_ix = 0u; spiral_ix < spiral_audio_runtime.binding_count; ++spiral_ix)
+            (void)apsis_spiral_dsp_trigger_binding(
+                &spiral_dsp, &apsis, &spiral_audio_runtime.binding[spiral_ix],
+                spiral_block_start);
+        apsis_spiral_dsp_render(&spiral_dsp, out, n);
+'''
+else:
+    runtime_process = '''        if (string_attractor_runtime.length ||
             apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
             apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
                                                      &keep_bank, &chain_sequence,
@@ -199,7 +243,12 @@ audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
                                            &bloom_voicing_state, n, 0, 0,
                                            &rhythm_observation);
         }
-        for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
+'''
+audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
+        uint8_t attr_ix;
+''' + clock_decl + spiral_decl + drift_lines + clock_collect + '''        apsis_string_dsp_render(&string_dsp, out, n);
+''' + drift_render + clock_render + '''        apsis_string_transient_render(&string_transient_pool, out, n);
+''' + runtime_process + '''        for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string_attractor_trigger_binding(
                 &string_transient_pool, &apsis, &string_pitch_memory,
                 &string_attractor_runtime.binding[attr_ix],
@@ -210,7 +259,7 @@ audio_new = '''        ApsisRuntimeStringRhythmObservation rhythm_observation;
                                                     &string_pitch_memory,
                                                     &rhythm_observation.event);'''
 if audio_old not in s:
-    raise SystemExit('FAIL: M4e live audio handoff anchor missing')
+    raise SystemExit('FAIL: M4f live audio handoff anchor missing')
 s = s.replace(audio_old, audio_new, 1)
 
 probe_anchor = '        apsis_runtime_probe[3] = (uint32_t)apsis_runtime.cursor_sample;'
@@ -224,11 +273,15 @@ if init_anchor not in s:
     raise SystemExit('FAIL: runtime telemetry init anchor missing')
 s = s.replace(init_anchor, init_extra, 1)
 
-# Static BSS starts zero. Drift lazily rises through its source smoothing;
-# Clock voices allocate only when the existing shared events occur.
+# Static BSS starts zero. Explicitly reset every new external M4f structure;
+# keep the already-frozen runtime_start call itself unchanged.
 start_anchor = '    apsis_runtime_start(&apsis_runtime);'
 if start_anchor not in s:
     raise SystemExit('FAIL: runtime start anchor missing')
+if spiral_dsp_enabled:
+    s = s.replace(start_anchor,
+                  '    apsis_spiral_audio_runtime_reset(&spiral_audio_runtime);\n'
+                  '    apsis_spiral_dsp_reset(&spiral_dsp);\n' + start_anchor, 1)
 
 p.write_text(s)
 PY
@@ -237,6 +290,7 @@ python3 ci/patch_release_identity.py work/apsis/tools/build.py
 
 ( cd work/apsis && APP_VER="$VERSION" bash tests/run_host.sh ) 2>&1 | tee build/evidence/apsis_host.log
 
-printf 'PASS: APSIS overlay + host shell%s%s\n' \
+printf 'PASS: APSIS overlay + host shell%s%s%s\n' \
   "${APSIS_CI_DRIFT_DSP_OFF:+ (Drift DSP bypass)}" \
-  "${APSIS_CI_CLOCK_DSP_OFF:+ (Clock DSP bypass)}"
+  "${APSIS_CI_CLOCK_DSP_OFF:+ (Clock DSP bypass)}" \
+  "${APSIS_CI_SPIRAL_DSP_OFF:+ (Spiral DSP bypass)}"
