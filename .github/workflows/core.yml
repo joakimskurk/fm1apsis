@@ -35,3 +35,5 @@ jobs:
         run: bash ci/test_phase5_quantized_gravity_audio.sh
       - name: P5c Mother sounding structural semantics
         run: bash ci/test_phase5_mother_audio.sh
+      - name: P5d Chain sounding boundary semantics
+        run: bash ci/test_phase5_chain_audio.sh
