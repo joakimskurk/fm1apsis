@@ -31,6 +31,7 @@ SRC=(
   apsis/apsis_late_binding.c
   apsis/apsis_persistent_audio.c
   apsis/apsis_runtime_m5a.c
+  apsis/apsis_runtime_m5a_probe.c
 )
 COMMON=(-std=c11 -Wall -Wextra -Werror -pedantic -Iapsis "${SRC[@]}" tests/test_structural_audio_runtime.c)
 
