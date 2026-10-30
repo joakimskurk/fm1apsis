@@ -1,6 +1,6 @@
 # P5a — sounding late-binding integration contract
 
-Status: normative Phase-5 slice contract.
+Status: normative Phase-5 slice contract; **P5a completed and Phase 5 subsequently closed through P5f verification.**
 
 Authority:
 - Study 126 remains behavioural/state/timing/safety authority.
@@ -45,14 +45,16 @@ P5a acceptance:
 - the occurrence token, petal target sample and occurrence-frozen petal acoustic values remain unchanged;
 - the finite petal remains delayed to the original target sample.
 
-## Non-goals
+## Original P5a non-goals
 
-P5a does not yet close all of Phase 5. These remain later Phase-5 slices:
-- quantised Gravity sounding-source cases, including the deliberate Spiral-vs-Bloom pending asymmetry;
+P5a itself did not close all of Phase 5. At contract freeze, these were deliberately deferred:
+- quantized Gravity sounding-source cases, including the deliberate Spiral-vs-Bloom pending asymmetry;
 - Mother `->1` held structural edits with live mixer/master;
 - Chain discrete/morph application into already-sounding engines;
 - pending-Gravity UI/visual distinction;
 - shared Space/Cathedral (Phase 6 only).
+
+The first three items were subsequently closed by P5b–P5e. Step-one sounding free-run/resync was additionally closed by P5f. Pending-Gravity UI/visual work remains a later UI concern; shared Space/Cathedral remains Phase 6.
 
 ## Resource and architecture constraints
 
@@ -69,3 +71,30 @@ The post-M4g real target leaves only 10,968 B static RAM headroom, so a verifica
 ## Exit gate
 
 A dedicated normal + ASAN/UBSAN scripted test must prove both Spiral and Bloom end-to-end chains from structural state mutation through the existing M3c bind to actual finite-DSP oscillator frequency, while all frozen M3/M4 regressions remain green.
+
+## Completion evidence
+
+Verification head before the final documentation freeze:
+- `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`
+- APSIS core #357 PASS
+- APSIS staged validation #346 PASS
+
+Completed sounding gates:
+- P5a structural late binding reaches sounding Spiral/Bloom DSP
+- P5b quantized Gravity asymmetry reaches sounding Spiral/Bloom DSP
+- P5c Mother-held Gravity reaches sounding sources only after `->1` commit
+- P5d Chain discrete boundary reaches sounding Spiral/Bloom in source order
+- P5e Chain continuous Drift morph begins on target and reaches sounding DSP
+- P5f step-one RESYNC OFF free-runs into sounding Spiral energy
+
+All P5 gates pass normal + ASAN/UBSAN. No production scheduler/DSP/runtime change was required.
+
+Staged #346 therefore remains exact M4g:
+- image 100,944 B
+- RAM 87,336 B
+- pool 30,720 B
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+
+This is the desired Phase-5 outcome: sounding structural parity was proven without consuming additional target RAM or creating a second timing/audio architecture.
