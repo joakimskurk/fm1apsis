@@ -128,3 +128,29 @@ The +8 ms shadow remains DSP-local. `ApsisRuntime` does not grow.
 M4f initially reduced the cursor to 123,392 even with the source-default empty Spiral route because the callback still cleared the external binding batch and scanned an empty 32-leg renderer every block. The accepted architecture keeps the exact M4e callback path until Spiral first has both sound and a non-empty route, then latches M4f active permanently so pending binds/tails remain safe.
 
 **Why:** A silent/inactive new dry engine must not quietly consume one full 256-frame callback of the pinned emulator budget. This gate applies to later Bloom/Space work unless an explicitly justified scenario change deliberately rebaselines it.
+
+## 2026-10-30 - M4g Bloom reuses M3c occurrence and petal-bind causality
+
+**Decision:** Bloom audio does not create a second Bloom lifecycle. M4g mirrors the existing M3c 64-slot Bloom token/slot state externally: occurrence freezes only the source-defined acoustic geometry, and each existing M3c petal bind supplies the authoritative target-aware Gravity/tuning result.
+
+Occurrence-frozen data: petal count/order, length/duration, unfurl/target offsets, width/pan, source level/amplitude.
+
+Bind-late data: final `ApsisBloomLateBinding`, current VEIL/CHOIR/ORGAN/GLASS voice family, attack, brightness and source ON/OFF.
+
+M4g may not draw random numbers, choose another voicing plan, add queue events, change the M3c future-Gravity projection rules or grow `ApsisRuntime`.
+
+## 2026-10-30 - M4g Bloom finite pool is 136 petals
+
+**Decision:** Use a fixed 136-petal Bloom DSP pool, maximum three oscillators per petal.
+
+**Evidence:** Legal worst-case stress reaches 125 simultaneous petals and 375 oscillators with 186 triggers, 0 drops, peak 266 and deterministic hash `5881bb36`. The frozen pool leaves 11 petal slots of margin (more than two five-petal occurrences) above measured high-water.
+
+## 2026-10-30 - Bloom activation preserves the exact M4f idle path
+
+**Decision:** M4g must not scan/reset its 22,864-byte finite renderer every callback before Bloom actually has work. Target integration remains on the exact M4f callback path until an already-planned shared Bloom occurrence is due inside the current block. Once activated, M4g stays latched so pending petals and tails survive later mute/state edits.
+
+The pinned default three-second scenario therefore remains bit-identical M4f (PCM `6c3b8fff…`, cursor 123,648) even though the full Bloom target code is present and real-target linked.
+
+## 2026-10-30 - Static RAM is now a hard Phase-5/6 constraint
+
+**Decision:** After M4g, the real target uses 87,336 / 98,304 B static RAM, leaving only **10,968 B** headroom. Phase 5 structural integration and Phase 6 Space/Cathedral must treat RAM as a first-class design constraint. Do not add large unconditional BSS pools without evidence, and do not trade away parity merely to hide RAM use without a measured alternative.

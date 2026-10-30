@@ -160,98 +160,128 @@ Clock-DSP bypass returns PCM/runtime and image/RAM/pool exactly to frozen M4d be
 
 ## Phase 4 / M4f — Spiral
 
-Branch `m4f-spiral`; draft PR #12.
-Base: merged M4e `db9d0b3ecbc7931be343cec7717103059d3c5160`.
-Technically final implementation/CI head: `11569371ea18bc8a5e06f28d09ddef90f9835e29`.
+Merged `734229f4d23626a176a8366de82aab2c58c48cc9` via PR #12.
+Final documentation head `744559f89df733c4c167367efe30250b6dcdecdf`; core #261 + staged #250 PASS.
 
-Status: **implementation verified through real target + emulator; merge pending exact final documentation-head gate**.
-
-Normative reference:
-- `docs/reference/M4F_SPIRAL_CONTRACT.md`
-
-### Host planning/bridge verification
-
-Verified:
-- source duration/energy/noteLength law
-- source-level and Drift audible delta/width frozen at planning time
-- THREAD / GLASS / REED / HALO topology
-- two-leg main/shadow topology with +8 ms shadow local delay
-- no new scheduler event or random draw
-- external snapshot runtime keyed to existing M3c token/slot
-- M3c target−80 ms late pitch binding remains authoritative
-- planning-time topology/Q/envelope with current-voice late cutoff-family edge behaviour
-- `sizeof(ApsisRuntime)` remains 21,928 B
-
-### Frozen Spiral renderer references
-
-Identical normal + ASAN/UBSAN:
-- THREAD peak/hash **1230 / `aef6c83e`**, 2 legs / 4 oscillators
-- GLASS **1157 / `9efa9bdc`**, 2 legs / 6 oscillators
-- REED **967 / `e67a3c15`**, 2 legs / 6 oscillators
-- HALO **1256 / `e7ed6161`**, 2 legs / 6 oscillators
+Frozen host normal + ASAN/UBSAN:
+- THREAD 1230 / `aef6c83e`, 2 legs / 4 oscillators
+- GLASS 1157 / `9efa9bdc`, 2 legs / 6 oscillators
+- REED 967 / `e67a3c15`, 2 legs / 6 oscillators
+- HALO 1256 / `e7ed6161`, 2 legs / 6 oscillators
 
 Eight-second worst acoustic stress:
 - hits 384
 - logical high-water 15
-- leg high-water **30/32**
+- leg high-water 30/32
 - oscillator high-water 90
 - steals 0
 - drops 0
-- hash **`02be4bc5`**
+- hash `02be4bc5`
 
-All prior M3/M4 host references remain unchanged.
-
-### Idle callback regression and fix
-
-The first fully integrated M4f target (`923e7555…`) passed all gates but default emulator telemetry advanced only 123,392 samples instead of frozen 123,648 — exactly one 256-frame callback less — even though default Spiral route is empty and PCM was unchanged.
-
-Pinned Dinghy boot inspection proved `.bss` zeroing occurs before audio init/IRQ, so BSS size was not the cause. The issue was unnecessary per-callback M4f runtime/binding clear and 32-leg renderer scanning while Spiral could not produce audio.
-
-Accepted fix (`7a01a890…`):
-- route-empty default path uses exact frozen M4e runtime/audio path;
-- Spiral layer latches on only when route is non-empty and sound is ON;
-- once latched it stays active so pending binds/tails survive later route/mute edits;
-- renderer is not scanned before the first hit.
-
-Result: default cursor restored to **123,648** with unchanged Spiral DSP semantics.
-
-`ci/emulator_smoke.sh` now asserts exact cursor 123,648. Assertion head `11569371…` passed core #260 and staged #249.
-
-### Technically final M4f target/emulator
-
-Target:
-- image **95,804 / 581,564 B**
-- RAM **58,056 / 98,304 B**
-- pool **30,720 / 344,064 B**
-- RAM headroom 40,248 B
+Merged M4f target/emulator:
+- image 95,804 B; RAM 58,056 B; pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
+- default source route is empty, so PCM remains M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512; overflow 0; late flags 0; cursor exactly 123,648; trace `811c9dc5`
+
+M4f bypass is exact frozen M4e target/package/PCM/runtime.
+
+## Phase 4 / M4g — Bloom
+
+Branch `m4g-bloom`; draft PR #13.
+Base: merged M4f `734229f4d23626a176a8366de82aab2c58c48cc9`.
+Technically final implementation/CI head: `6c54d1cd5ca354543237a14c257b3ec28ab424d1`.
+
+Status: **implementation verified through real target + emulator; final documentation-head gate and merge remain.**
+
+Normative reference:
+- `docs/reference/M4G_BLOOM_CONTRACT.md`
+
+### Planner / bridge verification
+
+Verified normal + ASAN/UBSAN:
+- occurrence-time source-vector planner for frozen duration/unfurl/target offset/amp/pan
+- external 64-slot snapshot runtime keyed to existing M3c Bloom slot/token
+- no additional scheduler event or random draw
+- existing M3c occurrence target−45 ms and per-petal causal target−50 ms bind remain authoritative
+- per-petal bind consumes existing `ApsisBloomLateBinding`
+- current Bloom voice/attack/brightness are late-read at bind
+- frozen plan/petal count survives later DEPTH edits
+- `sizeof(ApsisRuntime)` remains 21,928 B
+
+### Frozen Bloom renderer references
+
+Core #292 PASS normal + ASAN/UBSAN.
+
+- VEIL peak/hash **175 / `6177470f`**
+- CHOIR **143 / `4b2969f8`**
+- ORGAN **122 / `d54a68d9`**
+- GLASS **129 / `ca1c3127`**
+
+Legal worst-case Bloom stress:
+- triggers **186**
+- petal high-water **125/136**
+- oscillator high-water **375**
+- drops **0**
+- peak **266**
+- deterministic hash **`5881bb36`**
+- `sizeof(ApsisBloomDsp)=22,864 B`
+
+Pool capacity is frozen at 136 petals, leaving 11 petal slots above the measured legal high-water.
+
+All prior M3/M4 references remain unchanged in the same core run.
+
+### Target integration / inactive-path gate
+
+M4g is layered above the merged M4f target. It preserves the exact M4f callback path until an already-planned Bloom occurrence is due inside the current callback. Once activated, the Bloom layer stays live so pending petals and finite tails survive later state/mute edits.
+
+Staged #281 PASS all gates:
+- Gate 1 source core / pinned upstream
+- Gate 2 unchanged Dinghy host + target
+- Gate 3 actual M4g single-TU overlay + host shell
+- Gate 4 real JieLi `FM-1_972` target package
+- Gate 5 FM-1 emulator smoke
+- Gate 5b exact M4f Bloom-DSP/runtime bypass
+
+### Technically final M4g target
+
+- image **100,944 / 581,564 B**
+- RAM **87,336 / 98,304 B**
+- RAM headroom **10,968 B**
+- pool **30,720 / 344,064 B**
+- pool headroom 313,344 B
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
 - product `FM-1_972`
 
-Default emulator:
-- source-default Spiral route is empty, so no audible Spiral voice is expected
-- PCM remains exact M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- peak 856; RMS 144/144; stereo delta 125; mean -2/-2
-- queue 28/512; overflow 0; late flags 0; **cursor 123,648**; trace `811c9dc5`
+### Default M4g emulator
 
-The default emulator proves integration, boot, baseline audio/runtime preservation and callback-budget invariance. Because route is empty, audible Spiral is verified at host/full-chain level plus real target compile/link, not by a target listening scenario.
+The pinned three-second reference scenario does not reach a due Bloom occurrence, so the activation latch intentionally keeps the exact M4f audio/runtime path during this smoke.
 
-### Gate 5b — exact M4e bypass
-
-With only Spiral DSP/runtime consumer omitted:
-- image **90,684 B**
-- RAM **49,128 B**
-- pool **30,720 B**
-- package `74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b`
 - PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512; overflow 0; late flags 0; cursor 123,648; trace `811c9dc5`
+- peak 856
+- RMS 144/144
+- stereo delta 125
+- mean -2/-2
+- queue 28/512
+- overflow 0
+- late flags 0
+- cursor **123,648**
+- late trace `811c9dc5`
 
-This is exact frozen M4e target/PCM/runtime.
+This verifies real target integration, boot and baseline callback/audio/runtime preservation. Audible Bloom is verified by host source-vector, bridge, full shared-runtime handoff and finite-renderer tests plus real target compile/link. Physical listening is not verified.
 
-### Exact implementation-head gates
+### Gate 5b — exact M4f Bloom bypass
 
-- core #260 PASS
-- staged #249 PASS all gates including real JieLi target, default emulator, exact cursor assertion and Spiral-DSP bypass
+With only M4g Bloom DSP/runtime consumption omitted:
+- image **95,804 B**
+- RAM **58,056 B**
+- pool **30,720 B**
+- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
+- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+
+This is exact frozen M4f target/package/PCM/runtime.
 
 ## Next verification
 
-Freeze M4f continuity docs, run both workflows on that exact documentation head, then merge PR #12 if green. Physical FM-1 remains untested.
+Freeze M4g continuity docs and `M4G_BLOOM_CONTRACT.md`, run both workflows on that exact documentation head, then merge PR #13 if green. After merge, begin Phase 5 sounding-source structural integration from the actual M4g merge commit. Physical FM-1 remains untested.

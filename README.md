@@ -26,16 +26,16 @@ The repository, not chat history, is the durable source of project state.
   - M4b String finite/Rhythm: merged
   - M4c String Attractor: merged
   - M4d Drift persistent: merged
-  - M4e Clock: merged as `db9d0b3ecbc7931be343cec7717103059d3c5160`
-  - M4f Spiral: implementation complete; PR #12 pending only final documentation-head double gate
-  - M4g Bloom: not started
-- active branch: `m4f-spiral`
-- active draft PR: #12
-- technically final M4f implementation/CI head: `11569371ea18bc8a5e06f28d09ddef90f9835e29`
-- core #260 and staged #249 passed, including real JieLi target, exact default cursor invariant and exact M4e Spiral-DSP bypass
+  - M4e Clock: merged
+  - M4f Spiral: merged as `734229f4d23626a176a8366de82aab2c58c48cc9`
+  - M4g Bloom: implementation complete; PR #13 pending only final documentation-head double gate and guarded merge
+- active branch: `m4g-bloom`
+- active draft PR: #13
+- technically final M4g implementation/CI head: `6c54d1cd5ca354543237a14c257b3ec28ab424d1`
+- core #292 and staged #281 passed, including real JieLi target, emulator and exact frozen-M4f Bloom bypass
 - physical FM-1 validation has not yet been performed
 
-See `PROJECT_STATE.md` for the exact continuation point. The next implementation slice after M4f merge is **M4g / Bloom dry engine**.
+See `PROJECT_STATE.md` for the exact continuation point. After M4g merges, the roadmap proceeds to **Phase 5 sounding-source structural integration**, not directly to shared Space/Cathedral.
 
 ## Core rule
 
@@ -84,7 +84,7 @@ The frozen M3c shared runtime remains the only musical scheduler:
 - canonical random trace `78771ff5`
 - canonical late trace `0e6fc422`
 
-The pinned three-second emulator scenario now also freezes **runtime cursor 123,648 exactly**. This catches dry-engine callback-budget regressions that a weaker “cursor advanced” check would miss.
+The pinned three-second emulator scenario freezes **runtime cursor 123,648 exactly**. This catches dry-engine callback-budget regressions that a weaker “cursor advanced” check would miss.
 
 No real ISR-cycle margin is claimed because physical hardware is unavailable.
 
@@ -102,26 +102,46 @@ M4d restores the identity-bearing paired beating field around the tuned Gravity 
 
 ### Clock
 
-M4e passively consumes the shared Clock events with STONE/WOOD/GLASS/SOFT voices and deterministic Clock-local Snap noise. Merged as `db9d0b3ecbc7931be343cec7717103059d3c5160`.
+M4e passively consumes shared Clock events with STONE/WOOD/GLASS/SOFT voices and deterministic Clock-local Snap noise. Merged as `db9d0b3ecbc7931be343cec7717103059d3c5160`.
 
 ### Spiral
 
-M4f reuses the existing M3c occurrence/token/target−80 ms late-bind lifecycle. Acoustic planning state is stored externally and a fixed 32-leg renderer implements THREAD/GLASS/REED/HALO plus source main/shadow topology.
+M4f reuses the existing M3c occurrence/token/target−80 ms late-bind lifecycle. Acoustic planning state is external and a fixed 32-leg renderer implements THREAD/GLASS/REED/HALO plus source main/shadow topology.
 
 Frozen host refs:
 - THREAD 1230 / `aef6c83e`
 - GLASS 1157 / `9efa9bdc`
 - REED 967 / `e67a3c15`
 - HALO 1256 / `e7ed6161`
-- worst stress 30/32 legs, 0 steals, 0 drops, hash `02be4bc5`
+- worst stress 30/32 legs, 90 oscillators, 0 steals, 0 drops, hash `02be4bc5`
 
-Technically final M4f target:
+Merged M4f target:
 - image 95,804 B
 - RAM 58,056 B
 - pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
 
-The default source route is empty, so default emulator PCM remains exact M4e. Audible Spiral is proven by host/full-chain tests plus real target compile/link; physical listening remains unverified.
+### Bloom
+
+M4g reuses the existing M3c target / target−45 ms occurrence / causal target−50 ms petal-bind lifecycle. Occurrence freezes petal acoustic geometry; each bind consumes M3c's target-aware Gravity/tuning result and late-reads current Bloom voice/attack/brightness.
+
+Frozen host refs:
+- VEIL 175 / `6177470f`
+- CHOIR 143 / `4b2969f8`
+- ORGAN 122 / `d54a68d9`
+- GLASS 129 / `ca1c3127`
+- worst legal stress: 125/136 petals, 375 oscillators, 0 drops, hash `5881bb36`
+
+Technically final M4g target:
+- image 100,944 B
+- RAM 87,336 B
+- **RAM headroom only 10,968 B**
+- pool 30,720 B
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+
+The pinned three-second emulator does not reach a due Bloom occurrence, so M4g preserves the exact M4f callback/audio path until Bloom actually activates. Default PCM remains `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b` and runtime cursor remains exactly 123,648.
+
+A dedicated Bloom-DSP/runtime bypass returns exactly to the frozen M4f target/package/PCM/runtime.
 
 ## Project documents
 
@@ -143,6 +163,7 @@ Detailed design/reference files include:
 - `docs/reference/M4D_DRIFT_CONTRACT.md`
 - `docs/reference/M4E_CLOCK_CONTRACT.md`
 - `docs/reference/M4F_SPIRAL_CONTRACT.md`
+- `docs/reference/M4G_BLOOM_CONTRACT.md`
 
 ## Important design consequence
 

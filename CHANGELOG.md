@@ -2,36 +2,56 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-10-30 - M4f Spiral implementation complete
+## 2026-10-30 - M4g Bloom implementation complete
 
-Active branch: `m4f-spiral`; draft PR #12.
+Active branch: `m4g-bloom`; draft PR #13; base is merged M4f `734229f4d23626a176a8366de82aab2c58c48cc9`.
 
 Completed and implementation-gated:
-- source-correct THREAD / GLASS / REED / HALO acoustic topology
-- planning-time capture of energy, duration/noteLength, source level, Drift delta/width, voice topology and envelope/filter identity
-- reuse of existing M3c Spiral token/slot and target−80 ms late bind; no new scheduler event or random draw
-- external 64-slot acoustic snapshot/bind bridge; `ApsisRuntime` remains 21,928 B
-- fixed 32-leg finite renderer with DSP-local +8 ms shadow
-- deterministic host references: THREAD 1230/`aef6c83e`, GLASS 1157/`9efa9bdc`, REED 967/`e67a3c15`, HALO 1256/`e7ed6161`
-- eight-second worst acoustic stress: 15 logical, 30/32 legs, 90 oscillators, 0 steals, 0 drops, hash `02be4bc5`
-- real JieLi target and default FM-1 emulator
-- exact M4e target/PCM/runtime Spiral-DSP bypass
-- default route-empty callback-path fix restoring the frozen emulator cursor from 123,392 to 123,648
-- permanent emulator assertion requiring cursor 123,648
+- source-correct occurrence-time Bloom acoustic planning
+- reuse of existing M3c target / target−45 ms occurrence / causal target−50 ms petal-bind lifecycle
+- external 64-slot Bloom acoustic snapshot/bind bridge; `ApsisRuntime` remains 21,928 B
+- per-petal late read of current VEIL/CHOIR/ORGAN/GLASS voice, attack and brightness while M3c remains pitch/tuning authority
+- deterministic fixed-point finite Bloom renderer
+- evidence-driven **136-petal** pool; legal stress reaches 125/136 petals and 375 oscillators with 0 drops
+- frozen host refs VEIL 175/`6177470f`, CHOIR 143/`4b2969f8`, ORGAN 122/`d54a68d9`, GLASS 129/`ca1c3127`
+- legal stress hash `5881bb36`
+- real JieLi target and FM-1 emulator integration
+- exact inactive/default callback path until an already-planned Bloom occurrence is due
+- exact M4f target/package/PCM/runtime Bloom bypass
 
-Technically final implementation/CI head: `11569371ea18bc8a5e06f28d09ddef90f9835e29`.
-- core #260 PASS
-- staged #249 PASS all gates
+Technically final implementation/CI head: `6c54d1cd5ca354543237a14c257b3ec28ab424d1`.
+- core #292 PASS
+- staged #281 PASS all gates
 
-Technically final M4f target:
+Technically final M4g target:
+- image 100,944 B
+- RAM 87,336 B
+- RAM headroom 10,968 B
+- pool 30,720 B
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+
+The pinned three-second default emulator does not reach a due Bloom occurrence, so PCM/runtime remain exact M4f: PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`, cursor 123,648, queue 28/512 and late trace `811c9dc5`.
+
+Status: implementation complete; exact final documentation-head double gate and PR #13 guarded merge remain.
+
+## 2026-10-30 - M4f Spiral merged
+
+PR #12 squash-merged to `main` as `734229f4d23626a176a8366de82aab2c58c48cc9` after final documentation head `744559f89df733c4c167367efe30250b6dcdecdf` passed core #261 + staged #250.
+
+Frozen host:
+- THREAD 1230 / `aef6c83e`
+- GLASS 1157 / `9efa9bdc`
+- REED 967 / `e67a3c15`
+- HALO 1256 / `e7ed6161`
+- worst stress 15 logical hits, 30/32 legs, 90 oscillators, 0 steals/drops, hash `02be4bc5`
+
+Merged M4f target:
 - image 95,804 B
 - RAM 58,056 B
 - pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
 
-Default emulator uses the source-default empty Spiral route, so PCM remains exact M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`; audible Spiral is verified by host/full-chain tests plus real target compile/link rather than this default listening scenario.
-
-Status: implementation complete; exact final documentation-head double gate and PR #12 merge remain.
+Default source route is empty, so PCM remains exact M4e `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`. The exact cursor assertion remains 123,648.
 
 ## 2026-10-30 - M4e Clock merged
 
