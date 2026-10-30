@@ -179,7 +179,7 @@ Real target with exact selected Space storage retained:
 - package `5db84c9e09c76d1434abd3e01e55abd4e5e85afa4b39124869fe87d3bb02ffed`
 - product `FM-1_972`
 
-Room renderer is still disabled in this gate.
+Room renderer is disabled in this memory gate.
 
 Emulator remains exact frozen dry behaviour:
 - PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
@@ -194,6 +194,52 @@ CI conclusions:
 - `PASS: P6 selected-FDN pool storage fits real target pool=305436/344064 ram=87336/98304`
 - `PASS: silent P6 pool probe preserves frozen M4g/Phase-5 PCM/runtime`
 
+## Phase 6 — fixed-point FDN core and full shared-room host engine
+
+Current verified head before this documentation checkpoint: `014c6f843d6e8e7a15ac35e9bbc372e460756e9c`.
+
+APSIS core #398: **PASS**.
+- normal regression PASS;
+- ASAN/UBSAN PASS;
+- P6 selected fixed-point FDN core PASS;
+- P6 shared-room front-end/topology PASS.
+
+Frozen FDN host references:
+- default peak **217** / hash `a190ca86` / late `2646000`;
+- decay 4 s `1455300`;
+- decay 12 s `3507773`;
+- dark `7d4c13e3`;
+- bright `7e1a4d9e`.
+
+Frozen full-room host references:
+- default peak **47**;
+- hash `1350a6da`;
+- late `1278900`;
+- first non-zero sample **927**;
+- no-echo hash `97669507`;
+- dark hash `5ff1f59a`.
+
+The full host room implements:
+- 0.72 room trim;
+- 170 Hz guard HP;
+- smoothed guard LP and compressor safety transfer;
+- four early taps at 21 / 43 / 71 / 109 ms;
+- predelay;
+- 190 Hz long-tail HP;
+- selected 8-line fixed-point FDN;
+- FDN damping/decay controls;
+- 4.2 kHz filtered feedback echo;
+- separate early path + wet return;
+- caller-owned external storage with fill/valid tracking and **no bulk storage clear on bind**.
+
+APSIS staged #387: **PASS** on the same head through pinned source/core, unchanged Dinghy, dry M4g overlay, real JieLi target, default emulator, Bloom bypass and the silent selected-Space-storage gate.
+
+Important verification boundary: the staged firmware still does **not** call `apsis_space_room_render()` from `app_audio()`. Therefore Phase 6 is verified at host DSP level plus real-target storage/link-layout level, but **not yet as audible Space on target/emulator**.
+
 ## Next verification
 
-Implement the selected FDN as a **pure host fixed-point engine first**, using externally supplied delay storage and validity/fill counters so NOLOAD memory is never read before being written. Add deterministic reference and sanitizer tests before any `app_audio()` integration. Only then integrate the five post-Mother source sends into one shared room and require a room-disabled exact-dry target/emulator bypass gate.
+1. Split the existing dry target render into five post-Mother source contributions while preserving their exact summed dry PCM.
+2. Apply frozen String/Drift/Clock/Spiral/Bloom Space-send levels into one shared room input.
+3. Bind the already-proven NOLOAD storage and call the shared room from `app_audio()`.
+4. Add a room-disabled exact-dry target/emulator bypass gate.
+5. Add an audible-room target/emulator scenario, then freeze Phase-6 references before merge.
