@@ -46,7 +46,7 @@ static void fixture(ApsisState *state, ApsisRuntime *runtime)
 
     state->gravity.degree = 2u;
     state->gravity.voicing = 1u;
-    state->gravity.selected_ring = 2u;
+    state->gravity.selected_ring = 1u;
     state->gravity.selected_point_degree = 5u;
     for (i = 0u; i < APSIS_GRAVITY_POINTS; ++i)
         state->gravity.points[i].enabled = (uint8_t)((i % 5u) != 0u);
@@ -139,6 +139,7 @@ static void test_state_is_live_not_shadowed(void)
     b = render_full(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
     assert(a != b);
 
+    fixture(&state, &runtime);
     a = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
     runtime.gravity_pending.degree = 1u;
     c = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);

@@ -84,7 +84,7 @@ void apsis_visual_line(ApsisVisualRaster *raster, int16_t x0, int16_t y0,
         apsis_visual_pixel(raster, (int16_t)x, (int16_t)y, colour);
         if (x == x1 && y == y1) break;
         {
-            int32_t e2 = err << 1;
+            int32_t e2 = err * 2;
             if (e2 >= dy) { err += dy; x += sx; }
             if (e2 <= dx) { err += dx; y += sy; }
         }
@@ -224,7 +224,6 @@ void apsis_visual_render_mother(ApsisVisualRaster *raster,
     if (mother->sync)
         apsis_visual_circle(raster, 120, 122, 36, APSIS_VISUAL_GRAVITY);
 
-    /* Five source witnesses make the topology readable even at minimum mix. */
     for (i = 0u; i < 5u; ++i) {
         int16_t x, y;
         apsis_visual_polar(120, 122, 48, centers[i], &x, &y);
@@ -247,7 +246,7 @@ void apsis_visual_render_gravity(ApsisVisualRaster *raster,
     for (ring = 0u; ring < APSIS_GRAVITY_RINGS; ++ring) {
         apsis_visual_circle(raster, 120, 124, radii[ring], APSIS_VISUAL_DIM);
         for (degree = 0u; degree < APSIS_GRAVITY_DEGREES; ++degree) {
-            const uint8_t point_index = (uint8_t)(ring * APSIS_GRAVITY_DEGREES + degree);
+            const uint8_t point_index = (uint8_t)(degree * APSIS_GRAVITY_RINGS + ring);
             const ApsisGravityPoint *point = &gravity->points[point_index];
             const uint8_t angle = (uint8_t)(48u + degree * 8u);
             int16_t x, y;
@@ -257,7 +256,7 @@ void apsis_visual_render_gravity(ApsisVisualRaster *raster,
 
             if (ring == gravity->selected_ring && degree == gravity->selected_point_degree)
                 apsis_visual_circle(raster, x, y, 5, APSIS_VISUAL_GRAVITY);
-            if (degree == gravity->degree && ring == gravity->voicing)
+            if (degree == gravity->degree && ring == gravity->selected_ring)
                 apsis_visual_disc(raster, x, y, 3, APSIS_VISUAL_GRAVITY);
         }
     }
