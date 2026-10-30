@@ -9,6 +9,14 @@
 #define DEFAULT_FRAMES ((8400u + 1000u) * 44100u / 1000u)
 #define SHORT_FRAMES (6000u * 44100u / 1000u)
 
+#define P6_FDN_DEFAULT_PEAK 217
+#define P6_FDN_DEFAULT_HASH 0xa190ca86u
+#define P6_FDN_DEFAULT_LATE_ENERGY 2646000ull
+#define P6_FDN_DECAY4_LATE_ENERGY 1455300ull
+#define P6_FDN_DECAY12_LATE_ENERGY 3507773ull
+#define P6_FDN_DARK_HASH 0x7d4c13e3u
+#define P6_FDN_BRIGHT_HASH 0x7e1a4d9eu
+
 static int16_t clip16(int32_t x)
 {
     if (x > 32767) return 32767;
@@ -116,8 +124,9 @@ static void test_deterministic_garbage_independence(void)
     assert(a.hash == b.hash);
     assert(a.peak == b.peak);
     assert(a.late_energy == b.late_energy);
-    assert(a.peak > 0);
-    assert(a.late_energy > 0u);
+    assert(a.peak == P6_FDN_DEFAULT_PEAK);
+    assert(a.hash == P6_FDN_DEFAULT_HASH);
+    assert(a.late_energy == P6_FDN_DEFAULT_LATE_ENERGY);
     printf("PASS: P6 FDN default peak=%d hash=%08x late=%llu\n",
            a.peak, a.hash, (unsigned long long)a.late_energy);
     free(storage);
@@ -131,10 +140,14 @@ static void test_decay_and_damping_controls(void)
 
     short_decay = render_impulse(storage, (int16_t)0x2222, 4000u, 6200u, SHORT_FRAMES);
     long_decay = render_impulse(storage, (int16_t)0x3333, 12000u, 6200u, SHORT_FRAMES);
+    assert(short_decay.late_energy == P6_FDN_DECAY4_LATE_ENERGY);
+    assert(long_decay.late_energy == P6_FDN_DECAY12_LATE_ENERGY);
     assert(long_decay.late_energy > short_decay.late_energy * 2u);
 
     dark = render_impulse(storage, (int16_t)0x4444, 8400u, 2200u, SHORT_FRAMES);
     bright = render_impulse(storage, (int16_t)0x5555, 8400u, 6800u, SHORT_FRAMES);
+    assert(dark.hash == P6_FDN_DARK_HASH);
+    assert(bright.hash == P6_FDN_BRIGHT_HASH);
     assert(dark.hash != bright.hash);
     assert(dark.peak > 0 && bright.peak > 0);
 
