@@ -152,7 +152,7 @@ static void test_storage_layout_and_no_clear(void)
     storage_fill(&s, (int16_t)0x4567);
     assert(!apsis_space_room_bind(&room,
         s.history, APSIS_SPACE_HISTORY_STORAGE_SAMPLES - 1u,
-        s.echo, APSIS_SPACE_ECHO_STORAGE_SAMPLES,
+        s.echo, APSIS_SPACE_ECHO_STORAGE_STORAGE_SAMPLES,
         s.fdn, APSIS_SPACE_FDN_STORAGE_SAMPLES));
     bind_room(&room, &s);
     assert(s.history[0] == (int16_t)0x4567);
@@ -201,17 +201,19 @@ static void test_room_determinism_and_controls(void)
     assert(a.peak == b.peak);
     assert(a.late_energy == b.late_energy);
     assert(a.first_nonzero == b.first_nonzero);
-    assert(a.peak > 0);
-    assert(a.late_energy > 0u);
+    assert(a.peak == 47);
+    assert(a.hash == 0x1350a6dau);
+    assert(a.late_energy == 1278900u);
+    assert(a.first_nonzero == 927u);
 
     state.echo_feedback_q15 = 0u;
     no_echo = render_impulse(&s, (int16_t)0x3333, &state, ROOM_FRAMES);
-    assert(no_echo.hash != a.hash);
+    assert(no_echo.hash == 0x97669507u);
 
     state = default_space();
     state.damping_hz = 2200u;
     dark = render_impulse(&s, (int16_t)0x4444, &state, ROOM_FRAMES);
-    assert(dark.hash != a.hash);
+    assert(dark.hash == 0x5ff1f59au);
     assert(dark.late_energy != a.late_energy);
 
     printf("PASS: P6 room default peak=%d hash=%08x late=%llu first=%u\n",
