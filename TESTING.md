@@ -11,23 +11,20 @@ This file records what has actually been verified. Do not promote a result to a 
 5. emulator smoke
 6. physical FM-1 hardware
 
-Physical FM-1 is not currently available. Nothing below is promoted to level 6.
+Physical FM-1 is not currently available. Nothing below is level 6.
 
 ## Pinned baseline
 
-- Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
-- Dinghy tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`
-- APSIS product `FM-1_972`
+- Dinghy `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
+- tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`
+- product `FM-1_972`
 - target image budget 581,564 B
-- RAM `.data + .bss` budget 98,304 B
-- pool budget 344,064 B
-- 44.1 kHz, 256-frame callback
+- RAM budget 98,304 B
+- POOL budget 344,064 B
+- source/output rate 44.1 kHz, 256-frame callback
 
 ## Frozen Phase-3 runtime
 
-M3c merged `ec0dc0b350793572f19040efc938f00121128dc6` via PR #6.
-
-Host invariants:
 - `sizeof(ApsisRuntime)=21,928 B`
 - queue 352/512 canonical; 357/512 extreme
 - Spiral slots 59/64
@@ -36,129 +33,115 @@ Host invariants:
 - late `0e6fc422`
 - normal + ASAN/UBSAN agree
 
-Pinned emulator invariants:
+## Frozen Phase-5 / M4g target
+
+- image 100,944 B
+- RAM 87,336 B
+- pool 30,720 B
+- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+- dry PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 - queue 28/512
 - overflow 0
 - late flags 0
-- cursor **123,648 exactly**
+- cursor **123,648**
 - late trace `811c9dc5`
 
-## Phase 4 merged dry engines
-
-- M4a String persistent: `2ea217f09c143d30385f136e84e2b29d582987a0`
-  - Classic 1477 / `b20610c1`
-  - Dual L/R 823/787 / `10d23cf4`
-- M4b String finite/Rhythm: `c96c00debf9a67948f1e874e36b090999dacadb9`
-  - transient 1309 / `97142d3e`
-  - BODY 947 / `c1168570`
-  - 80 logical +32 fade-tail reserve
-- M4c String Attractor: `6fcdd8ff5330a9b3ed4ffaa93f3e940e41b7c5cc`
-  - shared heap 415/512; pending 60/64
-  - advances/mutations/binds 1470/1470/2884
-  - random `b7a9a395`; late `e777a771`
-- M4d Drift: `d7e39e2481c33628f402bed51d761b8be8304bb3`
-  - host 488 / `0aec6bc2`
-- M4e Clock: `db9d0b3ecbc7931be343cec7717103059d3c5160`
-  - STONE 2081 / `edcc4a81`
-  - GLASS 1880 / `0adf9829`
-  - SNAP 738 / `04bc514a`
-  - pool stress 23/32, 176 triggers, 0 drops
-- M4f Spiral: `734229f4d23626a176a8366de82aab2c58c48cc9`
-  - THREAD 1230 / `aef6c83e`
-  - GLASS 1157 / `9efa9bdc`
-  - REED 967 / `e67a3c15`
-  - HALO 1256 / `e7ed6161`
-  - stress 30/32 legs, 90 oscillators, 0 steals/drops, `02be4bc5`
-- M4g Bloom: `713a1e9ac746a1a4d19ba825a0e6765b337ba410`
-  - VEIL 175 / `6177470f`
-  - CHOIR 143 / `4b2969f8`
-  - ORGAN 122 / `d54a68d9`
-  - GLASS 129 / `ca1c3127`
-  - stress 186 triggers, 125/136 petals, 375 oscillators, 0 drops, peak 266, `5881bb36`
-
-## M4g real target baseline
-
-Final M4g documentation head `f3633cec98a71108bc64d57049ed24064f9632a3` passed core #299 + staged #288 before merge via PR #13.
-
-Real target:
-- image **100,944 / 581,564 B**
-- RAM **87,336 / 98,304 B**
-- RAM headroom **10,968 B**
-- pool **30,720 / 344,064 B**
-- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- product `FM-1_972`
-
-Pinned default emulator:
-- PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- peak 856; RMS 144/144; stereo delta 125; mean -2/-2
-- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
-
-Bloom bypass exactly returns to frozen M4f:
-- image/RAM/pool 95,804 / 58,056 / 30,720 B
+M4f Bloom-bypass remains independently frozen:
+- image 95,804 B
+- RAM 58,056 B
+- pool 30,720 B
 - package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-- same PCM/runtime telemetry as M4f
+- same dry PCM/runtime telemetry and cursor 123,648
 
-## Phase 5 — sounding-source structural integration
+## Phase 6 host/reference evidence
 
-Active PR #15, branch `p5-sounding-integration`, base merged M4g `713a1e9a…`.
+Selected compact 8-line modulated FDN:
+- default peak 217 / hash `a190ca86` / late 2,646,000
+- decay4 1,455,300
+- decay12 3,507,773
+- dark `7d4c13e3`
+- bright `7e1a4d9e`
 
-Technically final verification head before docs freeze:
-- `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`
-- APSIS core #357 PASS
-- APSIS staged validation #346 PASS
+Full host room:
+- default peak 47
+- hash `1350a6da`
+- late 1,278,900
+- first non-zero sample 927
+- no-echo `97669507`
+- dark `5ff1f59a`
 
-### P5a — structural late binding
+Normal and ASAN/UBSAN gates are clean. The host/reference room remains 44.1 kHz.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5a structural late binding reaches sounding Spiral/Bloom DSP`
-- verifies structural state mutation through existing M3c bind to actual finite Spiral/Bloom oscillator phase increment
-- occurrence token, target sample and occurrence-frozen acoustic values remain unchanged
+## Phase 6 target architecture
 
-### P5b — quantized Gravity
+One shared post-Mother room with sends:
+- String 0.72
+- Drift 0.20
+- Clock 0.06
+- Spiral 0.62
+- Bloom 0.58
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5b quantized Gravity asymmetry reaches sounding Spiral/Bloom DSP`
-- Spiral uses committed state only at its target−80 ms bind
-- Bloom may project ordinary pending Gravity target-aware under the frozen +0.5 ms rule
+Long storage is in dedicated pre-`.pool` NOLOAD memory and self-initialises through fill/valid counters.
 
-### P5c — Mother `->1`
+The generated FM-1 target uses a quarter-rate room renderer at **11.025 kHz**. Source engines, scheduler and final output remain 44.1 kHz. Target-only retiming preserves room milliseconds, early taps, predelay, echo delay, FDN decay/damping and modulation rate.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5c Mother held Gravity reaches sounding sources only after ->1 commit`
-- Mother-held future state is not projected by Spiral or Bloom before the structural commit
+## Final technical Phase-6 verification head
 
-### P5d — Chain discrete
+Head before final documentation freeze: `0ec9915f9d994454aa079a5be107765844534666`.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5d Chain discrete boundary reaches sounding Spiral/Bloom in source order`
-- verifies existing early Chain observation and subsequent M3c late-bound sounding consumers without another scheduler
+- core #416: **PASS**
+- staged #405: **PASS all gates**
+- P6 final #14: **PASS all gates**
 
-### P5e — Chain continuous morph
+The staged multi-variant reporter was corrected on this head to parse the final resource summary in the append-only target log. This restored truthful M4f Bloom-bypass reporting without changing firmware bytes.
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5e Chain continuous Drift morph begins on target and reaches sounding DSP`
-- verifies source-defined continuous morph timing reaches the actual persistent Drift renderer
+### Real target, audible P6
 
-### P5f — step-one free-run/resync
+- product `FM-1_972`
+- image **107,352 / 581,564 B**
+- RAM **87,780 / 98,304 B**
+- RAM headroom 10,524 B
+- POOL **309,532 / 344,064 B**
+- POOL headroom 34,532 B
 
-Normal + ASAN/UBSAN:
-- PASS: `APSIS P5f step-one RESYNC OFF free-runs into sounding Spiral energy`
-- source trigger position is taken from the existing frozen M3c Spiral slot/token; M4f acoustic snapshots are not expanded to duplicate scheduler identity
+Pinned emulator:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- peak 856
+- RMS 144/144
+- stereo delta 126
+- queue 28/512
+- overflow 0
+- late flags 0
+- cursor **123,392**
+- late trace `811c9dc5`
 
-### Phase-5 production-impact proof
+### P6 dry-only regression
 
-Phase 5 required no production scheduler/DSP/runtime change.
+The same P6 target/source-split/storage path with final room return omitted produces:
+- exact Phase-5 PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- queue 28/512
+- overflow 0
+- late flags 0
+- cursor **123,392**
+- late trace `811c9dc5`
 
-Staged #346 rebuilt the exact M4g target:
-- image **100,944 B**
-- RAM **87,336 B**
-- pool **30,720 B**
-- package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
-- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512; overflow 0; late flags 0; cursor 123,648; late trace `811c9dc5`
+The shared 123,392 value for audible and dry-only P6 variants is treated as the explicit Phase-6 boot-to-stop scenario baseline. It is one 256-frame callback below the historical M4g scenario but does not coincide with late flags, queue overflow, trace divergence, or a scheduler change.
 
-The same staged run passed the exact frozen M4f Bloom-bypass gate. Therefore Phase 5 consumed **0 additional static RAM** and did not change target audio/runtime identity.
+### Historical silent-storage gate
+
+Before audible integration, the selected 44.1-kHz conservative storage probe used 305,436 / 344,064 B POOL and preserved the old 123,648 dry cursor. This proved the pre-`.pool` NOLOAD placement itself does not perturb boot timing.
+
+## Current verification boundary
+
+Phase 6 is verified through level 5: implementation, desktop/reference tests, sanitizers, real JieLi target build and pinned emulator.
+
+Still unverified until physical hardware exists:
+- real ISR-cycle margin
+- actual DAC/audio listening quality
+- full physical controls/LED/display behaviour
+- worst-case combined UI/audio load
+- power-loss persistence behaviour
 
 ## Next verification
 
-Run core + full staged validation on the exact Phase-5 final documentation head. If both pass, merge PR #15 with a guarded squash merge. Only then begin Phase 6 Space/Cathedral prototyping from the actual merge commit.
+Run the same core + staged + P6-final gates on the final documentation head, then guarded-merge PR #16.
