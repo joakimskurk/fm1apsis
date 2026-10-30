@@ -77,6 +77,32 @@ static void process_to(ApsisRuntime *r, ApsisState *s, ApsisKeepBank *bank,
     }
 }
 
+static void process_to_consuming(ApsisRuntime *r, ApsisState *s,
+                                 ApsisKeepBank *bank,
+                                 ApsisChainSequence *chain,
+                                 ApsisMotherPending *mother,
+                                 ApsisBloomVoicingState *bloom,
+                                 ApsisSpiralAudioRuntime *spiral,
+                                 ApsisBloomAudioRuntime *bloom_audio,
+                                 ApsisPersistentAudioQueue *queue,
+                                 ApsisStringPitchMemory *pitch,
+                                 ApsisStructuralAudioStats *stats,
+                                 ApsisStringDsp *string_dsp,
+                                 ApsisDriftDsp *drift_dsp,
+                                 uint64_t target,
+                                 ApsisRuntimeMotherApplyFn mother_apply,
+                                 void *mother_user)
+{
+    while (r->cursor_sample < target) {
+        uint64_t remain = target - r->cursor_sample;
+        uint32_t frames = remain > 256u ? 256u : (uint32_t)remain;
+        process_frames(r, s, bank, chain, mother, bloom, spiral, bloom_audio,
+                       queue, pitch, stats, frames, mother_apply, mother_user);
+        (void)apsis_persistent_audio_apply_through(queue, r->cursor_sample,
+                                                   string_dsp, drift_dsp);
+    }
+}
+
 static void setup_one_pulse_chain(ApsisState *s, ApsisKeepBank *bank,
                                   ApsisChainSequence *chain)
 {
@@ -126,7 +152,7 @@ static void test_three_structural_sources_share_one_target(void)
     ApsisStringDsp string_dsp;
     ApsisDriftDsp drift_dsp;
     ApsisClockState fastest;
-    uint64_t target, gravity_observe, min_pulse;
+    uint64_t target, mother_observe, chain_observe, gravity_observe, min_pulse;
     uint32_t mother_calls = 0u;
 
     init_all(&s, &r, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio, &pitch);
@@ -152,33 +178,64 @@ static void test_three_structural_sources_share_one_target(void)
     apsis_runtime_chain_start(&r, &s, &chain);
     apsis_runtime_start_bloom_audio(&r, &s, 0, &spiral, &bloom_audio);
 
-    /* Consume target 0 so the next Clock target can carry the legal maximum
-     * same-target structural cluster. */
+    /* First callback fills the 1.20 s lookahead through absolute pulse 2 and
+     * consumes Chain target 0. The scheduler frontier is therefore pulse 3. */
     process_frames(&r, &s, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio,
                    &queue, &pitch, &stats, 256u, 0, 0);
     assert(stats.chain_captures == 1u);
     assert(queue.count == 1u && queue.event[0].sample == 0u);
     assert(apsis_persistent_audio_apply_through(&queue, 0u,
                                                 &string_dsp, &drift_dsp) == 1u);
-    apsis_structural_audio_stats_reset(&stats);
 
-    /* Gravity is requested while Mother hold is OFF so it owns the ordinary
-     * quantized pending slot. change_grid=12 makes every Clock pulse a legal
-     * Gravity boundary for the default 12-step meter. */
-    s.gravity.change_grid = 12u;
+    /* Gravity is requested while Mother hold is OFF. With change_grid=1 only
+     * Clock step 1 / cycle boundaries are legal Gravity targets, so the
+     * scheduler-frontier search lands on absolute pulse 12. */
+    s.gravity.change_grid = 1u;
     assert(apsis_runtime_request_gravity(&r, &s, &mother, 4u, 2u,
                                          r.cursor_sample, 0u) == 3u);
     target = r.gravity_pending.target_sample;
-    assert(target == 18375u);
+    assert(target > r.cursor_sample);
 
-    /* Then arm Mother for the same next pulse. This is a legal user sequence:
-     * an already-pending ordinary Gravity edit may coexist with a subsequently
-     * armed Mother hold. Chain is already one-cell-per-pulse. */
+    /* Arm Mother after the ordinary Gravity request. Horizon 8 from audible
+     * absolute step 0 cannot commit until a Clock-step-1 boundary; the first
+     * such boundary satisfying elapsed>=8 is the same absolute pulse 12.
+     * Chain is one-cell-per-pulse, so it also applies at that target. */
     apsis_mother_set_sync(&s.mother, &mother, 1u);
-    apsis_mother_set_horizon(&s.mother, &mother, 1u, 0);
+    apsis_mother_set_horizon(&s.mother, &mother, 8u, 0);
     assert(apsis_mother_queue_param(&mother, 10u, APSIS_Q15_MILLI(777), 0));
 
+    mother_observe = target - ms_samples(26u);
+    chain_observe = target - ms_samples(24u);
     gravity_observe = target - ms_samples(18u);
+    assert(mother_observe < chain_observe && chain_observe < gravity_observe);
+
+    /* Model the real audio side while approaching the cluster: previously
+     * queued Chain targets are consumed at their true target samples. Stop
+     * immediately before Mother target-26 ms so the queue is empty and the
+     * cluster high-water can be measured independently. */
+    process_to_consuming(&r, &s, &bank, &chain, &mother, &bloom,
+                         &spiral, &bloom_audio, &queue, &pitch, &stats,
+                         &string_dsp, &drift_dsp, mother_observe,
+                         mother_apply_test, &mother_calls);
+    assert(queue.count == 0u);
+    apsis_structural_audio_stats_reset(&stats);
+    mother_calls = 0u;
+    queue.high_water = 0u;
+    queue.overflowed = 0u;
+
+    process_frames(&r, &s, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio,
+                   &queue, &pitch, &stats, 1u,
+                   mother_apply_test, &mother_calls);
+    assert(queue.count == 1u && queue.event[0].sample == target);
+
+    process_to(&r, &s, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio,
+               &queue, &pitch, &stats, chain_observe,
+               mother_apply_test, &mother_calls);
+    process_frames(&r, &s, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio,
+                   &queue, &pitch, &stats, 1u,
+                   mother_apply_test, &mother_calls);
+    assert(queue.count == 2u);
+
     process_to(&r, &s, &bank, &chain, &mother, &bloom, &spiral, &bloom_audio,
                &queue, &pitch, &stats, gravity_observe,
                mother_apply_test, &mother_calls);
@@ -198,17 +255,17 @@ static void test_three_structural_sources_share_one_target(void)
     assert(queue.event[1].sample == target);
     assert(queue.event[2].sample == target);
 
-    /* Same-target stable serial order applies all three at the target and
-     * leaves one coherent final persistent target for subsequent rendering. */
+    /* Same-target stable serial order applies all three at the target. */
     assert(apsis_persistent_audio_apply_through(&queue, target - 1u,
                                                 &string_dsp, &drift_dsp) == 0u);
     assert(apsis_persistent_audio_apply_through(&queue, target,
                                                 &string_dsp, &drift_dsp) == 3u);
     assert(queue.count == 0u);
 
-    printf("M5A_CAPACITY high_water=%u provisional_cap=%u min_pulse=%llu lead26=%llu captures=%u/%u/%u drops=%u\n",
+    printf("M5A_CAPACITY high_water=%u provisional_cap=%u target=%llu min_pulse=%llu lead26=%llu captures=%u/%u/%u drops=%u\n",
            (unsigned)queue.high_water,
            (unsigned)APSIS_PERSISTENT_AUDIO_QUEUE_CAP,
+           (unsigned long long)target,
            (unsigned long long)min_pulse,
            (unsigned long long)ms_samples(26u),
            (unsigned)stats.mother_captures,
