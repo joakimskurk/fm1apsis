@@ -59,6 +59,10 @@ static ApsisBloomAudioBinding make_binding(const ApsisState *s, uint8_t voice,
 
 static void test_voice_vectors(void)
 {
+    static const uint32_t expected_peak[4] = {175u, 143u, 122u, 129u};
+    static const uint32_t expected_hash[4] = {
+        0x6177470fu, 0x4b2969f8u, 0xd54a68d9u, 0xca1c3127u
+    };
     ApsisState s;
     ApsisBloomAcousticPlan plan;
     ApsisBloomDsp dsp;
@@ -93,8 +97,10 @@ static void test_voice_vectors(void)
             assert(dsp.petal[0].env_event_sample[0] == 572u);
         }
         hash = render_hash(&dsp, 97020u, &peak); /* 2.2 seconds */
-        printf("M4g Bloom voice %u peak/hash %u / %08x\n",
+        printf("M4G_REF voice=%u peak=%u hash=%08x\n",
                (unsigned)voice, (unsigned)peak, (unsigned)hash);
+        assert(peak == expected_peak[voice]);
+        assert(hash == expected_hash[voice]);
         assert(apsis_bloom_dsp_active(&dsp) == 0u);
         assert(dsp.drop_count == 0u);
     }
@@ -128,7 +134,7 @@ static void test_target_delay_is_exact(void)
     assert(dsp.petal[0].age_samples == 22u);
 }
 
-static void test_provisional_worst_case_capacity(void)
+static void test_frozen_worst_case_capacity(void)
 {
     ApsisState s;
     ApsisBloomAcousticPlan plan;
@@ -148,6 +154,7 @@ static void test_provisional_worst_case_capacity(void)
     s.bloom.brightness_q15 = APSIS_Q15_ONE;
     apsis_bloom_audio_plan(&s, 5u, &plan);
     assert(plan.valid == 1u && plan.count == 5u);
+    assert(APSIS_BLOOM_DSP_PETAL_CAP == 136u);
     apsis_bloom_dsp_reset(&dsp);
 
     while (block_start < total_frames) {
@@ -183,24 +190,28 @@ static void test_provisional_worst_case_capacity(void)
         block_start = block_end;
     }
 
-    printf("M4g Bloom stress triggers=%u petals=%u/%u oscs=%u drops=%u peak=%u hash=%08x\n",
+    printf("M4G_STRESS triggers=%u petals=%u/%u oscs=%u drops=%u peak=%u hash=%08x sizeof=%u\n",
            (unsigned)dsp.trigger_count,
            (unsigned)dsp.petal_high_water,
            (unsigned)APSIS_BLOOM_DSP_PETAL_CAP,
            (unsigned)dsp.oscillator_high_water,
            (unsigned)dsp.drop_count,
            (unsigned)peak,
-           (unsigned)hash);
-    assert(dsp.trigger_count > 150u);
-    assert(dsp.petal_high_water < APSIS_BLOOM_DSP_PETAL_CAP);
+           (unsigned)hash,
+           (unsigned)sizeof(ApsisBloomDsp));
+    assert(dsp.trigger_count == 186u);
+    assert(dsp.petal_high_water == 125u);
+    assert(dsp.oscillator_high_water == 375u);
     assert(dsp.drop_count == 0u);
+    assert(peak == 266u);
+    assert(hash == 0x5881bb36u);
 }
 
 int main(void)
 {
     test_voice_vectors();
     test_target_delay_is_exact();
-    test_provisional_worst_case_capacity();
-    puts("PASS: APSIS M4g Bloom finite renderer and provisional capacity probe");
+    test_frozen_worst_case_capacity();
+    puts("PASS: APSIS M4g frozen Bloom renderer and capacity gate");
     return 0;
 }
