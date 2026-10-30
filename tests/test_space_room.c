@@ -178,10 +178,11 @@ static void test_early_reflections_are_direct(void)
     RoomStats early;
     state.mix_q15 = 0u;
     state.echo_feedback_q15 = 0u;
-    early = render_impulse(&s, (int16_t)0x2222, &state, 20000u);
+    early = render_impulse(&s, (int16_t)0x2222, &state, 70000u);
 
     /* 21 ms = 926.1 samples. History validity makes the first fractional tap
-     * observable on the next complete sample; it must not arrive early. */
+     * observable on the next complete sample; it must not arrive early. The
+     * final one-second measurement window begins long after the 109-ms last tap. */
     assert(early.first_nonzero >= 926u && early.first_nonzero <= 928u);
     assert(early.peak > 0);
     assert(early.late_energy == 0u);
