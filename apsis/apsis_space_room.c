@@ -103,35 +103,33 @@ static int32_t space_room_abs_i32(int32_t v)
     return v < 0 ? -v : v;
 }
 
-static int32_t space_room_mul_q15(int32_t a, int32_t b)
+static int32_t space_room_round_shift(int64_t v, uint8_t bits)
 {
-    int64_t p = (int64_t)a * b;
-    if (p >= 0) p += 16384;
-    else p -= 16384;
-    return (int32_t)(p >> 15);
+    int64_t half = (int64_t)1 << (bits - 1u);
+    if (v >= 0) return (int32_t)((v + half) >> bits);
+    return -(int32_t)(((-v) + half) >> bits);
 }
 
-static int32_t space_room_shift_q30(int64_t v)
+static int32_t space_room_mul_q15(int32_t a, int32_t b)
 {
-    if (v >= 0) v += (int64_t)1 << 29;
-    else v -= (int64_t)1 << 29;
-    return (int32_t)(v >> 30);
+    return space_room_round_shift((int64_t)a * b, 15u);
 }
 
 static int32_t space_room_biquad(ApsisSpaceBiquadState *s,
                                  const SpaceRoomBiquadCoeff *c,
-                                 int32_t x)
+                                 int32_t x_q15)
 {
-    const int64_t q30 = (int64_t)1 << 30;
-    int32_t y;
-    int64_t z;
-    if (!s || !c) return x;
-    y = space_room_shift_q30((int64_t)c->b0 * x + (int64_t)s->z1_q15 * q30);
-    z = (int64_t)c->b1 * x - (int64_t)c->a1 * y + (int64_t)s->z2_q15 * q30;
-    s->z1_q15 = space_room_shift_q30(z);
-    z = (int64_t)c->b2 * x - (int64_t)c->a2 * y;
-    s->z2_q15 = space_room_shift_q30(z);
-    return y;
+    int64_t x_q30;
+    int32_t y_q30;
+    if (!s || !c) return x_q15;
+
+    /* Keep 15 extra signal bits through the recursive state. Coefficients are
+     * Q30, so b*x and z are Q60. Only the public filter input/output is Q15. */
+    x_q30 = (int64_t)x_q15 * 32768;
+    y_q30 = space_room_round_shift((int64_t)c->b0 * x_q30 + s->z1_q60, 30u);
+    s->z1_q60 = (int64_t)c->b1 * x_q30 - (int64_t)c->a1 * y_q30 + s->z2_q60;
+    s->z2_q60 = (int64_t)c->b2 * x_q30 - (int64_t)c->a2 * y_q30;
+    return space_room_round_shift(y_q30, 15u);
 }
 
 /* Exact rounded Q16 frames for integer milliseconds at 44.1 kHz using only
@@ -353,10 +351,10 @@ void apsis_space_room_reset(ApsisSpaceRoom *room)
     room->target_echo_feedback_q15 = 0;
     room->params_initialized = 0u;
     for (ch = 0u; ch < 2u; ++ch) {
-        room->guard_hp[ch].z1_q15 = room->guard_hp[ch].z2_q15 = 0;
-        room->guard_lp[ch].z1_q15 = room->guard_lp[ch].z2_q15 = 0;
-        room->tail_hp[ch].z1_q15 = room->tail_hp[ch].z2_q15 = 0;
-        room->echo_lp[ch].z1_q15 = room->echo_lp[ch].z2_q15 = 0;
+        room->guard_hp[ch].z1_q60 = room->guard_hp[ch].z2_q60 = 0;
+        room->guard_lp[ch].z1_q60 = room->guard_lp[ch].z2_q60 = 0;
+        room->tail_hp[ch].z1_q60 = room->tail_hp[ch].z2_q60 = 0;
+        room->echo_lp[ch].z1_q60 = room->echo_lp[ch].z2_q60 = 0;
     }
     apsis_space_fdn_reset(&room->fdn);
 }
