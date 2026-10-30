@@ -59,60 +59,76 @@ jobs:
           bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 | tee build/evidence/emulator_smoke.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke
 
-      - name: Gate 5b - Clock DSP bypass preserves frozen M4d PCM
+      - name: Gate 5b - Spiral DSP bypass preserves frozen M4e target and PCM
         shell: bash
         run: |
           set -euo pipefail
-          cp build/target_report.json build/evidence/m4e-default-target-report.json
-          cp build/SHA256SUMS build/evidence/m4e-default-SHA256SUMS
-          cp build/apsis-0.1-dev.fwsc build/m4e-default-fw-backup.fwsc
+          cp build/target_report.json build/evidence/m4f-default-target-report.json
+          cp build/SHA256SUMS build/evidence/m4f-default-SHA256SUMS
+          cp build/apsis-0.1-dev.fwsc build/m4f-default-fw-backup.fwsc
 
-          APSIS_CI_CLOCK_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis.sh
+          APSIS_CI_SPIRAL_DSP_OFF=1 APSIS_VERSION=0.1-dev bash ci/apply_apsis.sh
           APSIS_VERSION=0.1-dev bash ci/build_apsis_target.sh
-          cp build/target_report.json build/evidence/m4e-clock-bypass-target-report.json
-          cp build/SHA256SUMS build/evidence/m4e-clock-bypass-SHA256SUMS
+          cp build/target_report.json build/evidence/m4f-spiral-bypass-target-report.json
+          cp build/SHA256SUMS build/evidence/m4f-spiral-bypass-SHA256SUMS
 
           set -o pipefail
           bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
-            | tee build/evidence/emulator_clock_bypass.txt
-          cp -a work/emu-smoke build/evidence/emulator-smoke-clock-bypass
+            | tee build/evidence/emulator_spiral_bypass.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-spiral-bypass
 
           python3 - <<'PY'
           import json
           from pathlib import Path
+
+          target = json.loads(Path('build/target_report.json').read_text())
+          expected_target = {
+              'image': 90684,
+              'ram': 49128,
+              'pool': 30720,
+              'package_sha256': '74bd7f01a7fef75985350be04e721acda0e49075b9a47b8b2bd4eb170924200b',
+              'product': 'FM-1_972',
+          }
+          for key, expected in expected_target.items():
+              actual = target.get(key)
+              if actual != expected:
+                  raise SystemExit(
+                      f'FAIL: M4f Spiral bypass target {key}={actual!r} != frozen M4e {expected!r}'
+                  )
+
           report = json.loads(Path('work/emu-smoke/report.json').read_text())
-          expected_pcm = '539e4192134d62d5f941ea21111157f763e92d0db5007f8157ca023db7c975f7'
+          expected_pcm = '6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b'
           if report.get('wav_raw_sha256') != expected_pcm:
               raise SystemExit(
-                  'FAIL: M4e Clock DSP bypass changed frozen M4d PCM: '
+                  'FAIL: M4f Spiral DSP bypass changed frozen M4e PCM: '
                   f"{report.get('wav_raw_sha256')} != {expected_pcm}"
               )
           if report.get('runtime_queue_high_water') != 28:
               raise SystemExit(
-                  f"FAIL: M4e bypass queue high-water {report.get('runtime_queue_high_water')} != 28"
+                  f"FAIL: M4f bypass queue high-water {report.get('runtime_queue_high_water')} != 28"
               )
           if report.get('runtime_queue_overflowed') != 0:
-              raise SystemExit('FAIL: M4e bypass runtime queue overflow')
+              raise SystemExit('FAIL: M4f bypass runtime queue overflow')
           if report.get('runtime_late_flags') != 0:
               raise SystemExit(
-                  f"FAIL: M4e bypass late flags {report.get('runtime_late_flags')}"
+                  f"FAIL: M4f bypass late flags {report.get('runtime_late_flags')}"
               )
           if report.get('runtime_cursor_low32') != 123648:
               raise SystemExit(
-                  f"FAIL: M4e bypass cursor {report.get('runtime_cursor_low32')} != 123648"
+                  f"FAIL: M4f bypass cursor {report.get('runtime_cursor_low32')} != 123648"
               )
           if report.get('runtime_late_trace_hash') != '811c9dc5':
               raise SystemExit(
-                  'FAIL: M4e bypass late trace '
+                  'FAIL: M4f bypass late trace '
                   f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
               )
-          print('PASS: M4e Clock DSP bypass preserves frozen M4d PCM/runtime')
+          print('PASS: M4f Spiral DSP bypass exactly preserves frozen M4e target/PCM/runtime')
           PY
 
-          cp build/m4e-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
-          cp build/evidence/m4e-default-target-report.json build/target_report.json
-          cp build/evidence/m4e-default-SHA256SUMS build/SHA256SUMS
-          rm -f build/m4e-default-fw-backup.fwsc
+          cp build/m4f-default-fw-backup.fwsc build/apsis-0.1-dev.fwsc
+          cp build/evidence/m4f-default-target-report.json build/target_report.json
+          cp build/evidence/m4f-default-SHA256SUMS build/SHA256SUMS
+          rm -f build/m4f-default-fw-backup.fwsc
 
       - name: Upload Phase 1 evidence
         if: always()
