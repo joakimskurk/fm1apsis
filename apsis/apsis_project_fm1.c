@@ -54,16 +54,13 @@ void apsis_project_fm1_reset(ApsisProjectFm1 *store)
     for (i = 0u; i < APSIS_PROJECT_RECORD_SIZE; ++i) store->record[i] = 0u;
 }
 
-int apsis_project_fm1_load(ApsisProjectFm1 *store,
-                           ApsisKeepBank *keep,
-                           ApsisChainSequence *chain,
-                           ApsisChainState *chain_settings)
+int apsis_project_fm1_prefetch(ApsisProjectFm1 *store)
 {
-    ApsisProjectRecordInfo a, b;
+    ApsisProjectRecordInfo a, b, chosen;
     uint8_t va, vb, pick;
-    uint32_t at, generation = 0u;
+    uint32_t at;
     int rc;
-    if (!store || !keep || !chain || !chain_settings || !flash_ok) return -1;
+    if (!store || !flash_ok) return -1;
 
     va = project_fm1_read_valid(store, 0u, &a) == 0 ? 1u : 0u;
     vb = project_fm1_read_valid(store, 1u, &b) == 0 ? 1u : 0u;
@@ -79,21 +76,47 @@ int apsis_project_fm1_load(ApsisProjectFm1 *store,
 
     at = project_fm1_addr(pick);
     rc = st_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
-    if (rc) {
-        store->last_result = (int16_t)rc;
-        return rc;
-    }
+    if (rc) goto done;
+    rc = apsis_project_record_inspect(store->record,
+                                      APSIS_PROJECT_RECORD_SIZE, &chosen);
+    if (rc) goto done;
+    store->active_slot = (int8_t)pick;
+    store->generation = chosen.generation;
+    rc = 0;
+
+done:
+    store->last_result = (int16_t)rc;
+    return rc;
+}
+
+int apsis_project_fm1_apply_prefetched(ApsisProjectFm1 *store,
+                                       ApsisKeepBank *keep,
+                                       ApsisChainSequence *chain,
+                                       ApsisChainState *chain_settings)
+{
+    uint32_t generation = 0u;
+    int rc;
+    if (!store || !keep || !chain || !chain_settings) return -1;
+    if (store->active_slot < 0) return store->last_result == 1 ? 1 : -1;
+
     rc = apsis_project_record_decode(store->record,
                                      APSIS_PROJECT_RECORD_SIZE,
                                      keep, chain, chain_settings, &generation);
-    if (rc) {
-        store->last_result = (int16_t)rc;
-        return rc;
-    }
-    store->active_slot = (int8_t)pick;
-    store->generation = generation;
-    store->last_result = 0;
-    return 0;
+    if (!rc && generation != store->generation) rc = -10;
+    store->last_result = (int16_t)rc;
+    return rc;
+}
+
+int apsis_project_fm1_load(ApsisProjectFm1 *store,
+                           ApsisKeepBank *keep,
+                           ApsisChainSequence *chain,
+                           ApsisChainState *chain_settings)
+{
+    int rc;
+    if (!store || !keep || !chain || !chain_settings) return -1;
+    rc = apsis_project_fm1_prefetch(store);
+    if (rc) return rc;
+    return apsis_project_fm1_apply_prefetched(store, keep, chain, chain_settings);
 }
 
 void apsis_project_fm1_request_save(ApsisProjectFm1 *store)

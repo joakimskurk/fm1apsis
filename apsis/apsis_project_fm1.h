@@ -14,7 +14,16 @@ typedef struct {
 
 void apsis_project_fm1_reset(ApsisProjectFm1 *store);
 
-/* Reads only. Safe to call during app startup before APSIS runtime_ready. */
+/* Phase-7 boot is deliberately split in two. prefetch() performs the NOR
+ * reads before FM-1 audio/DMA starts; apply_prefetched() later decodes only
+ * RAM after APSIS defaults and KEEP/CHAIN containers have been reset. */
+int apsis_project_fm1_prefetch(ApsisProjectFm1 *store);
+int apsis_project_fm1_apply_prefetched(ApsisProjectFm1 *store,
+                                       ApsisKeepBank *keep,
+                                       ApsisChainSequence *chain,
+                                       ApsisChainState *chain_settings);
+
+/* Convenience path used by host/fake-flash tests and non-audio callers. */
 int apsis_project_fm1_load(ApsisProjectFm1 *store,
                            ApsisKeepBank *keep,
                            ApsisChainSequence *chain,

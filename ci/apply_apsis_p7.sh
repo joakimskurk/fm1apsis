@@ -27,6 +27,25 @@ new = '''#define APSIS_PROJECT_FLASH_LO 0x000F4000u
 if old not in s:
     raise SystemExit('FAIL: P7 pinned Dinghy flash allow-list anchor missing')
 s = s.replace(old, new, 1)
+
+# Project NOR reads must happen before ALNK0 starts. Pinned Dinghy enters
+# app_main() only after audio/DMA has been enabled, so add one narrow pre-audio
+# application hook. The hook does read-only prefetch; all APSIS decode remains
+# in app_main after defaults are installed.
+decl = 'static void app_audio(int32_t *out, uint32_t n);\nstatic void app_main(void);'
+if decl not in s:
+    raise SystemExit('FAIL: P7 pre-audio declaration anchor missing')
+s = s.replace(decl,
+              'static void app_audio(int32_t *out, uint32_t n);\n'
+              'static void app_pre_audio_init(void);\n'
+              'static void app_main(void);', 1)
+start = '    fm1_adc_init();\n    fm1_audio_init(abuf, HALF_WORDS, isr_alnk0, 3);'
+if start not in s:
+    raise SystemExit('FAIL: P7 pre-audio call anchor missing')
+s = s.replace(start,
+              '    fm1_adc_init();\n'
+              '    app_pre_audio_init();\n'
+              '    fm1_audio_init(abuf, HALF_WORDS, isr_alnk0, 3);', 1)
 p.write_text(s)
 
 p = Path('work/apsis/firmware/src/dinghy.c')
@@ -69,16 +88,28 @@ if state_anchor not in s:
 s = s.replace(state_anchor,
               state_anchor + '\nstatic ApsisProjectFm1 project_store;', 1)
 
-# Load after defaults/KEEP/CHAIN reset but before the shared runtime is reset
-# and started. Empty sectors leave all defaults untouched.
+# The platform hook runs before ALNK0/DMA. It only discovers and buffers the
+# newest valid project record; no APSIS musical state is touched yet.
+pre_anchor = 'static ApsisProjectFm1 project_store;'
+pre_fn = '''static ApsisProjectFm1 project_store;
+
+static void app_pre_audio_init(void)
+{
+    apsis_project_fm1_reset(&project_store);
+    (void)apsis_project_fm1_prefetch(&project_store);
+}'''
+s = s.replace(pre_anchor, pre_fn, 1)
+
+# Once app_main has installed the normal defaults and reset KEEP/CHAIN, apply
+# only the already-prefetched RAM record. Empty flash leaves defaults untouched.
 load_anchor = '    apsis_chain_sequence_reset(&chain_sequence);'
 if load_anchor not in s:
-    raise SystemExit('FAIL: P7 project-load anchor missing')
+    raise SystemExit('FAIL: P7 project-apply anchor missing')
 s = s.replace(
     load_anchor,
     load_anchor +
-    '\n    apsis_project_fm1_reset(&project_store);'
-    '\n    (void)apsis_project_fm1_load(&project_store, &keep_bank, &chain_sequence, &apsis.chain);',
+    '\n    (void)apsis_project_fm1_apply_prefetched('
+    '\n        &project_store, &keep_bank, &chain_sequence, &apsis.chain);',
     1)
 
 # Prototype save gesture: once already on KEEP, pressing SAVE again requests a
@@ -114,11 +145,13 @@ s = s.replace(service_anchor, service, 1)
 p.write_text(s)
 PY
 
-# Static guardrails: the generated target must own exactly the intended sectors
-# and must keep all erase/program calls out of app_audio.
+# Static guardrails: the generated target must own exactly the intended sectors,
+# prefetch before audio starts, and keep all erase/program calls out of app_audio.
 grep -q 'APSIS_PROJECT_FLASH_LO 0x000F4000u' work/apsis/firmware/src/platform.c
 grep -q 'APSIS_PROJECT_FLASH_HI 0x000F6000u' work/apsis/firmware/src/platform.c
-grep -q 'apsis_project_fm1_load' work/apsis/firmware/src/dinghy.c
+grep -q 'app_pre_audio_init();' work/apsis/firmware/src/platform.c
+grep -q 'apsis_project_fm1_prefetch' work/apsis/firmware/src/dinghy.c
+grep -q 'apsis_project_fm1_apply_prefetched' work/apsis/firmware/src/dinghy.c
 grep -q 'project_store.save_pending && !apsis_runtime.transport.running' work/apsis/firmware/src/dinghy.c
 grep -q '#define clamp_q15 apsis_p7_clamp_q15' work/apsis/firmware/src/dinghy.c
 python3 - <<'PY'
@@ -130,5 +163,5 @@ audio = s[a:b]
 for forbidden in ('fl_erase4k(', 'fl_write(', 'apsis_project_fm1_service_save('):
     if forbidden in audio:
         raise SystemExit(f'FAIL: P7 flash write leaked into app_audio: {forbidden}')
-print('PASS: P7 generated target keeps project writes outside app_audio')
+print('PASS: P7 project reads prefetch before audio; writes stay outside app_audio')
 PY
