@@ -4,7 +4,7 @@ Last updated: 2026-10-30
 
 ## Current milestone
 
-**Phase 6 — shared Space / Cathedral: FDN selected and silent real-target memory gate complete; production room DSP is next.**
+**Phase 6 — shared Space / Cathedral: selected FDN + complete pure host room engine are green; target/audible integration is next.**
 
 Active branch: `p6-space-cathedral`  
 Draft PR: #16  
@@ -149,7 +149,34 @@ The accepted layout places Space storage in a dedicated NOLOAD `.apsis_space_poo
 - no Phase-6 runtime call executes while the room is disabled;
 - dry PCM/runtime/cursor remain bit-identical.
 
-Production Space must therefore explicitly initialise/validate its own NOLOAD delay memory before first use. Prefer validity/fill counters over a giant boot-time memset so inactive Space preserves the frozen startup/callback path.
+Production Space explicitly tracks validity/fill instead of requiring a giant boot-time memset, so stale NOLOAD memory is never read before it has been overwritten by the room.
+
+## Pure fixed-point room engine — complete host gate
+
+Current validated Phase-6 head: `014c6f843d6e8e7a15ac35e9bbc372e460756e9c`.
+
+Core #398: **PASS**, including normal + ASAN/UBSAN for the selected FDN and the full shared-room front end.
+
+Implemented in `apsis_space_dsp.[ch]` + `apsis_space_room.[ch]` with caller-owned external delay storage:
+- selected 8-line fixed-point FDN;
+- room trim 0.72;
+- guard 170 Hz HP + smoothed 3.8..5.6 kHz LP + compressor safety transfer;
+- four source-defined early reflections at 21 / 43 / 71 / 109 ms;
+- predelay;
+- 190 Hz tail HP;
+- FDN decay/damping control;
+- 4.2 kHz filtered feedback echo;
+- independent early path + wet return;
+- self-initialising history/echo/FDN validity through fill counters, with **no storage clear on bind**.
+
+Frozen host references on the current head:
+- selected FDN default: peak **217**, hash `a190ca86`, late `2646000`;
+- FDN controls: decay4 `1455300`, decay12 `3507773`, dark `7d4c13e3`, bright `7e1a4d9e`;
+- full room default: peak **47**, hash `1350a6da`, late `1278900`, first non-zero sample **927**;
+- room no-echo hash `97669507`;
+- room dark hash `5ff1f59a`.
+
+Staged #387 on the same head is also **PASS** through the existing dry target/emulator + silent selected-storage gate. The room renderer is deliberately **not yet called from `app_audio()`**, so this staged result does not claim audible Space on target yet.
 
 ## Completed merged baselines
 
@@ -167,11 +194,11 @@ Production Space must therefore explicitly initialise/validate its own NOLOAD de
 
 ## Exact next action
 
-1. Implement the selected 8-line FDN as a pure fixed-point host engine (`apsis_space_dsp.[ch]`) with external delay storage; do **not** put large arrays in the DSP struct.
-2. Port the source-defined front end in testable slices: room trim/guard -> early taps -> predelay -> tail HP/FDN/damping -> filtered feedback echo -> wet return.
-3. Use self-initialising/fill-counted delay histories so untouched NOLOAD memory is never read before being written.
-4. Add deterministic impulse/decay/hash tests and ASAN/UBSAN before touching `app_audio()`.
-5. Only after the pure engine is green, integrate the five post-Mother source sends into one shared room-input accumulator and add a room-disabled bypass gate requiring exact frozen dry PCM/runtime.
+1. Split the existing dry render path into five post-source/post-Mother source contributions without changing their summed dry PCM.
+2. Apply the frozen String/Drift/Clock/Spiral/Bloom Space-send gains to one shared stereo room-input accumulator.
+3. Bind the already-proven dedicated NOLOAD Space storage and call `apsis_space_room_render()` from `app_audio()` only after the dry source contributions are available.
+4. Add an explicit room-disabled bypass gate requiring exact frozen Phase-5/M4g dry PCM/runtime/cursor.
+5. Add an audible-room target/emulator scenario and verify target image/RAM/pool, callback cursor and deterministic room output before considering Phase 6 merge-ready.
 
 ## Do not regress
 
