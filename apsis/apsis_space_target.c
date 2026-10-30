@@ -114,27 +114,52 @@ void apsis_space_target_render(ApsisSpaceTarget *target,
                                int32_t *dry_out,
                                uint32_t frames)
 {
-    uint32_t i, room_frames;
+    uint32_t i, room_frames, complete_groups, remainder;
     if (!target || !target->room_bound || !state || !dry_out) return;
     if (frames > APSIS_SPACE_ROOM_BLOCK_MAX) frames = APSIS_SPACE_ROOM_BLOCK_MAX;
 
-    /* The embedded room runs at 22.05 kHz while the source engines and public
-     * audio callback remain 44.1 kHz. Cathedral is deliberately bandwidth-
-     * limited, so a 2:1 room rate is the highest-value CPU trade here: average
-     * adjacent send samples, run the full shared room topology once, then hold
-     * each wet sample for the corresponding output pair. ci/apply_apsis_p6.sh
-     * scales the generated room/FDN time constants for this target rate; the
-     * host/reference room stays full-rate and unchanged. */
-    room_frames = frames >> 1u;
+    /* Source engines and the public callback stay at 44.1 kHz. The shared,
+     * deliberately bandwidth-limited Cathedral bus advances at 11.025 kHz.
+     * Four adjacent sends are box-filtered/averaged into one room frame; the
+     * resulting wet sample is held across the same four output frames. The
+     * generated target room is retimed by ci/patch_apsis_p6_room_rate.py so
+     * predelay, early taps, echo, FDN decay, damping and modulation retain their
+     * intended real-time behaviour. The host/reference room remains 44.1 kHz. */
+    complete_groups = frames >> 2u;
+    remainder = frames & 3u;
+    room_frames = complete_groups + (remainder ? 1u : 0u);
     if (!room_frames) return;
 
-    for (i = 0u; i < room_frames; ++i) {
-        uint32_t in0 = i * 4u;
+    for (i = 0u; i < complete_groups; ++i) {
+        uint32_t in0 = i * 8u;
         uint32_t room = i * 2u;
         apsis_space_target_input[room] =
-            (apsis_space_target_input[in0] + apsis_space_target_input[in0 + 2u]) / 2;
+            (apsis_space_target_input[in0] +
+             apsis_space_target_input[in0 + 2u] +
+             apsis_space_target_input[in0 + 4u] +
+             apsis_space_target_input[in0 + 6u]) / 4;
         apsis_space_target_input[room + 1u] =
-            (apsis_space_target_input[in0 + 1u] + apsis_space_target_input[in0 + 3u]) / 2;
+            (apsis_space_target_input[in0 + 1u] +
+             apsis_space_target_input[in0 + 3u] +
+             apsis_space_target_input[in0 + 5u] +
+             apsis_space_target_input[in0 + 7u]) / 4;
+        apsis_space_target_source[room] = 0;
+        apsis_space_target_source[room + 1u] = 0;
+    }
+
+    if (remainder) {
+        uint32_t frame0 = complete_groups * 4u;
+        uint32_t in0 = frame0 * 2u;
+        uint32_t room = complete_groups * 2u;
+        int32_t sum_l = 0;
+        int32_t sum_r = 0;
+        uint32_t j;
+        for (j = 0u; j < remainder; ++j) {
+            sum_l += apsis_space_target_input[in0 + j * 2u];
+            sum_r += apsis_space_target_input[in0 + j * 2u + 1u];
+        }
+        apsis_space_target_input[room] = sum_l / (int32_t)remainder;
+        apsis_space_target_input[room + 1u] = sum_r / (int32_t)remainder;
         apsis_space_target_source[room] = 0;
         apsis_space_target_source[room + 1u] = 0;
     }
@@ -144,35 +169,33 @@ void apsis_space_target_render(ApsisSpaceTarget *target,
                             apsis_space_target_source,
                             room_frames);
 
-    for (i = 0u; i < room_frames; ++i) {
+    for (i = 0u; i < complete_groups; ++i) {
         uint32_t room = i * 2u;
-        uint32_t out0 = i * 4u;
+        uint32_t out0 = i * 8u;
+        uint32_t j;
         int32_t wet_l = apsis_space_target_source[room];
         int32_t wet_r = apsis_space_target_source[room + 1u];
-        dry_out[out0] = apsis_space_target_clamp_q15(dry_out[out0] + wet_l);
-        dry_out[out0 + 1u] = apsis_space_target_clamp_q15(dry_out[out0 + 1u] + wet_r);
-        dry_out[out0 + 2u] = apsis_space_target_clamp_q15(dry_out[out0 + 2u] + wet_l);
-        dry_out[out0 + 3u] = apsis_space_target_clamp_q15(dry_out[out0 + 3u] + wet_r);
+        for (j = 0u; j < 4u; ++j) {
+            uint32_t o = out0 + j * 2u;
+            dry_out[o] = apsis_space_target_clamp_q15(dry_out[o] + wet_l);
+            dry_out[o + 1u] = apsis_space_target_clamp_q15(dry_out[o + 1u] + wet_r);
+        }
         apsis_space_target_source[room] = 0;
         apsis_space_target_source[room + 1u] = 0;
     }
 
-    /* Dinghy currently calls us with 256-frame blocks. Preserve correctness for
-     * an odd final frame if that contract changes later. */
-    if (frames & 1u) {
-        uint32_t last = (frames - 1u) * 2u;
-        apsis_space_target_input[0] = apsis_space_target_input[last];
-        apsis_space_target_input[1] = apsis_space_target_input[last + 1u];
-        apsis_space_target_source[0] = 0;
-        apsis_space_target_source[1] = 0;
-        apsis_space_room_render(&target->room, state,
-                                apsis_space_target_input,
-                                apsis_space_target_source, 1u);
-        dry_out[last] = apsis_space_target_clamp_q15(
-            dry_out[last] + apsis_space_target_source[0]);
-        dry_out[last + 1u] = apsis_space_target_clamp_q15(
-            dry_out[last + 1u] + apsis_space_target_source[1]);
-        apsis_space_target_source[0] = 0;
-        apsis_space_target_source[1] = 0;
+    if (remainder) {
+        uint32_t room = complete_groups * 2u;
+        uint32_t out0 = complete_groups * 8u;
+        uint32_t j;
+        int32_t wet_l = apsis_space_target_source[room];
+        int32_t wet_r = apsis_space_target_source[room + 1u];
+        for (j = 0u; j < remainder; ++j) {
+            uint32_t o = out0 + j * 2u;
+            dry_out[o] = apsis_space_target_clamp_q15(dry_out[o] + wet_l);
+            dry_out[o + 1u] = apsis_space_target_clamp_q15(dry_out[o + 1u] + wet_r);
+        }
+        apsis_space_target_source[room] = 0;
+        apsis_space_target_source[room + 1u] = 0;
     }
 }
