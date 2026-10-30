@@ -21,3 +21,5 @@ jobs:
         run: bash ci/test_spiral_audio_runtime.sh
       - name: M4f Spiral finite renderer and capacity probe
         run: bash ci/test_spiral_dsp.sh
+      - name: M4g Bloom occurrence acoustic planning
+        run: bash ci/test_bloom_audio_plan.sh
