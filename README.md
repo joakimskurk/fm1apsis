@@ -21,21 +21,17 @@ The repository, not chat history, is the durable source of project state.
 - Phase 1 pinned FM-1 skeleton/build/emulator pipeline: complete
 - Phase 2 pure musical/state core: complete and merged
 - Phase 3 deterministic shared transport/runtime: complete and merged
-- Phase 4 dry sources:
-  - M4a String persistent: merged
-  - M4b String finite/Rhythm: merged
-  - M4c String Attractor: merged
-  - M4d Drift persistent: merged
-  - M4e Clock: merged
-  - M4f Spiral: merged as `734229f4d23626a176a8366de82aab2c58c48cc9`
-  - M4g Bloom: implementation complete; PR #13 pending only final documentation-head double gate and guarded merge
-- active branch: `m4g-bloom`
-- active draft PR: #13
-- technically final M4g implementation/CI head: `6c54d1cd5ca354543237a14c257b3ec28ab424d1`
-- core #292 and staged #281 passed, including real JieLi target, emulator and exact frozen-M4f Bloom bypass
+- Phase 4 five dry source engines: complete and merged through M4g Bloom
+- Phase 5 sounding-source structural integration: **technically complete; final documentation-head double gate + PR #15 merge pending**
+- active branch: `p5-sounding-integration`
+- active draft PR: #15
+- Phase-5 verification head before docs freeze: `de3a0bdfc0831db502c186ca8808c46b46ee5c1a`
+- core #357 + staged #346 PASS
 - physical FM-1 validation has not yet been performed
 
-See `PROJECT_STATE.md` for the exact continuation point. After M4g merges, the roadmap proceeds to **Phase 5 sounding-source structural integration**, not directly to shared Space/Cathedral.
+Phase 5 is intentionally verification-only: the existing M3c shared runtime plus M4f/M4g sounding bridges already satisfy source-defined structural timing. P5a–P5f prove that behaviour reaches actual DSP voices without changing the production firmware.
+
+After PR #15 merges from an exact double-gated documentation head, the roadmap proceeds to **Phase 6 shared Space/Cathedral**.
 
 ## Core rule
 
@@ -44,7 +40,6 @@ APSIS must remain **APSIS**.
 This project is not a conventional groovebox reinterpretation and not a generic synth/sequencer using APSIS names. The target is the closest practical 1:1 port of the musical model, timing rules, state relationships, sound roles and visual language of the browser instrument. Only the interaction layer is translated where mouse/touch gestures do not exist on FM-1.
 
 The source instrument is one musical state seen through:
-
 - STRING
 - DRIFT / TUNING
 - CLOCK
@@ -56,92 +51,80 @@ The source instrument is one musical state seen through:
 
 The first five are audible source roles. GRAVITY and TUNING shape shared pitch/harmony. CHAIN operates on musical-memory lanes. MOTHER is the shared mix/structural-sync layer. The shared CATHEDRAL / SPACE return is part of the instrument identity and is not to be replaced by unrelated per-part effects.
 
-## Platform baseline
+## Source authority
 
-The port follows a pinned Dinghy discipline:
+Study 126 is behavioural/state/timing/safety authority. Frozen SHA-256:
+`012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
+
+Study 98 is separately locked only as the narrow String acoustic reference for features that actually existed there. LF SHA-256:
+`43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`
+
+Study 98 does not supersede Study 126 behaviour/timing/state authority.
+
+## Platform baseline
 
 - Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`
 - Dinghy tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`
-- APSIS FM-1 product identity `FM-1_972`
-- verify unchanged Dinghy host + target before applying the APSIS overlay
-- keep audio/state/UI code testable on host before device optimisation
+- APSIS product identity `FM-1_972`
+- 44.1 kHz / 256-frame audio callbacks
 - no allocation, flash access, screen drawing or waiting inside audio render
-- use fixed-capacity queues and voice pools
-- measure RAM, pool and callback progress continuously
-- preserve updater/rescue paths
-- do not optimise away characteristic behaviour before parity tests exist
+- fixed-capacity queues and voice pools
+- updater/rescue paths preserved
 
 The exact pin is recorded in `UPSTREAM.lock.json`.
 
 ## Timing/runtime baseline
 
-Pinned Dinghy audio is 44.1 kHz with 256-frame callbacks (~5.80 ms).
-
-The frozen M3c shared runtime remains the only musical scheduler:
+M3c remains the only musical scheduler:
 - `sizeof(ApsisRuntime)=21,928 B`
 - 512-entry shared event heap
 - no module-private clocks
-- canonical random trace `78771ff5`
-- canonical late trace `0e6fc422`
+- random trace `78771ff5`
+- late trace `0e6fc422`
 
-The pinned three-second emulator scenario freezes **runtime cursor 123,648 exactly**. This catches dry-engine callback-budget regressions that a weaker “cursor advanced” check would miss.
+The pinned three-second emulator scenario freezes runtime cursor **123,648 exactly**. This catches callback-budget regressions that a weaker “cursor advanced” check would miss.
 
 No real ISR-cycle margin is claimed because physical hardware is unavailable.
 
-## Phase-4 dry engines
+## Phase-4 dry-engine baseline
 
-### String
+Merged dry engines:
+- M4a String persistent `2ea217f0…`
+- M4b String finite/Rhythm `c96c00de…`
+- M4c String Attractor `6fcdd8ff…`
+- M4d Drift `d7e39e24…`
+- M4e Clock `db9d0b3e…`
+- M4f Spiral `734229f4…`
+- M4g Bloom `713a1e9a…`
 
-Study 98 is the narrow acoustic authority for old String features; Study 126 remains behavioural/timing/state/safety authority.
-
-Merged M4a–M4c provide persistent Foundation/Classic/Dual, finite transients/Rhythm and String Attractor excitation.
-
-### Drift
-
-M4d restores the identity-bearing paired beating field around the tuned Gravity root as an explicit documented source-wiring repair. Merged as `d7e39e2481c33628f402bed51d761b8be8304bb3`.
-
-### Clock
-
-M4e passively consumes shared Clock events with STONE/WOOD/GLASS/SOFT voices and deterministic Clock-local Snap noise. Merged as `db9d0b3ecbc7931be343cec7717103059d3c5160`.
-
-### Spiral
-
-M4f reuses the existing M3c occurrence/token/target−80 ms late-bind lifecycle. Acoustic planning state is external and a fixed 32-leg renderer implements THREAD/GLASS/REED/HALO plus source main/shadow topology.
-
-Frozen host refs:
-- THREAD 1230 / `aef6c83e`
-- GLASS 1157 / `9efa9bdc`
-- REED 967 / `e67a3c15`
-- HALO 1256 / `e7ed6161`
-- worst stress 30/32 legs, 90 oscillators, 0 steals, 0 drops, hash `02be4bc5`
-
-Merged M4f target:
-- image 95,804 B
-- RAM 58,056 B
-- pool 30,720 B
-- package `77035ccdbbe827e80730762ac3b79dd9978f04bcf4adb2b86456198a98213898`
-
-### Bloom
-
-M4g reuses the existing M3c target / target−45 ms occurrence / causal target−50 ms petal-bind lifecycle. Occurrence freezes petal acoustic geometry; each bind consumes M3c's target-aware Gravity/tuning result and late-reads current Bloom voice/attack/brightness.
-
-Frozen host refs:
-- VEIL 175 / `6177470f`
-- CHOIR 143 / `4b2969f8`
-- ORGAN 122 / `d54a68d9`
-- GLASS 129 / `ca1c3127`
-- worst legal stress: 125/136 petals, 375 oscillators, 0 drops, hash `5881bb36`
-
-Technically final M4g target:
+Frozen M4g target:
 - image 100,944 B
-- RAM 87,336 B
-- **RAM headroom only 10,968 B**
+- RAM 87,336 / 98,304 B
+- **static RAM headroom only 10,968 B**
 - pool 30,720 B
 - package `b4e74e8bdd71b79e1a496576d29f537bd76b223127ca4161554bfffb502deeca`
+- default PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
+- runtime cursor 123,648; queue 28/512; late trace `811c9dc5`
 
-The pinned three-second emulator does not reach a due Bloom occurrence, so M4g preserves the exact M4f callback/audio path until Bloom actually activates. Default PCM remains `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b` and runtime cursor remains exactly 123,648.
+## Phase 5 — sounding structural semantics
 
-A dedicated Bloom-DSP/runtime bypass returns exactly to the frozen M4f target/package/PCM/runtime.
+P5a–P5f prove actual sounding DSP obeys the frozen structural model:
+- immediate late binding reaches finite Spiral/Bloom oscillators;
+- quantized Gravity preserves the deliberate Spiral-vs-Bloom pending-state asymmetry;
+- Mother-held Gravity does not become audible before `->1` commit;
+- Chain discrete state reaches sounding Spiral/Bloom in source order;
+- Chain continuous Drift morph begins at the target and reaches the persistent Drift renderer;
+- step-one RESYNC OFF preserves free-running Spiral attractor phase into sounding energy.
+
+No production code was required for these proofs. Staged #346 rebuilt the exact M4g target/package/PCM/runtime, so Phase 5 consumes **0 additional static RAM**.
+
+Normative starting contract: `docs/reference/P5A_SOUNDING_LATE_BINDING_CONTRACT.md`.
+
+## Phase 6 consequence
+
+Space/Cathedral is next after Phase 5 merges. It must remain **one shared room with five per-source sends**.
+
+Because only 10,968 B of static target RAM remains, Phase 6 begins with source/topology freeze and memory prototypes, not immediate reverb integration. Compact modulated FDN and nested allpass/Schroeder candidates must be compared for diffusion, metallicity, decay, CPU and memory before choosing an implementation.
 
 ## Project documents
 
@@ -152,7 +135,7 @@ Root continuity files:
 - `TESTING.md`
 - `CHANGELOG.md`
 
-Detailed design/reference files include:
+Detailed references include:
 - `docs/PORT_CONTRACT.md`
 - `docs/ARCHITECTURE.md`
 - `docs/UI_MAPPING.md`
@@ -164,14 +147,8 @@ Detailed design/reference files include:
 - `docs/reference/M4E_CLOCK_CONTRACT.md`
 - `docs/reference/M4F_SPIRAL_CONTRACT.md`
 - `docs/reference/M4G_BLOOM_CONTRACT.md`
+- `docs/reference/P5A_SOUNDING_LATE_BINDING_CONTRACT.md`
 
-## Important design consequence
+## Important visual consequence
 
-The 240x240 screen should draw real APSIS surfaces - String, orbiting Clock, Spiral, Bloom and Gravity - in a reduced native form. It should **not** replace them with generic parameter lists as the primary interface.
-
-## Reference source
-
-Study 126 is the behavioural source of truth. Frozen SHA-256:
-`012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21`
-
-Study 98 is separately locked only as the narrow String acoustic reference; it does not supersede Study 126 behaviour/timing/state authority.
+The 240x240 screen should draw real reduced APSIS surfaces — String, orbiting Clock, Spiral, Bloom and Gravity — rather than replacing them with generic parameter lists as the primary interface.

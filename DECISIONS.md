@@ -4,25 +4,23 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 
 ## 2026-10-23 - APSIS identity is parity-first
 
-**Decision:** The FM-1 port must preserve APSIS as a distinct instrument. Port the musical/state/timing relationships as close to 1:1 as practical, adapting only the physical interaction where FM-1 differs from browser mouse/touch.
+**Decision:** The FM-1 port preserves APSIS as a distinct instrument. Port musical/state/timing relationships as close to 1:1 as practical; adapt only interaction where FM-1 differs from browser mouse/touch.
 
 ## 2026-10-23 - Source reference is frozen
 
-**Decision:** Study 126 / `apsis.html` SHA-256 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21` is the behavioural source authority.
-
-The attached LF `index.html` is the same source modulo LF/CRLF; no source relock occurred.
+**Decision:** Study 126 / `apsis.html` SHA-256 `012f4fcc3e14e91af9a87f61839d9b29dde76c29652d5b5120dd19b4f1ba8d21` is behavioural/state/timing/safety authority. The attached LF `index.html` is the same source modulo LF/CRLF.
 
 ## 2026-10-23 - Dinghy baseline and product identity are pinned
 
-**Decision:** Use Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`, tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`, and APSIS product `FM-1_972` until an explicit revalidation changes them.
+**Decision:** Use Dinghy commit `d44df7db09b98ccad2f1233b8f83f5f09c04829e`, tree `8cefd253b92b544109a315fd2fb9ffcea7c429b6`, and APSIS product `FM-1_972` until explicitly revalidated.
 
 ## 2026-10-23 - Phase order is state -> transport -> sound
 
-**Decision:** Musical/state semantics and the deterministic shared transport must precede final DSP. Sound code consumes APSIS semantics; it does not define them.
+**Decision:** Musical/state semantics and deterministic shared transport precede final DSP. Sound consumes APSIS semantics; it does not define them.
 
 ## 2026-10-23 - One shared state graph and one shared transport
 
-**Decision:** STRING/DRIFT/CLOCK/SPIRAL/BLOOM/GRAVITY/KEEP/CHAIN/MOTHER are views of one state graph. Clock-derived musical time uses one sample-referenced fixed-capacity event timeline; modules do not get private clocks.
+**Decision:** STRING/DRIFT/CLOCK/SPIRAL/BLOOM/GRAVITY/KEEP/CHAIN/MOTHER are views of one state graph. Clock-derived musical time uses one sample-referenced fixed-capacity timeline; modules do not get private clocks.
 
 ## 2026-10-23 - Transport time representation
 
@@ -30,48 +28,38 @@ The attached LF `index.html` is the same source modulo LF/CRLF; no source relock
 
 ## 2026-10-23 - Fixed-capacity audio-side structures
 
-**Decision:** Audio scheduling/voice management uses fixed-capacity allocation-free structures. Capacities are evidence-driven through legal worst-case stress, not guessed.
-
-M3c raised the shared heap from 256 to 512 only after 256 measurably starved. M3c late-bind pools remain 64 Spiral +64 Bloom because measured stress stayed within those bounds.
+**Decision:** Audio scheduling/voice management uses allocation-free fixed-capacity structures. Capacities are evidence-driven by legal worst-case stress. M3c raised the shared heap from 256 to 512 only after measured starvation.
 
 ## 2026-10-23 - Browser timer jitter is not a feature
 
-**Decision:** Preserve musical boundary semantics and late-binding intent, not incidental JavaScript `setTimeout` jitter. Native sample timing may implement the same causality deterministically.
+**Decision:** Preserve musical boundary semantics and late-binding intent, not incidental JavaScript timer jitter. Native sample timing implements the same causality deterministically.
 
 ## 2026-10-23 - Spiral/Bloom late binding is mandatory
 
-**Decision:** Event time remains fixed while final musical pitch is resolved against the latest source-visible state at the source-defined late observation point.
+**Decision:** Event time remains fixed while final musical pitch resolves against source-visible state at the source-defined late observation point.
 
 Native desktop profile:
 - Spiral target−80 ms
 - Bloom occurrence target−45 ms
 - Bloom petal target−50 ms with causal occurrence clamp
 
-Source narrow/mobile values remain regression facts (Spiral −110 ms, Bloom petal −70 ms) but are browser timer-safety margins, not the FM-1 runtime profile.
+Spiral does not project ordinary pending Gravity. Bloom may project ordinary pending Gravity target-aware under the frozen +0.5 ms rule. Mother-held future state is not projected.
 
-## 2026-10-23 - KEEP is not a full preset
+## 2026-10-23 - KEEP / CHAIN / MOTHER semantics are source-defined
 
-**Decision:** KEEP stores only the source-defined partial musical memory: String tension/anchors, Drift amount, Clock geometry, Spiral route, Tuning mode and Gravity harmony.
-
-## 2026-10-23 - CHAIN preserves lane semantics
-
-**Decision:** CHAIN remains a 32-cell musical-memory lane system with chance, transpose, morph, lane scopes and start/loop sync. Continuous morph is limited to source-defined String position and Drift amount.
-
-## 2026-10-23 - MOTHER structural hold keeps mixer live
-
-**Decision:** `->1` may hold structural edits, but `mother.*` mixer/mute controls and output/master remain live. Pending items preserve first insertion order; repeat param updates replace value in place; repeated toggles cancel; pending Gravity applies after ordered items.
+**Decision:** KEEP stores only source-defined partial musical memory. CHAIN remains the 32-cell lane system with chance/transpose/morph/scope/start-loop sync; continuous morph is source-limited to String position and Drift amount. MOTHER `->1` may hold structural edits while mixer/mute/output remain live.
 
 ## 2026-10-23 - Step-one resync defaults OFF
 
-**Decision:** `stepOneResync` remains OFF by default. If enabled, resync is processed before Clock-linked String/Spiral events at Clock 1.
+**Decision:** `stepOneResync` remains OFF by default. When enabled, resync precedes Clock-linked String/Spiral events at Clock 1.
 
 ## 2026-10-23 - Shared Space/Cathedral topology
 
-**Decision:** The final room is one shared Space/Cathedral return with per-source sends. Prototype compact modulated FDN and nested allpass/Schroeder alternatives before choosing. Do not introduce unrelated per-source reverbs.
+**Decision:** Final room is one shared Space/Cathedral return with per-source sends. Prototype compact modulated FDN and nested allpass/Schroeder alternatives before choosing. Do not introduce unrelated per-source reverbs.
 
 ## 2026-10-23 - Project persistence uses dedicated journal storage
 
-**Decision:** Full APSIS project storage will use a dedicated versioned CRC-protected journal/two-slot strategy with safe write deferral. Dinghy's tiny settings slot is not the project store.
+**Decision:** Full project storage will use versioned CRC-protected journal/two-slot persistence with safe write deferral. Dinghy's tiny settings slot is not the project store.
 
 ## 2026-10-23 - Verification language must be literal
 
@@ -79,78 +67,66 @@ Source narrow/mobile values remain regression facts (Spiral −110 ms, Bloom pet
 
 ## 2026-10-29 - Study 98 is a narrow String acoustic authority
 
-**Decision:** Study 126 remains authority for String state/performance/timing/Gravity/routing/Classic-vs-Dual and later safety fixes. Study 98 (`old_index.html`, LF SHA `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`) is only the acoustic/timbre reference for String features that existed there.
+**Decision:** Study 126 remains String behaviour/state/timing/Gravity/routing/Classic-vs-Dual/safety authority. Study 98 (`old_index.html`, LF SHA `43553cc1836e080776e8d20b33d5eace32064df9d9f791743bb480ac94af92c8`) is only the acoustic/timbre reference for String features that existed there.
 
-Native String therefore restores the preferred old Foundation/Classic sine+Drift DNA and old partial/pluck character without restoring removed broadband random-noise bow excitation or rolling back newer behaviour.
+Native String restores old Foundation/Classic sine+Drift DNA and partial/pluck character without restoring removed broadband random-noise bow excitation or rolling back later safety fixes.
 
 ## 2026-10-29 - M3c deterministic identity is locked
 
-**Decision:** Canonical 30 s host replay uses seed `0x31415926` with random trace `78771ff5`, late trace `0e6fc422`, queue 352/512, Spiral slots 59/64 and Bloom slots 44/64. Extended max-swing stress reaches queue 357/512.
-
-`ApsisRuntime` remains 21,928 B unless an explicitly scoped later phase changes it.
+**Decision:** Canonical replay uses `sizeof(ApsisRuntime)=21,928 B`, 512-event heap, seed `0x31415926`, random trace `78771ff5`, late trace `0e6fc422`, queue 352/512, Spiral 59/64, Bloom 44/64. Extreme max-swing reaches 357/512.
 
 ## 2026-10-30 - Drift persistent pair is a documented source-wiring repair
 
-**Decision:** Native DRIFT is the identity-bearing paired beating field around the Gravity root even though late Study 126 no longer wires `beatPair()` as a persistent transport voice. Preserve the source delta/depth/level law and historical stereo-width law rather than making DRIFT silent.
-
-**Why:** The port contract and earlier source history establish the paired field as DRIFT identity; the missing Study-126 transport connection is treated as a source wiring defect, not a new synth-design opportunity.
+**Decision:** Native DRIFT is the paired beating field around the Gravity root even though late Study 126 no longer wires `beatPair()` as a persistent transport voice. Preserve source delta/depth/level and historical stereo-width law rather than making DRIFT silent.
 
 ## 2026-10-30 - Clock consumes the shared timeline
 
-**Decision:** M4e Clock audio passively consumes existing `CLOCK_MAIN`, `CLOCK_SNAP`, `CLOCK_INNER` and `CLOCK_GHOST` events. It may use DSP-local sample delay and deterministic pulse-0 bootstrap, but never another Clock scheduler/queue or second Ghost random draw.
+**Decision:** Clock audio passively consumes existing `CLOCK_MAIN`, `CLOCK_SNAP`, `CLOCK_INNER`, `CLOCK_GHOST` events. No second Clock scheduler/queue or Ghost random draw.
 
-## 2026-10-30 - Snap noise uses a local deterministic RNG
-
-**Decision:** Native Clock Snap reuses a deterministic Clock-local noise realization and never consumes the frozen shared musical RNG.
-
-**Why:** Study 126's one-time Snap buffer uses global unseeded `Math.random()` shared with musical systems; that coupling is unstable engine leakage rather than reproducible musical semantics.
+Snap uses deterministic Clock-local noise rather than consuming the shared musical RNG; browser global `Math.random()` coupling is unstable engine leakage.
 
 ## 2026-10-30 - Preserve exact integer DSP math on JieLi via target ABI shim
 
-**Decision:** Keep frozen host fixed-point arithmetic unchanged. Where pi32v2 omits libgcc DI-mode division helpers, provide target-only standard ABI `__divdi3` / `__udivdi3` using shift/compare/subtract restoring division instead of weakening DSP math.
+**Decision:** Keep frozen host fixed-point arithmetic unchanged. Where pi32v2 omits libgcc DI-mode division helpers, provide target-only `__divdi3` / `__udivdi3` via restoring division rather than weakening DSP math.
 
 ## 2026-10-30 - M4f Spiral reuses the frozen M3c lifecycle
 
-**Decision:** Spiral audio does not schedule another occurrence or bind. M4f snapshots only the acoustic data that Study 126 freezes at planning time, keyed to the existing M3c token/slot, then consumes the existing target−80 ms late-bound pitch result.
+**Decision:** Spiral audio never schedules another occurrence or bind. M4f snapshots only source-defined planning-time acoustic data keyed to the existing M3c token/slot, then consumes the existing target−80 ms late-bound pitch. `ApsisRuntime` does not grow.
 
-Planning-time snapshot includes energy, duration/noteLength, source level, Drift delta/width, voice topology, attack/tail, filter Q and main/shadow topology. Route/Gravity/register/tuning remain M3c late-bound. The source edge case where a later voice change affects cutoff family but not topology/Q/envelope is preserved.
+M4f pool is fixed at 32 legs after legal stress reached 30/32 legs, 15 logical hits and 90 oscillators with 0 steals/drops (`02be4bc5`).
 
-The +8 ms shadow remains DSP-local. `ApsisRuntime` does not grow.
+## 2026-10-30 - Inactive dry engines preserve exact emulator callback budget
 
-## 2026-10-30 - M4f Spiral finite pool is 32 legs
-
-**Decision:** Use 32 fixed Spiral legs. Evidence: eight-second legal worst acoustic stress reaches 30/32 legs, 15 logical hits and 90 oscillators with 0 steals and 0 drops. Reference stress hash is `02be4bc5`.
-
-## 2026-10-30 - Inactive dry engines must preserve the frozen emulator callback budget
-
-**Decision:** The pinned three-second emulator scenario must advance the shared runtime cursor to **123,648 samples exactly**, not merely nonzero. `ci/emulator_smoke.sh` enforces this.
-
-M4f initially reduced the cursor to 123,392 even with the source-default empty Spiral route because the callback still cleared the external binding batch and scanned an empty 32-leg renderer every block. The accepted architecture keeps the exact M4e callback path until Spiral first has both sound and a non-empty route, then latches M4f active permanently so pending binds/tails remain safe.
-
-**Why:** A silent/inactive new dry engine must not quietly consume one full 256-frame callback of the pinned emulator budget. This gate applies to later Bloom/Space work unless an explicitly justified scenario change deliberately rebaselines it.
+**Decision:** Pinned three-second emulator must advance shared runtime cursor to **123,648 samples exactly**. A silent/inactive new engine may not consume a full 256-frame callback of budget. This remains a regression gate unless an explicitly justified scenario rebaselines it.
 
 ## 2026-10-30 - M4g Bloom reuses M3c occurrence and petal-bind causality
 
-**Decision:** Bloom audio does not create a second Bloom lifecycle. M4g mirrors the existing M3c 64-slot Bloom token/slot state externally: occurrence freezes only the source-defined acoustic geometry, and each existing M3c petal bind supplies the authoritative target-aware Gravity/tuning result.
+**Decision:** Bloom audio creates no second lifecycle. M4g mirrors existing M3c Bloom token/slot state externally: occurrence freezes only source-defined acoustic geometry; each existing petal bind supplies authoritative target-aware Gravity/tuning. No M4g random draw, queue event or `ApsisRuntime` growth.
 
-Occurrence-frozen data: petal count/order, length/duration, unfurl/target offsets, width/pan, source level/amplitude.
+Bloom finite pool is 136 petals after legal stress reached 125 simultaneous petals / 375 oscillators / 0 drops (`5881bb36`).
 
-Bind-late data: final `ApsisBloomLateBinding`, current VEIL/CHOIR/ORGAN/GLASS voice family, attack, brightness and source ON/OFF.
+## 2026-10-30 - Bloom activation preserves exact M4f idle path
 
-M4g may not draw random numbers, choose another voicing plan, add queue events, change the M3c future-Gravity projection rules or grow `ApsisRuntime`.
+**Decision:** M4g stays on the exact M4f callback path until an already-planned Bloom occurrence is due. Once activated it remains latched so pending petals/tails survive later edits. The pinned default scenario therefore remains exact M4f PCM/cursor even with Bloom target code linked.
 
-## 2026-10-30 - M4g Bloom finite pool is 136 petals
+## 2026-10-30 - Static RAM is a hard Phase-5/6 constraint
 
-**Decision:** Use a fixed 136-petal Bloom DSP pool, maximum three oscillators per petal.
+**Decision:** M4g real target uses 87,336 / 98,304 B static RAM, leaving **10,968 B**. Phase 5/6 must not add large unconditional BSS without measured need. Memory savings may not silently trade away parity.
 
-**Evidence:** Legal worst-case stress reaches 125 simultaneous petals and 375 oscillators with 186 triggers, 0 drops, peak 266 and deterministic hash `5881bb36`. The frozen pool leaves 11 petal slots of margin (more than two five-petal occurrences) above measured high-water.
+## 2026-10-30 - Phase 5 is verification-only when the existing architecture is already correct
 
-## 2026-10-30 - Bloom activation preserves the exact M4f idle path
+**Decision:** Do not change production scheduler/DSP/runtime merely to manufacture a phase diff. P5a–P5f prove source-defined structural semantics end-to-end at the actual sounding DSP boundary. Because M3c + M4f/M4g already satisfy those contracts, Phase 5 adds tests/contracts/workflow gates but **no production musical or audio code**.
 
-**Decision:** M4g must not scan/reset its 22,864-byte finite renderer every callback before Bloom actually has work. Target integration remains on the exact M4f callback path until an already-planned shared Bloom occurrence is due inside the current block. Once activated, M4g stays latched so pending petals and tails survive later mute/state edits.
+**Evidence:** verification head `de3a0bdfc0831db502c186ca8808c46b46ee5c1a` passed core #357 and staged #346; the real target remained exact M4g: 100,944 B image, 87,336 B RAM, package `b4e74e8…eeca`, default PCM `6c3b8fff…aa2b`, cursor 123,648.
 
-The pinned default three-second scenario therefore remains bit-identical M4f (PCM `6c3b8fff…`, cursor 123,648) even though the full Bloom target code is present and real-target linked.
+## 2026-10-30 - Sounding identity stays in the layer that owns it
 
-## 2026-10-30 - Static RAM is now a hard Phase-5/6 constraint
+**Decision:** Phase-5 tests must read scheduler/attractor identity from the existing M3c slot/token rather than expanding M4f/M4g acoustic snapshots with duplicate structural fields merely for test convenience.
 
-**Decision:** After M4g, the real target uses 87,336 / 98,304 B static RAM, leaving only **10,968 B** headroom. Phase 5 structural integration and Phase 6 Space/Cathedral must treat RAM as a first-class design constraint. Do not add large unconditional BSS pools without evidence, and do not trade away parity merely to hide RAM use without a measured alternative.
+**Why:** occurrence/acoustic snapshots should contain only source-frozen acoustic data. Route/trigger identity and late-bound structural state remain owned by the shared runtime. This keeps Phase-4 contracts narrow and avoids redundant state that can diverge.
+
+## 2026-10-30 - Phase 6 starts with topology + memory prototypes, not immediate reverb integration
+
+**Decision:** After Phase 5 merges, freeze the Study-126 Space/Cathedral contract and prototype at least compact modulated FDN and nested allpass/Schroeder candidates against the real 10,968 B static-RAM headroom before integrating a room into `app_audio()`.
+
+The result must remain one shared room with five per-source sends. Delay-memory placement is an explicit design problem; do not assume a large unconditional BSS delay network fits.
