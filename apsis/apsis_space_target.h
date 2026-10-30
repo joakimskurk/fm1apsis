@@ -8,6 +8,7 @@
 typedef struct {
     ApsisSpaceRoom room;
     uint8_t room_bound;
+    uint8_t input_seeded;
 } ApsisSpaceTarget;
 
 /* Target-only bridge between the five frozen dry source renderers and the
