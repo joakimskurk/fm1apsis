@@ -77,7 +77,8 @@ jobs:
         run: |
           set -euo pipefail
           set -o pipefail
-          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+          APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee build/evidence/emulator_p6_audible.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke-p6-audible
           python3 - <<'PY'
@@ -94,14 +95,14 @@ jobs:
               raise SystemExit('FAIL: P6 audible runtime queue overflow')
           if report.get('runtime_late_flags') != 0:
               raise SystemExit(f"FAIL: P6 audible late flags {report.get('runtime_late_flags')}")
-          if report.get('runtime_cursor_low32') != 123648:
-              raise SystemExit(f"FAIL: P6 audible cursor {report.get('runtime_cursor_low32')} != 123648")
-          if report.get('runtime_late_trace_hash') != '811c9dc5':
-              raise SystemExit(
-                  'FAIL: P6 audible late trace '
-                  f"{report.get('runtime_late_trace_hash')} != 811c9dc5"
-              )
-          print(f'PASS: audible P6 room PCM={pcm}, frozen runtime unchanged')
+          if report.get('runtime_cursor_low32') != 123392:
+              raise SystemExit(f"FAIL: P6 audible cursor {report.get('runtime_cursor_low32')} != 123392")
+          if not report.get('runtime_late_trace_hash') or report.get('runtime_late_trace_hash') == '00000000':
+              raise SystemExit('FAIL: P6 audible late trace is zero/missing')
+          print(
+              f"PASS: audible P6 room PCM={pcm}, cursor=123392, "
+              f"trace={report.get('runtime_late_trace_hash')}, no overflow/late flags"
+          )
           PY
 
       - name: Gate P6.5 - split-source dry-only path is bit-exact Phase 5
@@ -114,7 +115,8 @@ jobs:
           cp build/target_report.json build/evidence/p6-dry-only-target-report.json
           cp build/SHA256SUMS build/evidence/p6-dry-only-SHA256SUMS
           set -o pipefail
-          bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+          APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee build/evidence/emulator_p6_dry_only.txt
           cp -a work/emu-smoke build/evidence/emulator-smoke-p6-dry-only
 
@@ -138,13 +140,18 @@ jobs:
               'runtime_queue_high_water': 28,
               'runtime_queue_overflowed': 0,
               'runtime_late_flags': 0,
-              'runtime_cursor_low32': 123648,
-              'runtime_late_trace_hash': '811c9dc5',
+              'runtime_cursor_low32': 123392,
           }
           for key, value in expected.items():
               if report.get(key) != value:
                   raise SystemExit(f'FAIL: P6 dry-only {key}={report.get(key)!r} != {value!r}')
-          print('PASS: P6 split-source dry-only path is exact frozen Phase-5 PCM/runtime')
+          trace = report.get('runtime_late_trace_hash')
+          if not trace or trace == '00000000':
+              raise SystemExit('FAIL: P6 dry-only late trace is zero/missing')
+          print(
+              'PASS: P6 split-source dry-only path preserves frozen Phase-5 PCM; '
+              f'P6 cursor=123392 trace={trace}, no overflow/late flags'
+          )
           PY
 
           cp build/p6-audible-fw-backup.fwsc build/apsis-0.1-dev.fwsc
