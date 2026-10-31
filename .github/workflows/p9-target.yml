@@ -41,10 +41,10 @@ jobs:
       - name: Gate P9.1 - pinned upstream and regressions
         run: bash ci/prepare_dinghy.sh
 
-      - name: Gate P9.2 - generated physical-control target
-        run: bash ci/apply_apsis_p9.sh
+      - name: Gate P9.2 - generated H3 structural-control target
+        run: bash ci/apply_apsis_p9h.sh
 
-      - name: Gate P9.3 - real JieLi target build
+      - name: Gate P9.3 - real JieLi H3 target build
         run: |
           bash ci/build_apsis_target.sh
           mkdir -p build/evidence
@@ -60,10 +60,10 @@ jobs:
               raise SystemExit(f"FAIL: P9 RAM {t.get('ram')}/{t.get('ram_max')}")
           if t.get('pool', 0) != 309532:
               raise SystemExit(f"FAIL: P9 changed frozen POOL {t.get('pool')} != 309532")
-          print(f"PASS: P9A target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
+          print(f"PASS: P9H3 target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
           PY
 
-      - name: Gate P9.4 - idle control integration preserves frozen P8 audio/runtime
+      - name: Gate P9.4 - idle H3 integration preserves frozen P8 audio/runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -78,7 +78,7 @@ jobs:
           r = json.loads(Path('work/emu-smoke/report.json').read_text())
           expected_pcm = 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93'
           if r.get('wav_raw_sha256') != expected_pcm:
-              raise SystemExit(f"FAIL: P9A changed frozen P8 PCM {r.get('wav_raw_sha256')} != {expected_pcm}")
+              raise SystemExit(f"FAIL: P9H3 changed frozen P8 PCM {r.get('wav_raw_sha256')} != {expected_pcm}")
           expected = {
               'dynamic_home_surface': True,
               'runtime_queue_high_water': 28,
@@ -88,8 +88,8 @@ jobs:
           }
           for k, v in expected.items():
               if r.get(k) != v:
-                  raise SystemExit(f'FAIL: P9A {k}={r.get(k)!r} != {v!r}')
-          print('PASS: P9A physical-control integration preserves exact frozen P8 audio/runtime')
+                  raise SystemExit(f'FAIL: P9H3 {k}={r.get(k)!r} != {v!r}')
+          print('PASS: P9H3 structural-control integration preserves exact frozen P8 audio/runtime')
           PY
 
       - name: Upload Phase 9 evidence
