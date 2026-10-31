@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: P9A FM-1 panel/navigation contract
+      - name: P9A/P9B FM-1 interaction contract
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             apsis/apsis_controls.c tests/test_controls.c -o /tmp/test_controls
           /tmp/test_controls
-      - name: P9A ASAN/UBSAN
+      - name: P9A/P9B ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
             -fsanitize=address,undefined -Iapsis \

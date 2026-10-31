@@ -2,10 +2,12 @@
 #define APSIS_CONTROLS_H
 
 #include <stdint.h>
+#include "apsis_state.h"
 
 #define APSIS_FM1_BUTTON_COUNT 14u
 #define APSIS_FM1_ENCODER_COUNT 7u
 #define APSIS_FM1_KEY_COUNT 27u
+#define APSIS_GRAVITY_DIRECT_KEYS 8u
 
 /* Pinned Dinghy/FM-1 physical ids. The generated target adapter must static-
  * assert these against platform.c before using this contract. */
@@ -67,6 +69,16 @@ typedef enum {
     APSIS_GLOBAL_ACTION_TRANSPORT_TOGGLE
 } ApsisGlobalAction;
 
+/* CLOCK has four physical edit layers. This byte is UI focus only; the actual
+ * musical truth remains the masks/bounds in ApsisClockState. */
+typedef enum {
+    APSIS_CLOCK_CONTROL_MAIN = 0,
+    APSIS_CLOCK_CONTROL_BETWEEN,
+    APSIS_CLOCK_CONTROL_SNAP,
+    APSIS_CLOCK_CONTROL_GROUP,
+    APSIS_CLOCK_CONTROL_LAYER_COUNT
+} ApsisClockControlLayer;
+
 /* P9A global navigation. HOME is absolute. SPACE is deliberately a chord:
  * an FX press edge is interpreted as SPACE when SEL is held at consumption. */
 uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
@@ -75,5 +87,21 @@ uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
 /* PLAY alone owns the global transport toggle. SEL+PLAY is reserved for the
  * later CHAIN interaction contract and must not accidentally toggle transport. */
 ApsisGlobalAction apsis_controls_global_action(const ApsisFm1InputFrame *input);
+
+/* P9B CLOCK: ALGORITHM detents cycle MAIN/BETWEEN/SNAP/GROUP. The first n
+ * physical note-key press edges edit the authoritative Clock masks/bounds.
+ * Returns the normalized layer or number of musical cells changed. */
+uint8_t apsis_controls_clock_layer_step(uint8_t current_layer, int32_t detents);
+uint8_t apsis_controls_clock_apply_keys(ApsisClockState *clock,
+                                        uint8_t layer,
+                                        uint32_t notes_pressed);
+
+/* P9B GRAVITY: first eight note keys address degrees 0..7. OCT-/OCT+ cycle the
+ * selected Anchor/Colour/Air ring. Degree selection is returned as a candidate;
+ * the target adapter must pass it through apsis_runtime_request_gravity(). */
+uint8_t apsis_controls_gravity_degree_from_fm1(const ApsisFm1InputFrame *input,
+                                               uint8_t *degree_out);
+uint8_t apsis_controls_gravity_ring_from_fm1(const ApsisFm1InputFrame *input,
+                                             uint8_t current_ring);
 
 #endif

@@ -1,7 +1,7 @@
 # Phase 9 Interaction Contract — FM-1 Physical Parity
 
 Date: 2026-10-31
-Status: P9A global panel/navigation contract frozen; per-surface musical mappings follow in P9B–P9G.
+Status: P9A global panel/navigation and P9B CLOCK/GRAVITY host contracts frozen; later surface contracts follow in P9C–P9G, with generated target/LED integration completed in P9H.
 Base: Phase-8 merged main `de60b5afea868c0f663a2c0d70b27787b302c86a`.
 
 ## Purpose
@@ -57,7 +57,45 @@ Rules:
 - SEL+PLAY is reserved for the later CHAIN interaction contract and must not accidentally toggle global transport.
 - No second transport or UI clock may be introduced.
 
-The target implementation must use the existing runtime start/stop path, including the existing String Attractor lifecycle wrapper where required by the generated target. P9A only freezes the gesture; target integration follows after deterministic routing tests.
+The target implementation uses the existing runtime start/stop path, including the existing String Attractor lifecycle wrapper. P9A target integration is edge-gated so the frozen P8 idle loop and LED path remain unchanged; persistent P9 LED feedback is intentionally deferred to P9H.
+
+## P9B CLOCK key-grid lock
+
+CLOCK uses the first `n` physical note keys, where the authoritative `ApsisClockState.n` remains constrained to 3..24. The three remaining FM-1 keys are not filled with unrelated features.
+
+`ALGORITHM` cycles one UI-only edit layer with wraparound:
+1. MAIN
+2. BETWEEN
+3. SNAP
+4. GROUP
+
+The layer byte is not musical state. The musical truth remains `main_mask`, `inner_mask`, `snap_mask` and `bounds[3]` in `ApsisClockState`.
+
+Key rules:
+- in MAIN/BETWEEN/SNAP, a note-key **press edge** toggles the corresponding bit for that Clock position;
+- all eligible press edges in one consumed frame are applied, so fast multi-key edits are deterministic rather than silently reduced to one key;
+- keys at positions `>= n` are inert;
+- GROUP uses positions 1..`n-1` as boundaries; position 0 is intentionally inert because no group can begin before Clock step 1;
+- GROUP toggles an existing boundary off, otherwise adds a boundary when one of the three source slots is free;
+- attempting to add a fourth simultaneous boundary is a no-op rather than silently replacing another boundary;
+- stored boundaries are normalized to unique ascending values with unused slots zero-filled.
+
+P9B does **not** yet assign BPM, Clock length, division, swing or voice encoders. Those remain later live-parameter work; this subphase freezes the geometry/key edit first.
+
+## P9B GRAVITY direct-control lock
+
+The lowest eight physical note-key indices map directly to Gravity degrees 0..7. If several degree press edges arrive in the same consumed frame, the lowest physical degree wins deterministically; the adapter must not emit a race of multiple harmony requests.
+
+`OCT-` / `OCT+` cycle the selected Gravity ring with wraparound:
+- 0 = Anchor
+- 1 = Colour
+- 2 = Air
+
+If OCT- and OCT+ edges are consumed together, they cancel and the current ring is retained.
+
+Critically, a physical degree press is only a **candidate**. The generated target must route that candidate through `apsis_runtime_request_gravity()` using the current selected ring, current runtime sample and the established runtime/MOTHER semantics. P9B must never write `state.gravity.degree` directly, because that would bypass immediate-vs-quantized change timing, target-minus-18ms commit timing and MOTHER `->1` ownership.
+
+Selected-point editing (`SEL + degree`), per-point parameter editing and advanced Gravity preview behavior remain later work; they are not smuggled into the P9B direct-degree contract.
 
 ## Reserved controls
 
@@ -79,7 +117,7 @@ An encoder turning on a surface must mutate only the parameter assigned to that 
 ## Phase split
 
 - **P9A** — panel vocabulary, direct navigation, SPACE chord, global transport gesture.
-- **P9B** — CLOCK key grid + GRAVITY eight-point direct play.
+- **P9B** — CLOCK four-layer key grid + GRAVITY eight-degree/ring direct controls.
 - **P9C** — STRING key map + continuous encoder slide/basic live parameters.
 - **P9D** — SPIRAL route entry/edit and bank semantics.
 - **P9E** — BLOOM petal/core/grow gesture and live parameters.
@@ -89,7 +127,7 @@ An encoder turning on a surface must mutate only the parameter assigned to that 
 
 Advanced String Motion capture, String/Spiral attractor editing and selected Gravity point editing remain Phase 10 as already defined by `docs/PLAN.md`.
 
-## P9A deterministic gate
+## P9A/P9B deterministic gate
 
 Host tests must prove:
 - the pinned 14-button / 7-encoder / 27-key vocabulary;
@@ -99,9 +137,15 @@ Host tests must prove:
 - HOME precedence;
 - invalid UI surface recovery to MOTHER;
 - PLAY alone produces a global transport toggle action;
-- SEL+PLAY does not produce that global action.
+- SEL+PLAY does not produce that global action;
+- CLOCK layer wrap in both directions and invalid-layer recovery;
+- MAIN/BETWEEN/SNAP toggle only first-`n` key positions;
+- GROUP add/remove/full/no-step-zero behavior and normalized boundary ordering;
+- GRAVITY direct-degree selection from only the first eight keys;
+- deterministic lowest-degree resolution for simultaneous degree edges;
+- OCT-/OCT+ ring wrap and simultaneous-edge cancellation.
 
-Before P9H target integration, the generated target must static-assert the local button/encoder ids against pinned Dinghy's `BTN_*` / `ENC_*` constants.
+Before P9H target integration, the generated target must static-assert the local button/encoder ids against pinned Dinghy's `BTN_*` / `ENC_*` constants. GRAVITY target integration must additionally prove that degree gestures call the existing runtime request path rather than mutating committed degree directly.
 
 ## Do not regress
 
