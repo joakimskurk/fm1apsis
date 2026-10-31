@@ -81,3 +81,17 @@ jobs:
             -o /tmp/test_controls_space_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_space_san
+      - name: P9H1 MOTHER-aware structural apply bridge
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_mother.c apsis/apsis_controls_apply.c \
+            tests/test_controls_apply.c -o /tmp/test_controls_apply
+          /tmp/test_controls_apply
+      - name: P9H1 apply bridge ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_mother.c apsis/apsis_controls_apply.c \
+            tests/test_controls_apply.c -o /tmp/test_controls_apply_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_apply_san
