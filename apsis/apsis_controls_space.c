@@ -44,11 +44,12 @@ void apsis_controls_space_reset(ApsisSpaceControlState *control)
 uint8_t apsis_controls_space_page_step(ApsisSpaceControlState *control,
                                        int32_t detents)
 {
+    const int32_t count = (int32_t)APSIS_SPACE_CONTROL_PAGE_COUNT;
     int32_t page;
     if (!control || !detents) return 0u;
     page = control->page < APSIS_SPACE_CONTROL_PAGE_COUNT ? control->page : 0;
-    page = (page + (detents % APSIS_SPACE_CONTROL_PAGE_COUNT)) % APSIS_SPACE_CONTROL_PAGE_COUNT;
-    if (page < 0) page += APSIS_SPACE_CONTROL_PAGE_COUNT;
+    page = (page + (detents % count)) % count;
+    if (page < 0) page += count;
     control->page = (uint8_t)page;
     return 1u;
 }
@@ -56,11 +57,12 @@ uint8_t apsis_controls_space_page_step(ApsisSpaceControlState *control,
 uint8_t apsis_controls_space_source_step(ApsisSpaceControlState *control,
                                          int32_t detents)
 {
+    const int32_t count = (int32_t)APSIS_MOTHER_SOURCE_COUNT;
     int32_t source;
     if (!control || !detents || control->page != APSIS_SPACE_CONTROL_ECHO_SEND) return 0u;
     source = control->source < APSIS_MOTHER_SOURCE_COUNT ? control->source : 0;
-    source = (source + (detents % APSIS_MOTHER_SOURCE_COUNT)) % APSIS_MOTHER_SOURCE_COUNT;
-    if (source < 0) source += APSIS_MOTHER_SOURCE_COUNT;
+    source = (source + (detents % count)) % count;
+    if (source < 0) source += count;
     control->source = (uint8_t)source;
     return 1u;
 }
