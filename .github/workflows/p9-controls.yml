@@ -1,0 +1,141 @@
+name: APSIS Phase 9 controls
+
+on:
+  push:
+    branches: [p9-controls]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  control-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P9A/P9B/P9C/P9D source-locked interaction contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_harmony.c apsis/apsis_string.c apsis/apsis_controls.c \
+            tests/test_controls.c -o /tmp/test_controls
+          /tmp/test_controls
+      - name: P9A/P9B/P9C/P9D ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_harmony.c apsis/apsis_string.c apsis/apsis_controls.c \
+            tests/test_controls.c -o /tmp/test_controls_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_san
+      - name: P9E BLOOM source-locked performance/parameter contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_harmony.c apsis/apsis_bloom.c apsis/apsis_controls_bloom.c \
+            tests/test_controls_bloom.c -o /tmp/test_controls_bloom
+          /tmp/test_controls_bloom
+      - name: P9E BLOOM ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_harmony.c apsis/apsis_bloom.c apsis/apsis_controls_bloom.c \
+            tests/test_controls_bloom.c -o /tmp/test_controls_bloom_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_bloom_san
+      - name: P9F KEEP/CHAIN source-locked control contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_controls_keep_chain.c \
+            tests/test_controls_keep_chain.c -o /tmp/test_controls_keep_chain
+          /tmp/test_controls_keep_chain
+      - name: P9F KEEP/CHAIN ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_controls_keep_chain.c \
+            tests/test_controls_keep_chain.c -o /tmp/test_controls_keep_chain_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_keep_chain_san
+      - name: P9G1 MOTHER live-mix and structural-sync contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_mother.c apsis/apsis_controls_mother.c \
+            tests/test_controls_mother.c -o /tmp/test_controls_mother
+          /tmp/test_controls_mother
+      - name: P9G1 MOTHER ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_mother.c apsis/apsis_controls_mother.c \
+            tests/test_controls_mother.c -o /tmp/test_controls_mother_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_mother_san
+      - name: P9G2 SPACE shared-room control contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_controls_space.c tests/test_controls_space.c \
+            -o /tmp/test_controls_space
+          /tmp/test_controls_space
+      - name: P9G2 SPACE ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_controls_space.c tests/test_controls_space.c \
+            -o /tmp/test_controls_space_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_space_san
+      - name: P9G3 DRIFT/TUNING live + structural contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_controls_drift.c tests/test_controls_drift.c \
+            -o /tmp/test_controls_drift
+          /tmp/test_controls_drift
+      - name: P9G3 DRIFT/TUNING ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_controls_drift.c tests/test_controls_drift.c \
+            -o /tmp/test_controls_drift_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_drift_san
+      - name: P9H1 MOTHER-aware structural apply bridge
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_mother.c apsis/apsis_controls_apply.c \
+            tests/test_controls_apply.c -o /tmp/test_controls_apply
+          /tmp/test_controls_apply
+      - name: P9H1 apply bridge ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_mother.c apsis/apsis_controls_apply.c \
+            tests/test_controls_apply.c -o /tmp/test_controls_apply_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_apply_san
+      - name: P9H2 unified control dispatcher
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_bloom.c apsis/apsis_keep.c \
+            apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_controls.c \
+            apsis/apsis_controls_drift.c apsis/apsis_controls_bloom.c \
+            apsis/apsis_controls_keep_chain.c apsis/apsis_controls_mother.c \
+            apsis/apsis_controls_space.c apsis/apsis_controls_apply.c \
+            apsis/apsis_controls_dispatch.c tests/test_controls_dispatch.c \
+            -o /tmp/test_controls_dispatch
+          /tmp/test_controls_dispatch
+      - name: P9H2 dispatcher ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_bloom.c apsis/apsis_keep.c \
+            apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_controls.c \
+            apsis/apsis_controls_drift.c apsis/apsis_controls_bloom.c \
+            apsis/apsis_controls_keep_chain.c apsis/apsis_controls_mother.c \
+            apsis/apsis_controls_space.c apsis/apsis_controls_apply.c \
+            apsis/apsis_controls_dispatch.c tests/test_controls_dispatch.c \
+            -o /tmp/test_controls_dispatch_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_dispatch_san

@@ -1,0 +1,111 @@
+name: APSIS Phase 9 target controls
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  p9-target:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P9.1 - pinned upstream and regressions
+        run: bash ci/prepare_dinghy.sh
+
+      - name: Gate P9.2 - generated H3 structural-control target
+        run: bash ci/apply_apsis_p9h.sh
+
+      - name: Gate P9.3 - real JieLi H3 target build
+        run: |
+          bash ci/build_apsis_target.sh
+          mkdir -p build/evidence
+          cp build/target_report.json build/evidence/p9-target-report.json
+          cp build/SHA256SUMS build/evidence/p9-SHA256SUMS
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          t = json.loads(Path('build/target_report.json').read_text())
+          if t.get('product') != 'FM-1_972':
+              raise SystemExit(f"FAIL: P9 product {t.get('product')!r}")
+          if t.get('ram', 0) > t.get('ram_max', 0):
+              raise SystemExit(f"FAIL: P9 RAM {t.get('ram')}/{t.get('ram_max')}")
+          if t.get('pool', 0) != 309532:
+              raise SystemExit(f"FAIL: P9 changed frozen POOL {t.get('pool')} != 309532")
+          print(f"PASS: P9H3 target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
+          PY
+
+      - name: Gate P9.4 - idle H3 integration preserves frozen P8 audio/runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 \
+          APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee build/evidence/emulator_p9_audible.txt
+          cp -a work/emu-smoke build/evidence/emulator-smoke-p9-audible
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path('work/emu-smoke/report.json').read_text())
+          expected_pcm = 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93'
+          if r.get('wav_raw_sha256') != expected_pcm:
+              raise SystemExit(f"FAIL: P9H3 changed frozen P8 PCM {r.get('wav_raw_sha256')} != {expected_pcm}")
+          expected = {
+              'dynamic_home_surface': True,
+              'runtime_queue_high_water': 28,
+              'runtime_queue_overflowed': 0,
+              'runtime_late_flags': 0,
+              'runtime_cursor_low32': 123392,
+          }
+          for k, v in expected.items():
+              if r.get(k) != v:
+                  raise SystemExit(f'FAIL: P9H3 {k}={r.get(k)!r} != {v!r}')
+          print('PASS: P9H3 structural-control integration preserves exact frozen P8 audio/runtime')
+          PY
+
+      - name: Upload Phase 9 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p9-target-evidence
+          path: build/evidence
+          if-no-files-found: warn
+
+      - name: Upload Phase 9 firmware
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: apsis-p9-firmware
+          path: |
+            build/apsis-0.1-dev.fwsc
+            build/target_report.json
+          if-no-files-found: error
