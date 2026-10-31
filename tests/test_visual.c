@@ -9,6 +9,11 @@
 #define PIXELS (APSIS_VISUAL_WIDTH * APSIS_VISUAL_HEIGHT)
 #define P8A_MOTHER_REFERENCE 0x27373657u
 #define P8A_GRAVITY_REFERENCE 0x55AFF30Bu
+#define P8B_STRING_REFERENCE 0x00532F1Du
+#define P8B_DRIFT_REFERENCE 0x9FF4AF95u
+#define P8B_CLOCK_REFERENCE 0x903A5F21u
+#define P8B_SPIRAL_REFERENCE 0x562A4043u
+#define P8B_BLOOM_REFERENCE 0x7FCC0856u
 
 static uint16_t full_frame[PIXELS];
 static uint16_t strip_frame[PIXELS];
@@ -127,22 +132,26 @@ static uint32_t render_full(ApsisVisualSurface surface,
     return fnv1a_pixels(full_frame, PIXELS);
 }
 
-static uint32_t render_two_strips(ApsisVisualSurface surface,
-                                  const ApsisState *state, const ApsisRuntime *runtime)
+static uint32_t render_strips(ApsisVisualSurface surface,
+                              const ApsisState *state, const ApsisRuntime *runtime,
+                              uint16_t strip_rows)
 {
     ApsisVisualRaster raster;
     ApsisVisualContext context;
+    uint16_t y;
     context.surface = surface;
     context.state = state;
     context.runtime = runtime;
     context.animation_tick = 0u;
     memset(strip_frame, 0xA5, sizeof strip_frame);
 
-    apsis_visual_bind(&raster, strip_frame, 240u, 120u, 240u, 0, 0);
-    apsis_visual_render_p8(&raster, &context);
-    apsis_visual_bind(&raster, strip_frame + 120u * 240u,
-                      240u, 120u, 240u, 0, 120);
-    apsis_visual_render_p8(&raster, &context);
+    for (y = 0u; y < APSIS_VISUAL_HEIGHT; y = (uint16_t)(y + strip_rows)) {
+        uint16_t rows = (uint16_t)(APSIS_VISUAL_HEIGHT - y);
+        if (rows > strip_rows) rows = strip_rows;
+        apsis_visual_bind(&raster, strip_frame + (uint32_t)y * APSIS_VISUAL_WIDTH,
+                          APSIS_VISUAL_WIDTH, rows, APSIS_VISUAL_WIDTH, 0, (int16_t)y);
+        apsis_visual_render_p8(&raster, &context);
+    }
     return fnv1a_pixels(strip_frame, PIXELS);
 }
 
@@ -166,8 +175,10 @@ static uint32_t assert_strip_surface(ApsisVisualSurface surface,
                                      const ApsisRuntime *runtime)
 {
     uint32_t full = render_full(surface, state, runtime);
-    uint32_t strips = render_two_strips(surface, state, runtime);
-    assert(full == strips);
+    uint32_t strips120 = render_strips(surface, state, runtime, 120u);
+    assert(full == strips120);
+    assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
+    assert(render_strips(surface, state, runtime, 8u) == full);
     assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
     assert(count_colour(full_frame, identity_colour) > 0u);
     return full;
@@ -190,17 +201,22 @@ static void test_strip_equivalence(void)
 
     string = assert_strip_surface(APSIS_VISUAL_SURFACE_STRING,
                                   APSIS_VISUAL_STRING, &state, &runtime);
+    assert(string == P8B_STRING_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
     drift = assert_strip_surface(APSIS_VISUAL_SURFACE_DRIFT,
                                  APSIS_VISUAL_DRIFT, &state, &runtime);
+    assert(drift == P8B_DRIFT_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
     clock = assert_strip_surface(APSIS_VISUAL_SURFACE_CLOCK,
                                  APSIS_VISUAL_CLOCK, &state, &runtime);
+    assert(clock == P8B_CLOCK_REFERENCE);
     spiral = assert_strip_surface(APSIS_VISUAL_SURFACE_SPIRAL,
                                   APSIS_VISUAL_SPIRAL, &state, &runtime);
+    assert(spiral == P8B_SPIRAL_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
     bloom = assert_strip_surface(APSIS_VISUAL_SURFACE_BLOOM,
                                  APSIS_VISUAL_BLOOM, &state, &runtime);
+    assert(bloom == P8B_BLOOM_REFERENCE);
 
     assert(mother != gravity);
     assert(string != drift && drift != clock && clock != spiral && spiral != bloom);
