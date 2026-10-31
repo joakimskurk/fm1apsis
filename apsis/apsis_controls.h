@@ -2,12 +2,13 @@
 #define APSIS_CONTROLS_H
 
 #include <stdint.h>
-#include "apsis_state.h"
+#include "apsis_string.h"
 
 #define APSIS_FM1_BUTTON_COUNT 14u
 #define APSIS_FM1_ENCODER_COUNT 7u
 #define APSIS_FM1_KEY_COUNT 27u
 #define APSIS_GRAVITY_DIRECT_KEYS 8u
+#define APSIS_STRING_FINE_STEPS 128u
 
 /* Pinned Dinghy/FM-1 physical ids. The generated target adapter must static-
  * assert these against platform.c before using this contract. */
@@ -103,5 +104,25 @@ uint8_t apsis_controls_gravity_degree_from_fm1(const ApsisFm1InputFrame *input,
                                                uint8_t *degree_out);
 uint8_t apsis_controls_gravity_ring_from_fm1(const ApsisFm1InputFrame *input,
                                              uint8_t current_ring);
+
+/* P9C STRING coordinate contract. No pitch table exists here: note keys and
+ * SELECT express only the existing split coordinate. P9H applies the result
+ * through apsis_string_set_side_split(), after which the existing String /
+ * Gravity / quantize / tuning pipeline owns pitch exactly as before.
+ *
+ * Classic always addresses RIGHT, because the frozen Classic DSP reads RIGHT
+ * as its single centre coordinate. Dual defaults to RIGHT/WIRE and SEL-held
+ * addresses LEFT/BODY. Key 0 is the 1:1 centre on either side; key 26 is the
+ * corresponding outer limit. SELECT provides 128 equal fine steps over that
+ * same half-string. */
+uint8_t apsis_controls_string_side_from_fm1(const ApsisStringState *string,
+                                            const ApsisFm1InputFrame *input);
+uint8_t apsis_controls_string_key_from_fm1(const ApsisFm1InputFrame *input,
+                                           uint8_t *key_out);
+uint16_t apsis_controls_string_split_for_key(uint8_t side, uint8_t key_index);
+uint16_t apsis_controls_string_split_nudge(uint8_t side,
+                                           uint16_t current_split,
+                                           int32_t detents);
+uint8_t apsis_controls_string_mode_step(uint8_t current_mode, int32_t detents);
 
 #endif

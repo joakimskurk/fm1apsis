@@ -63,6 +63,17 @@ static uint8_t apsis_controls_toggle_boundary(ApsisClockState *clock,
     return 0u;
 }
 
+static uint16_t apsis_controls_string_clamp(uint8_t side, int32_t split)
+{
+    int32_t lo = side == APSIS_SIDE_LEFT ? (int32_t)APSIS_STRING_SPLIT_MIN_Q15
+                                          : (int32_t)APSIS_STRING_SPLIT_MID_Q15;
+    int32_t hi = side == APSIS_SIDE_LEFT ? (int32_t)APSIS_STRING_SPLIT_MID_Q15
+                                          : (int32_t)APSIS_STRING_SPLIT_MAX_Q15;
+    if (split < lo) split = lo;
+    if (split > hi) split = hi;
+    return (uint16_t)split;
+}
+
 uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
                                         uint8_t current_surface)
 {
@@ -178,4 +189,69 @@ uint8_t apsis_controls_gravity_ring_from_fm1(const ApsisFm1InputFrame *input,
     if (down == up) return ring;
     if (up) return (uint8_t)((ring + 1u) % 3u);
     return ring == 0u ? 2u : (uint8_t)(ring - 1u);
+}
+
+uint8_t apsis_controls_string_side_from_fm1(const ApsisStringState *string,
+                                            const ApsisFm1InputFrame *input)
+{
+    if (!string || string->surface_mode == APSIS_STRING_CLASSIC)
+        return APSIS_SIDE_RIGHT;
+    if (input && (input->buttons_held & apsis_button_bit(APSIS_FM1_BTN_SEL)))
+        return APSIS_SIDE_LEFT;
+    return APSIS_SIDE_RIGHT;
+}
+
+uint8_t apsis_controls_string_key_from_fm1(const ApsisFm1InputFrame *input,
+                                           uint8_t *key_out)
+{
+    uint8_t key;
+    if (!input || !key_out) return 0u;
+    for (key = 0u; key < APSIS_FM1_KEY_COUNT; ++key) {
+        if (input->notes_pressed & (1u << key)) {
+            *key_out = key;
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+uint16_t apsis_controls_string_split_for_key(uint8_t side, uint8_t key_index)
+{
+    uint32_t travel;
+    uint32_t delta;
+    if (key_index >= APSIS_FM1_KEY_COUNT) key_index = APSIS_FM1_KEY_COUNT - 1u;
+    if (side == APSIS_SIDE_LEFT) {
+        travel = (uint32_t)APSIS_STRING_SPLIT_MID_Q15 - APSIS_STRING_SPLIT_MIN_Q15;
+        delta = (travel * key_index + 13u) / 26u;
+        return (uint16_t)(APSIS_STRING_SPLIT_MID_Q15 - delta);
+    }
+    travel = (uint32_t)APSIS_STRING_SPLIT_MAX_Q15 - APSIS_STRING_SPLIT_MID_Q15;
+    delta = (travel * key_index + 13u) / 26u;
+    return (uint16_t)(APSIS_STRING_SPLIT_MID_Q15 + delta);
+}
+
+uint16_t apsis_controls_string_split_nudge(uint8_t side,
+                                           uint16_t current_split,
+                                           int32_t detents)
+{
+    int32_t direction = side == APSIS_SIDE_LEFT ? -1 : 1;
+    uint32_t travel = (uint32_t)APSIS_STRING_SPLIT_MAX_Q15 - APSIS_STRING_SPLIT_MID_Q15;
+    int32_t one = (int32_t)((travel + APSIS_STRING_FINE_STEPS / 2u) /
+                            APSIS_STRING_FINE_STEPS);
+    int64_t candidate;
+    if (one < 1) one = 1;
+    candidate = (int64_t)current_split + (int64_t)direction * detents * one;
+    if (candidate < -2147483647LL) candidate = -2147483647LL;
+    if (candidate > 2147483647LL) candidate = 2147483647LL;
+    return apsis_controls_string_clamp(side, (int32_t)candidate);
+}
+
+uint8_t apsis_controls_string_mode_step(uint8_t current_mode, int32_t detents)
+{
+    uint8_t mode = current_mode == APSIS_STRING_CLASSIC ? APSIS_STRING_CLASSIC : APSIS_STRING_DUAL;
+    int32_t odd = detents % 2;
+    if (odd < 0) odd = -odd;
+    return odd ? (uint8_t)(mode == APSIS_STRING_CLASSIC ? APSIS_STRING_DUAL
+                                                        : APSIS_STRING_CLASSIC)
+               : mode;
 }

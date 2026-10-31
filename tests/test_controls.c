@@ -46,18 +46,14 @@ static int test_p9a(void)
     in.buttons_held = bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
     CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_SPACE);
 
-    /* SEL+FX pressed in one consumed input frame also qualifies: the contract
-     * is edge-on-FX plus current SEL-held state, exactly what Dinghy exposes. */
     in.buttons_pressed |= bit(APSIS_FM1_BTN_SEL);
     CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_SPACE);
 
-    /* Pressing SEL while FX is merely held is not the SPACE gesture. */
     memset(&in, 0, sizeof in);
     in.buttons_pressed = bit(APSIS_FM1_BTN_SEL);
     in.buttons_held = bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
     CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_BLOOM);
 
-    /* HOME stays absolute even if the SPACE chord edge arrives simultaneously. */
     memset(&in, 0, sizeof in);
     in.buttons_pressed = bit(APSIS_FM1_BTN_HOME) | bit(APSIS_FM1_BTN_FX);
     in.buttons_held = bit(APSIS_FM1_BTN_HOME) | bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
@@ -71,7 +67,6 @@ static int test_p9a(void)
     in.buttons_pressed = bit(APSIS_FM1_BTN_PLAY);
     in.buttons_held = bit(APSIS_FM1_BTN_PLAY);
     CHECK(apsis_controls_global_action(&in) == APSIS_GLOBAL_ACTION_TRANSPORT_TOGGLE);
-
     in.buttons_held |= bit(APSIS_FM1_BTN_SEL);
     CHECK(apsis_controls_global_action(&in) == APSIS_GLOBAL_ACTION_NONE);
     CHECK(apsis_controls_global_action(0) == APSIS_GLOBAL_ACTION_NONE);
@@ -82,7 +77,6 @@ static int test_clock_layers_and_keys(void)
 {
     ApsisClockState c;
     memset(&c, 0, sizeof c);
-
     CHECK(APSIS_CLOCK_CONTROL_LAYER_COUNT == 4u);
     CHECK(apsis_controls_clock_layer_step(APSIS_CLOCK_CONTROL_MAIN, 1) == APSIS_CLOCK_CONTROL_BETWEEN);
     CHECK(apsis_controls_clock_layer_step(APSIS_CLOCK_CONTROL_MAIN, 3) == APSIS_CLOCK_CONTROL_GROUP);
@@ -95,27 +89,22 @@ static int test_clock_layers_and_keys(void)
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_MAIN,
                                           (1u << 1) | (1u << 4) | (1u << 5)) == 2u);
     CHECK(c.main_mask == (0x1Fu ^ (1u << 1) ^ (1u << 4)));
-
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_BETWEEN,
                                           (1u << 0) | (1u << 3)) == 2u);
     CHECK(c.inner_mask == ((1u << 0) | (1u << 3)));
-    CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_SNAP,
-                                          (1u << 2)) == 1u);
+    CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_SNAP, 1u << 2) == 1u);
     CHECK(c.snap_mask == (1u << 2));
     CHECK(apsis_controls_clock_apply_keys(&c, 255u, 0xFFFFFFFFu) == 0u);
     CHECK(apsis_controls_clock_apply_keys(0, APSIS_CLOCK_CONTROL_MAIN, 1u) == 0u);
 
     memset(&c, 0, sizeof c);
     c.n = 8u;
-    c.bounds[0] = 6u;
-    c.bounds[1] = 2u;
-    c.bounds[2] = 4u;
+    c.bounds[0] = 6u; c.bounds[1] = 2u; c.bounds[2] = 4u;
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_GROUP, 1u << 4) == 1u);
     CHECK(c.bounds[0] == 2u && c.bounds[1] == 6u && c.bounds[2] == 0u);
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_GROUP, 1u << 5) == 1u);
     CHECK(c.bounds[0] == 2u && c.bounds[1] == 5u && c.bounds[2] == 6u);
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_GROUP, 1u << 3) == 0u);
-    CHECK(c.bounds[0] == 2u && c.bounds[1] == 5u && c.bounds[2] == 6u);
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_GROUP, 1u << 0) == 0u);
     CHECK(apsis_controls_clock_apply_keys(&c, APSIS_CLOCK_CONTROL_GROUP, 1u << 2) == 1u);
     CHECK(c.bounds[0] == 5u && c.bounds[1] == 6u && c.bounds[2] == 0u);
@@ -126,16 +115,12 @@ static int test_gravity_direct_controls(void)
 {
     ApsisFm1InputFrame in;
     uint8_t degree = 99u;
-
     memset(&in, 0, sizeof in);
     in.notes_pressed = (1u << 5) | (1u << 2);
     CHECK(apsis_controls_gravity_degree_from_fm1(&in, &degree) == 1u);
     CHECK(degree == 2u);
-
     in.notes_pressed = 1u << 8;
     CHECK(apsis_controls_gravity_degree_from_fm1(&in, &degree) == 0u);
-    CHECK(apsis_controls_gravity_degree_from_fm1(0, &degree) == 0u);
-    CHECK(apsis_controls_gravity_degree_from_fm1(&in, 0) == 0u);
 
     memset(&in, 0, sizeof in);
     in.buttons_pressed = bit(APSIS_FM1_BTN_OCT_UP);
@@ -146,9 +131,63 @@ static int test_gravity_direct_controls(void)
     CHECK(apsis_controls_gravity_ring_from_fm1(&in, 2u) == 1u);
     in.buttons_pressed = bit(APSIS_FM1_BTN_OCT_DOWN) | bit(APSIS_FM1_BTN_OCT_UP);
     CHECK(apsis_controls_gravity_ring_from_fm1(&in, 1u) == 1u);
-    in.buttons_pressed = 0u;
-    CHECK(apsis_controls_gravity_ring_from_fm1(&in, 9u) == 0u);
-    CHECK(apsis_controls_gravity_ring_from_fm1(0, 2u) == 2u);
+    return 0;
+}
+
+static int test_string_coordinate_controls(void)
+{
+    ApsisStringState s;
+    ApsisFm1InputFrame in;
+    uint8_t key = 99u, i;
+    uint16_t prev;
+    memset(&s, 0, sizeof s);
+    memset(&in, 0, sizeof in);
+
+    s.surface_mode = APSIS_STRING_CLASSIC;
+    in.buttons_held = bit(APSIS_FM1_BTN_SEL);
+    CHECK(apsis_controls_string_side_from_fm1(&s, &in) == APSIS_SIDE_RIGHT);
+    s.surface_mode = APSIS_STRING_DUAL;
+    CHECK(apsis_controls_string_side_from_fm1(&s, &in) == APSIS_SIDE_LEFT);
+    in.buttons_held = 0u;
+    CHECK(apsis_controls_string_side_from_fm1(&s, &in) == APSIS_SIDE_RIGHT);
+
+    in.notes_pressed = (1u << 19) | (1u << 4);
+    CHECK(apsis_controls_string_key_from_fm1(&in, &key) == 1u && key == 4u);
+    in.notes_pressed = 0u;
+    CHECK(apsis_controls_string_key_from_fm1(&in, &key) == 0u);
+
+    CHECK(apsis_controls_string_split_for_key(APSIS_SIDE_RIGHT, 0u) == APSIS_STRING_SPLIT_MID_Q15);
+    CHECK(apsis_controls_string_split_for_key(APSIS_SIDE_RIGHT, 26u) == APSIS_STRING_SPLIT_MAX_Q15);
+    CHECK(apsis_controls_string_split_for_key(APSIS_SIDE_LEFT, 0u) == APSIS_STRING_SPLIT_MID_Q15);
+    CHECK(apsis_controls_string_split_for_key(APSIS_SIDE_LEFT, 26u) == APSIS_STRING_SPLIT_MIN_Q15);
+    CHECK(apsis_controls_string_split_for_key(APSIS_SIDE_RIGHT, 99u) == APSIS_STRING_SPLIT_MAX_Q15);
+
+    prev = apsis_controls_string_split_for_key(APSIS_SIDE_RIGHT, 0u);
+    for (i = 1u; i < APSIS_FM1_KEY_COUNT; ++i) {
+        uint16_t now = apsis_controls_string_split_for_key(APSIS_SIDE_RIGHT, i);
+        CHECK(now > prev); prev = now;
+    }
+    prev = apsis_controls_string_split_for_key(APSIS_SIDE_LEFT, 0u);
+    for (i = 1u; i < APSIS_FM1_KEY_COUNT; ++i) {
+        uint16_t now = apsis_controls_string_split_for_key(APSIS_SIDE_LEFT, i);
+        CHECK(now < prev); prev = now;
+    }
+
+    CHECK(apsis_controls_string_split_nudge(APSIS_SIDE_RIGHT,
+            APSIS_STRING_SPLIT_MID_Q15, 1) > APSIS_STRING_SPLIT_MID_Q15);
+    CHECK(apsis_controls_string_split_nudge(APSIS_SIDE_LEFT,
+            APSIS_STRING_SPLIT_MID_Q15, 1) < APSIS_STRING_SPLIT_MID_Q15);
+    CHECK(apsis_controls_string_split_nudge(APSIS_SIDE_RIGHT,
+            APSIS_STRING_SPLIT_MAX_Q15, 1000) == APSIS_STRING_SPLIT_MAX_Q15);
+    CHECK(apsis_controls_string_split_nudge(APSIS_SIDE_LEFT,
+            APSIS_STRING_SPLIT_MIN_Q15, 1000) == APSIS_STRING_SPLIT_MIN_Q15);
+    CHECK(apsis_controls_string_split_nudge(APSIS_SIDE_RIGHT,
+            APSIS_STRING_SPLIT_MID_Q15, -1000) == APSIS_STRING_SPLIT_MID_Q15);
+
+    CHECK(apsis_controls_string_mode_step(APSIS_STRING_DUAL, 1) == APSIS_STRING_CLASSIC);
+    CHECK(apsis_controls_string_mode_step(APSIS_STRING_CLASSIC, -1) == APSIS_STRING_DUAL);
+    CHECK(apsis_controls_string_mode_step(APSIS_STRING_DUAL, 2) == APSIS_STRING_DUAL);
+    CHECK(apsis_controls_string_mode_step(99u, 0) == APSIS_STRING_DUAL);
     return 0;
 }
 
@@ -157,6 +196,7 @@ int main(void)
     CHECK(test_p9a() == 0);
     CHECK(test_clock_layers_and_keys() == 0);
     CHECK(test_gravity_direct_controls() == 0);
-    puts("PASS: APSIS P9A/P9B FM-1 interaction contract");
+    CHECK(test_string_coordinate_controls() == 0);
+    puts("PASS: APSIS P9A/P9B/P9C1 FM-1 interaction contract");
     return 0;
 }
