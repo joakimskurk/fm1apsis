@@ -8,7 +8,9 @@
 #define APSIS_FM1_ENCODER_COUNT 7u
 #define APSIS_FM1_KEY_COUNT 27u
 #define APSIS_GRAVITY_DIRECT_KEYS 8u
-#define APSIS_STRING_FINE_STEPS 128u
+#define APSIS_STRING_KEYS_PER_BANK 9u
+#define APSIS_STRING_VISIBLE_BANKS 3u
+#define APSIS_STRING_BANK_BASE_MAX 1u
 
 /* Pinned Dinghy/FM-1 physical ids. The generated target adapter must static-
  * assert these against platform.c before using this contract. */
@@ -39,9 +41,6 @@ typedef enum {
     APSIS_FM1_ENC_PRESETS = 6
 } ApsisFm1Encoder;
 
-/* Canonical UI surface vocabulary. This is navigation state only; it is not a
- * duplicate of APSIS musical state. Keep the order aligned with the frozen P8
- * target surface order so the adapter can migrate without translation tables. */
 typedef enum {
     APSIS_SURFACE_MOTHER = 0,
     APSIS_SURFACE_STRING,
@@ -70,8 +69,6 @@ typedef enum {
     APSIS_GLOBAL_ACTION_TRANSPORT_TOGGLE
 } ApsisGlobalAction;
 
-/* CLOCK has four physical edit layers. This byte is UI focus only; the actual
- * musical truth remains the masks/bounds in ApsisClockState. */
 typedef enum {
     APSIS_CLOCK_CONTROL_MAIN = 0,
     APSIS_CLOCK_CONTROL_BETWEEN,
@@ -80,49 +77,58 @@ typedef enum {
     APSIS_CLOCK_CONTROL_LAYER_COUNT
 } ApsisClockControlLayer;
 
-/* P9A global navigation. HOME is absolute. SPACE is deliberately a chord:
- * an FX press edge is interpreted as SPACE when SEL is held at consumption. */
+typedef enum {
+    APSIS_CONTROL_PARAM_NONE = 0,
+    APSIS_CONTROL_PARAM_STRING_RESONANCE,
+    APSIS_CONTROL_PARAM_STRING_BRIGHTNESS,
+    APSIS_CONTROL_PARAM_STRING_GLIDE,
+    APSIS_CONTROL_PARAM_STRING_SPAN
+} ApsisControlParam;
+
+typedef struct {
+    uint8_t param;
+    int32_t value;
+} ApsisControlParamEdit;
+
 uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
                                         uint8_t current_surface);
-
-/* PLAY alone owns the global transport toggle. SEL+PLAY is reserved for the
- * later CHAIN interaction contract and must not accidentally toggle transport. */
 ApsisGlobalAction apsis_controls_global_action(const ApsisFm1InputFrame *input);
 
-/* P9B CLOCK: ALGORITHM detents cycle MAIN/BETWEEN/SNAP/GROUP. The first n
- * physical note-key press edges edit the authoritative Clock masks/bounds.
- * Returns the normalized layer or number of musical cells changed. */
 uint8_t apsis_controls_clock_layer_step(uint8_t current_layer, int32_t detents);
 uint8_t apsis_controls_clock_apply_keys(ApsisClockState *clock,
                                         uint8_t layer,
                                         uint32_t notes_pressed);
 
-/* P9B GRAVITY: first eight note keys address degrees 0..7. OCT-/OCT+ cycle the
- * selected Anchor/Colour/Air ring. Degree selection is returned as a candidate;
- * the target adapter must pass it through apsis_runtime_request_gravity(). */
 uint8_t apsis_controls_gravity_degree_from_fm1(const ApsisFm1InputFrame *input,
                                                uint8_t *degree_out);
 uint8_t apsis_controls_gravity_ring_from_fm1(const ApsisFm1InputFrame *input,
                                              uint8_t current_ring);
 
-/* P9C STRING coordinate contract. No pitch table exists here: note keys and
- * SELECT express only the existing split coordinate. P9H applies the result
- * through apsis_string_set_side_split(), after which the existing String /
- * Gravity / quantize / tuning pipeline owns pitch exactly as before.
- *
- * Classic always addresses RIGHT, because the frozen Classic DSP reads RIGHT
- * as its single centre coordinate. Dual defaults to RIGHT/WIRE and SEL-held
- * addresses LEFT/BODY. Key 0 is the 1:1 centre on either side; key 26 is the
- * corresponding outer limit. SELECT provides 128 equal fine steps over that
- * same half-string. */
+/* P9C STRING input remains an expression of the existing String coordinate.
+ * The 27 FM-1 keys expose three copies of the source browser's 9-key String
+ * keyboard. bank_base=0 exposes source octave banks 0/1/2; bank_base=1 exposes
+ * 1/2/3. The split returned here is then applied with the existing
+ * apsis_string_set_side_split(..., mirror=1) path. */
 uint8_t apsis_controls_string_side_from_fm1(const ApsisStringState *string,
                                             const ApsisFm1InputFrame *input);
 uint8_t apsis_controls_string_key_from_fm1(const ApsisFm1InputFrame *input,
                                            uint8_t *key_out);
-uint16_t apsis_controls_string_split_for_key(uint8_t side, uint8_t key_index);
+uint8_t apsis_controls_string_bank_from_fm1(const ApsisFm1InputFrame *input,
+                                            uint8_t current_base);
+uint16_t apsis_controls_string_split_for_key(const ApsisState *state,
+                                             uint8_t side,
+                                             uint8_t key_index,
+                                             uint8_t bank_base);
 uint16_t apsis_controls_string_split_nudge(uint8_t side,
                                            uint16_t current_split,
                                            int32_t detents);
 uint8_t apsis_controls_string_mode_step(uint8_t current_mode, int32_t detents);
+
+/* Source-bounded K1..K4 edits. Values are native state units (Q15 for all four
+ * current String roles). This function never mutates ApsisState: the target
+ * adapter must either apply the edit or queue it through MOTHER ->1. */
+uint8_t apsis_controls_string_param_edits(const ApsisStringState *string,
+                                          const ApsisFm1InputFrame *input,
+                                          ApsisControlParamEdit out[4]);
 
 #endif

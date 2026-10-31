@@ -11,15 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: P9A/P9B/P9C1 FM-1 interaction contract
+      - name: P9A/P9B/P9C source-locked interaction contract
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            apsis/apsis_controls.c tests/test_controls.c -o /tmp/test_controls
+            apsis/apsis_harmony.c apsis/apsis_string.c apsis/apsis_controls.c \
+            tests/test_controls.c -o /tmp/test_controls
           /tmp/test_controls
-      - name: P9A/P9B/P9C1 ASAN/UBSAN
+      - name: P9A/P9B/P9C ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
             -fsanitize=address,undefined -Iapsis \
-            apsis/apsis_controls.c tests/test_controls.c -o /tmp/test_controls_san
+            apsis/apsis_harmony.c apsis/apsis_string.c apsis/apsis_controls.c \
+            tests/test_controls.c -o /tmp/test_controls_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_san
