@@ -52,7 +52,12 @@ if h[0] == h[1]:
     raise SystemExit('FAIL: SEQ did not visibly change APSIS surface')
 if h[1] == h[2]:
     raise SystemExit('FAIL: HOME did not visibly return from CLOCK surface')
-if h[0] != h[2]:
+# Legacy surfaces are static, so historical gates still require HOME to restore
+# the exact boot bitmap. Phase 8 native surfaces are live views of ApsisState;
+# returning to MOTHER later may legitimately show evolved state. P8 opts into
+# that rule explicitly while retaining both visible navigation checks above.
+dynamic_home = os.environ.get('APSIS_EMU_DYNAMIC_HOME', '0') == '1'
+if not dynamic_home and h[0] != h[2]:
     raise SystemExit('FAIL: HOME did not restore the original MOTHER surface')
 
 wp = root / 'apsis.wav'
@@ -126,6 +131,7 @@ if late_trace_hash == 0:
 report = {
     'screens': [p.name for p in shots],
     'screen_sha256': h,
+    'dynamic_home_surface': dynamic_home,
     'wav_frames': fr,
     'wav_channels': ch,
     'wav_peak': peak,
