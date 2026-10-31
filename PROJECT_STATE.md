@@ -4,12 +4,13 @@ Last updated: 2026-10-31
 
 ## Current milestone
 
-**Phase 8 — native 240×240 visual surfaces is technically complete on branch `p8-visuals`; PR #18 merge is pending. Phase 9 physical interaction parity is next after merge.**
+**Phase 8 — native 240×240 visual surfaces is complete and merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18. Phase 9 — physical interaction parity is current.**
 
-Current Phase-8 technical head:
-- `87575aa829f3fab6af43092b440d585745eecc25`
-- PR #18 `Phase 8: native 240×240 APSIS visual surfaces`
-- final technical P8 host + target gates on this head: **PASS**
+Phase-8 freeze:
+- technical source head `87575aa829f3fab6af43092b440d585745eecc25`
+- final documentation/CI head `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`
+- merge commit `4d71d712b34a684fb8f74f6b98ed675a9d5e1457`
+- exact-head gates: core #460, staged #449, P6-final #54, P7-storage #41, P7-target #34, P8-visuals #44 and P8-target #19 — **all PASS**
 
 Phase 7 remains merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.
 Phase 6 remains merged as `cd321e9f7999d0568d280d89e7e3574c3da66054` via PR #16.
@@ -162,13 +163,12 @@ The visual contract is source-derived and deterministic; screenshot/pixel-identi
 
 ## Exact next action — Phase 9
 
-After guarded merge of PR #18:
 1. freeze the FM-1 physical interaction/control contract before changing mappings;
 2. map direct access for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER and SPACE using the existing shared state graph;
 3. preserve HOME -> MOTHER and avoid UI shadow musical state;
 4. define encoder/pot pickup and edit semantics without mutating untouched parameters;
 5. add deterministic input-routing tests before target integration;
-6. validate that physical-control polling/LED work does not change the frozen audio/runtime baseline.
+6. validate that control polling/LED work does not change the frozen audio/runtime baseline.
 
 ## Do not regress
 

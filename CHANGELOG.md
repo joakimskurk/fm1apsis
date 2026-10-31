@@ -2,9 +2,9 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-10-31 - Phase 8 native visual technical candidate frozen
+## 2026-10-31 - Phase 8 native visuals merged
 
-PR #18 technical implementation is complete on `87575aa829f3fab6af43092b440d585745eecc25`; guarded merge remains pending while the final documentation head is revalidated.
+PR #18 merged to `main` as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` after final documentation/CI head `856c4e35ae1f041da8ccdc555f4c82b54f43a04a` passed core #460, staged #449, P6-final #54, P7-storage #41, P7-target #34, P8-visuals #44 and P8-target #19.
 
 Completed:
 - source-derived allocation-free 240×240 visual raster and canonical RGB565 palette
@@ -32,7 +32,7 @@ A first native redraw changed only early audio despite exact runtime telemetry. 
 
 The Phase-8 visual contract is deterministic and source-derived; screenshot/pixel-identical browser parity and real FM-1 panel appearance are not claimed.
 
-Next after guarded merge: Phase 9 physical interaction parity.
+Next: Phase 9 physical interaction parity.
 
 ## 2026-10-30 - Phase 7 persistent KEEP/CHAIN storage merged
 

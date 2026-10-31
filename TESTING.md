@@ -91,6 +91,8 @@ Generated-target guards prove:
 ## Final technical Phase-8 candidate
 
 Firmware source head: `87575aa829f3fab6af43092b440d585745eecc25`.
+Final documentation/CI head: `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`.
+Merged via PR #18 as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457`.
 
 Real JieLi target:
 - product `FM-1_972`
@@ -114,6 +116,17 @@ Pinned emulator, audible:
 - late trace `811c9dc5`
 - dynamic HOME -> MOTHER contract passes
 
+## Final exact-head matrix
+
+On `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`:
+- APSIS core #460 — PASS
+- APSIS staged validation #449 — PASS
+- APSIS Phase 6 final checkpoint #54 — PASS
+- APSIS Phase 7 storage #41 — PASS
+- APSIS Phase 7 target persistence #34 — PASS
+- APSIS Phase 8 visuals #44 — PASS
+- APSIS Phase 8 target visuals #19 — PASS
+
 ## Regression caught during Phase 8
 
 The first native target renderer changed PCM even though cursor, queue, overflow and late telemetry were all exact. Investigation showed large LCD updates could wait in Dinghy `cv_begin()`/`lcd_sync()` for previous 12 MHz LCD DMA completion.
@@ -135,6 +148,6 @@ Still unverified until physical hardware exists:
 - real NOR erase/program timing and power interruption
 - worst-case combined UI/control/audio load
 
-## Next verification
+## Next verification — Phase 9
 
-Run core + staged + P6-final + P7-storage + P7-target + P8-visuals + P8-target on the final documentation head, then guarded-merge PR #18.
+Freeze the physical FM-1 interaction contract, add deterministic input-routing tests, then prove target control polling/LED feedback can operate without changing the frozen audio/runtime baseline. Physical ergonomics remain level 6 and cannot be claimed without hardware.

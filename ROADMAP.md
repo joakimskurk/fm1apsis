@@ -71,7 +71,7 @@ Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`: image 
 
 ## Phase 8 — native visual surfaces
 
-Status: **[x] technical implementation complete on `87575aa829f3fab6af43092b440d585745eecc25`; PR #18 merge pending.**
+Status: **[x] complete and merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18.**
 
 - [x] freeze source-derived 240×240 layout/visual contract
 - [x] inventory pinned FM-1 graphics/update path and redraw hazards
@@ -91,7 +91,8 @@ Status: **[x] technical implementation complete on `87575aa829f3fab6af43092b440d
 - [x] preserve exact P7/P6 audible PCM by deferring native takeover until runtime sample 8192
 - [x] expose all 10 surfaces to target adapter while leaving final SPACE physical mapping to Phase 9
 - [x] real JieLi target + pinned emulator P8 gate
-- [ ] guarded PR #18 merge
+- [x] final exact-head matrix on `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`
+- [x] guarded PR #18 squash merge
 
 Frozen technical P8 head `87575aa829f3fab6af43092b440d585745eecc25`:
 - image 118,040 / 581,564 B
@@ -103,7 +104,7 @@ Frozen technical P8 head `87575aa829f3fab6af43092b440d585745eecc25`:
 
 ## Phase 9 — physical interaction parity
 
-Status: **[ ] next after Phase 8 merge.**
+Status: **[~] current.**
 
 - [ ] freeze FM-1 control/gesture mapping contract
 - [ ] direct mappings for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER and SPACE
@@ -138,4 +139,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Finalize exact-head CI and guarded merge for Phase 8. Then begin Phase 9 by freezing the physical FM-1 interaction contract before changing any button/encoder/pot mappings.
+Begin Phase 9 by freezing the physical FM-1 interaction contract before changing any button/encoder/pot mappings. Keep control routing read/write access anchored to the existing shared APSIS state and add deterministic routing tests before target integration.

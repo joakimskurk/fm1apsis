@@ -27,8 +27,8 @@ The repository, not chat history, is the durable source of project state.
 - Phase 5 sounding-source structural integration: complete and merged as `d677a887cf6dc8552634bde5a71fec0221c299b5`
 - Phase 6 shared Space/Cathedral: complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`
 - Phase 7 persistent KEEP/CHAIN storage: complete and merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285`
-- Phase 8 native 240×240 visual surfaces: **technical implementation complete; PR #18 merge pending**
-- Phase 9 physical interaction parity: next after Phase 8 merge
+- Phase 8 native 240×240 visual surfaces: complete and merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18
+- Phase 9 physical interaction parity: **current phase**
 
 Physical FM-1 validation has not yet been performed. Real hardware ISR margin, real NOR power-interruption behaviour, DAC/listening quality and physical controls/display behaviour therefore remain unverified.
 
@@ -55,7 +55,7 @@ The source instrument is one shared musical state seen through STRING, DRIFT/TUN
 
 Historical M4/M5 emulator baseline remains cursor **123,648**. The integrated Phase-6/7/8 scenario remains separately frozen at cursor **123,392**, queue 28/512, overflow 0, late flags 0 and trace `811c9dc5`.
 
-## Phase 8 — native 240×240 visuals
+## Phase 8 — frozen native visuals
 
 Phase 8 adds a read-only, allocation-free visual layer over the existing APSIS state graph. It does not create musical/UI shadow state.
 
@@ -64,12 +64,12 @@ Ten native surfaces are frozen and deterministic: MOTHER, GRAVITY, STRING, DRIFT
 Target display integration:
 - reuses Dinghy's existing canvas scratch; no second framebuffer
 - native updates are 8-row incremental strips
-- each strip starts only when the prior LCD DMA is complete through a HAL-level readiness helper
+- each strip starts only when the prior LCD DMA is complete through HAL helper `fm1_lcd_done()`
 - display rendering never runs from `app_audio()`
 - the exact frozen Phase-7 legacy boot draw is retained until runtime cursor sample 8192, then native rendering takes over
 - SPACE is target-addressable but deliberately has no final FM-1 physical button assignment until Phase 9
 
-Frozen Phase-8 technical head `87575aa829f3fab6af43092b440d585745eecc25`:
+Frozen Phase-8 technical head `87575aa829f3fab6af43092b440d585745eecc25`, final documentation/CI head `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`:
 - image **118,040 / 581,564 B**
 - RAM **88,644 / 98,304 B**
 - POOL **309,532 / 344,064 B**
@@ -77,7 +77,13 @@ Frozen Phase-8 technical head `87575aa829f3fab6af43092b440d585745eecc25`:
 - audible PCM remains bit-exact P6/P7: `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
+The final exact-head matrix passed core #460, staged #449, P6-final #54, P7-storage #41, P7-target #34, P8-visuals #44 and P8-target #19.
+
 The visual contract is source-derived and deterministically regression-tested; no claim is made that browser and FM-1 pixels are screenshot-identical. Physical panel appearance/redraw behaviour remains a hardware-validation item.
+
+## Current work — Phase 9
+
+Phase 9 freezes and implements the physical FM-1 interaction contract without changing the musical architecture. Controls and LEDs must act on the existing shared APSIS state graph, preserve HOME → MOTHER, avoid UI shadow state, and preserve the frozen audio/runtime regressions while polling and feedback are active.
 
 ## Important verification boundary
 
