@@ -86,6 +86,41 @@ static int test_keep_erase_prunes_chain(void)
     return 0;
 }
 
+static int test_keep_erase_preserves_chain_identity(void)
+{
+    ApsisKeepBank bank;
+    ApsisChainSequence chain;
+    ApsisState s;
+    ApsisChainState settings;
+    uint8_t slot;
+
+    memset(&settings, 0, sizeof settings); settings.default_cycles = 4u;
+    apsis_keep_bank_reset(&bank); apsis_chain_sequence_reset(&chain);
+    for (slot = 0u; slot < 4u; ++slot) fill_keep(&bank, &s, slot, slot);
+    for (slot = 0u; slot < 4u; ++slot)
+        CHECK(apsis_controls_chain_append_slot(&chain, &bank, &settings, 12u, slot));
+
+    chain.selected = 3;
+    chain.pos = 2u;
+    chain.pulse = 9u;
+    bank.selected_slot = 1;
+    CHECK(apsis_controls_keep_erase_selected(&bank, &chain) == 1u);
+    CHECK(chain.count == 3u);
+    CHECK(chain.cells[0].slot == 0u && chain.cells[1].slot == 2u && chain.cells[2].slot == 3u);
+    CHECK(chain.selected == 2); /* same surviving slot-3 object */
+    CHECK(chain.pos == 1u && chain.cells[chain.pos].slot == 2u);
+    CHECK(chain.pulse == 9u); /* active cell survived */
+
+    chain.playing = 1u;
+    chain.pulse = 7u;
+    bank.selected_slot = 2;
+    CHECK(apsis_controls_keep_erase_selected(&bank, &chain) == 1u);
+    CHECK(chain.count == 2u && chain.cells[0].slot == 0u && chain.cells[1].slot == 3u);
+    CHECK(chain.selected == 1);
+    CHECK(chain.pos == 1u && chain.pulse == 0u); /* active cell was removed */
+    return 0;
+}
+
 static int test_chain_append_cursor_and_params(void)
 {
     ApsisKeepBank bank;
@@ -169,6 +204,7 @@ int main(void)
 {
     CHECK(test_keep_source_semantics() == 0);
     CHECK(test_keep_erase_prunes_chain() == 0);
+    CHECK(test_keep_erase_preserves_chain_identity() == 0);
     CHECK(test_chain_append_cursor_and_params() == 0);
     CHECK(test_chain_duplicate_delete_transport() == 0);
     puts("PASS: APSIS P9F source-locked KEEP/CHAIN physical-control contract");
