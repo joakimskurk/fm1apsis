@@ -6,6 +6,9 @@
 #include "apsis_visual_p8c.h"
 
 #define PIXELS (APSIS_VISUAL_WIDTH * APSIS_VISUAL_HEIGHT)
+#define P8C_KEEP_REFERENCE 0xDF715375u
+#define P8C_CHAIN_REFERENCE 0x709ED554u
+#define P8C_SPACE_REFERENCE 0x9605ED04u
 
 static uint16_t full_frame[PIXELS];
 static uint16_t strip_frame[PIXELS];
@@ -93,20 +96,23 @@ static uint32_t render_full(ApsisVisualSurface surface, const ApsisState *state,
 
 static uint32_t render_strips(ApsisVisualSurface surface, const ApsisState *state,
                               const ApsisRuntime *runtime, const ApsisKeepBank *bank,
-                              const ApsisChainSequence *seq)
+                              const ApsisChainSequence *seq, uint16_t strip_rows)
 {
     ApsisVisualRaster raster;
     ApsisVisualContext context;
+    uint16_t y;
     context.surface = surface;
     context.state = state;
     context.runtime = runtime;
     context.animation_tick = 0u;
     memset(strip_frame, 0xA5, sizeof strip_frame);
-    apsis_visual_bind(&raster, strip_frame, 240u, 120u, 240u, 0, 0);
-    apsis_visual_render_p8c(&raster, &context, bank, seq);
-    apsis_visual_bind(&raster, strip_frame + 120u * 240u,
-                      240u, 120u, 240u, 0, 120);
-    apsis_visual_render_p8c(&raster, &context, bank, seq);
+    for (y = 0u; y < APSIS_VISUAL_HEIGHT; y = (uint16_t)(y + strip_rows)) {
+        uint16_t rows = (uint16_t)(APSIS_VISUAL_HEIGHT - y);
+        if (rows > strip_rows) rows = strip_rows;
+        apsis_visual_bind(&raster, strip_frame + (uint32_t)y * APSIS_VISUAL_WIDTH,
+                          APSIS_VISUAL_WIDTH, rows, APSIS_VISUAL_WIDTH, 0, (int16_t)y);
+        apsis_visual_render_p8c(&raster, &context, bank, seq);
+    }
     return fnv1a_pixels(strip_frame, PIXELS);
 }
 
@@ -115,8 +121,10 @@ static uint32_t assert_surface(ApsisVisualSurface surface, uint16_t colour,
                                const ApsisKeepBank *bank, const ApsisChainSequence *seq)
 {
     uint32_t a = render_full(surface, state, runtime, bank, seq);
-    uint32_t b = render_strips(surface, state, runtime, bank, seq);
+    uint32_t b = render_strips(surface, state, runtime, bank, seq, 120u);
     assert(a == b);
+    assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
+    assert(render_strips(surface, state, runtime, bank, seq, 8u) == a);
     assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
     assert(count_colour(full_frame, colour) > 0u);
     return a;
@@ -133,12 +141,15 @@ static void test_project_surfaces(void)
 
     keep = assert_surface(APSIS_VISUAL_SURFACE_KEEP, APSIS_VISUAL_MOTHER,
                           &state, &runtime, &bank, &seq);
+    assert(keep == P8C_KEEP_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_CHAIN) > 0u);
     chain = assert_surface(APSIS_VISUAL_SURFACE_CHAIN, APSIS_VISUAL_CHAIN,
                            &state, &runtime, &bank, &seq);
+    assert(chain == P8C_CHAIN_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_CLOCK) > 0u);
     space = assert_surface(APSIS_VISUAL_SURFACE_SPACE, APSIS_VISUAL_MOTHER,
                            &state, &runtime, &bank, &seq);
+    assert(space == P8C_SPACE_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_STRING) > 0u);
     assert(count_colour(full_frame, APSIS_VISUAL_DRIFT) > 0u);
     assert(count_colour(full_frame, APSIS_VISUAL_CLOCK) > 0u);
