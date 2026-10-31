@@ -53,3 +53,17 @@ jobs:
             tests/test_controls_keep_chain.c -o /tmp/test_controls_keep_chain_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_keep_chain_san
+      - name: P9G1 MOTHER live-mix and structural-sync contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_mother.c apsis/apsis_controls_mother.c \
+            tests/test_controls_mother.c -o /tmp/test_controls_mother
+          /tmp/test_controls_mother
+      - name: P9G1 MOTHER ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_mother.c apsis/apsis_controls_mother.c \
+            tests/test_controls_mother.c -o /tmp/test_controls_mother_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_mother_san
