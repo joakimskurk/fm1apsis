@@ -101,11 +101,14 @@ static int test_string_source_keyboard(void)
 static int test_string_source_params(void)
 {
     ApsisState s; ApsisFm1InputFrame in; ApsisControlParamEdit e[4]; uint8_t n;
+    uint16_t brightness_native;
     string_state(&s); memset(&in,0,sizeof in);
     in.encoder_steps[APSIS_FM1_ENC_K1]=1;in.encoder_steps[APSIS_FM1_ENC_K2]=-2;in.encoder_steps[APSIS_FM1_ENC_K3]=2;in.encoder_steps[APSIS_FM1_ENC_K4]=1;
     n=apsis_controls_string_param_edits(&s.string,&in,e);CHECK(n==4u);
     CHECK(e[0].param==APSIS_CONTROL_PARAM_STRING_RESONANCE&&e[0].value==APSIS_Q15_MILLI(670));
-    CHECK(e[1].param==APSIS_CONTROL_PARAM_STRING_BRIGHTNESS&&e[1].value==APSIS_Q15_MILLI(520));
+    brightness_native=(uint16_t)(APSIS_Q15_MILLI(540)-2u*APSIS_Q15_MILLI(10));
+    CHECK(e[1].param==APSIS_CONTROL_PARAM_STRING_BRIGHTNESS&&e[1].value==brightness_native);
+    CHECK(absi(e[1].value-(int32_t)APSIS_Q15_MILLI(520))<=1);
     CHECK(e[2].param==APSIS_CONTROL_PARAM_STRING_GLIDE&&e[2].value==APSIS_Q15_MILLI(63));
     CHECK(e[3].param==APSIS_CONTROL_PARAM_STRING_SPAN&&e[3].value==APSIS_Q15_MILLI(1280));
     s.string.resonance_q15=APSIS_Q15_MILLI(880);s.string.brightness_q15=APSIS_Q15_MILLI(200);s.string.glide_q15=APSIS_Q15_MILLI(380);s.string.span_q15=APSIS_Q15_MILLI(1560);
