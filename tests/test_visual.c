@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "apsis_visual.h"
+#include "apsis_visual_p8b.h"
 
 #define PIXELS (APSIS_VISUAL_WIDTH * APSIS_VISUAL_HEIGHT)
 #define P8A_MOTHER_REFERENCE 0x27373657u
@@ -38,6 +39,7 @@ static void fixture(ApsisState *state, ApsisRuntime *runtime)
     uint8_t i;
     memset(state, 0, sizeof(*state));
     memset(runtime, 0, sizeof(*runtime));
+
     state->mother.sync = 1u;
     state->mother.mix_q15[0] = APSIS_Q15_ONE;
     state->mother.mix_q15[1] = 24575u;
@@ -55,6 +57,59 @@ static void fixture(ApsisState *state, ApsisRuntime *runtime)
     runtime->gravity_pending.active = 1u;
     runtime->gravity_pending.degree = 6u;
     runtime->gravity_pending.ring = 0u;
+
+    state->string.surface_mode = APSIS_STRING_DUAL;
+    state->string.left_split_q15 = 6200u;
+    state->string.right_split_q15 = 25800u;
+    state->string.split_q15 = 17000u;
+    state->string.active_side = APSIS_SIDE_RIGHT;
+    state->string.linked = 1u;
+    state->string.rhythm_mask = 0x0000A55Au;
+    state->string.filter_attractor_gates = 0x00005AA5u;
+    state->string.motion_loop_play = 1u;
+    state->string.motion_loop_length = 16u;
+
+    state->drift.amount_q15 = 19000u;
+    state->drift.depth_q15 = 22500u;
+    state->drift.width_q15 = 14500u;
+    state->temper.mode = APSIS_TUNING_JUST;
+    state->temper.strength_q15 = 24000u;
+
+    state->clock.n = 12u;
+    state->clock.bounds[0] = 3u;
+    state->clock.bounds[1] = 7u;
+    state->clock.bounds[2] = 10u;
+    state->clock.main_mask = 0x00000AAAu;
+    state->clock.inner_mask = 0x00000492u;
+    state->clock.snap_mask = 0x00000111u;
+    runtime->transport.melody_step = 7u;
+
+    state->spiral.route_count = 7u;
+    state->spiral.route[0] = 1u;
+    state->spiral.route[1] = 5u;
+    state->spiral.route[2] = 9u;
+    state->spiral.route[3] = 14u;
+    state->spiral.route[4] = 21u;
+    state->spiral.route[5] = 28u;
+    state->spiral.route[6] = 34u;
+    state->spiral.attractor_length = APSIS_ATTRACTOR_STEPS;
+    state->spiral.attractor_gates = 0x00A55A5Au;
+    runtime->spiral_attractor_pos = 9u;
+    runtime->last_spiral.valid = 1u;
+    runtime->last_spiral.route_point = 21u;
+
+    state->bloom.depth = APSIS_BLOOM_DEPTH_SEVENTH;
+    state->bloom.width_q15 = 21000u;
+    state->bloom.brightness_q15 = 24000u;
+    state->bloom.unfurl_ms = 2800u;
+    runtime->last_bloom.valid = 1u;
+    runtime->last_bloom.plan.count = 4u;
+    runtime->last_bloom.plan.tone[0] = 0u;
+    runtime->last_bloom.plan.tone[1] = 4u;
+    runtime->last_bloom.plan.tone[2] = 7u;
+    runtime->last_bloom.plan.tone[3] = 11u;
+    runtime->last_bloom_bind.valid = 1u;
+    runtime->last_bloom_bind.serial = 5u;
 }
 
 static uint32_t render_full(ApsisVisualSurface surface,
@@ -68,7 +123,7 @@ static uint32_t render_full(ApsisVisualSurface surface,
     context.state = state;
     context.runtime = runtime;
     context.animation_tick = 0u;
-    apsis_visual_render(&raster, &context);
+    apsis_visual_render_p8(&raster, &context);
     return fnv1a_pixels(full_frame, PIXELS);
 }
 
@@ -84,10 +139,10 @@ static uint32_t render_two_strips(ApsisVisualSurface surface,
     memset(strip_frame, 0xA5, sizeof strip_frame);
 
     apsis_visual_bind(&raster, strip_frame, 240u, 120u, 240u, 0, 0);
-    apsis_visual_render(&raster, &context);
+    apsis_visual_render_p8(&raster, &context);
     apsis_visual_bind(&raster, strip_frame + 120u * 240u,
                       240u, 120u, 240u, 0, 120);
-    apsis_visual_render(&raster, &context);
+    apsis_visual_render_p8(&raster, &context);
     return fnv1a_pixels(strip_frame, PIXELS);
 }
 
@@ -105,38 +160,59 @@ static void test_palette(void)
     assert(APSIS_VISUAL_MOTHER == 0xD655u);
 }
 
+static uint32_t assert_strip_surface(ApsisVisualSurface surface,
+                                     uint16_t identity_colour,
+                                     const ApsisState *state,
+                                     const ApsisRuntime *runtime)
+{
+    uint32_t full = render_full(surface, state, runtime);
+    uint32_t strips = render_two_strips(surface, state, runtime);
+    assert(full == strips);
+    assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
+    assert(count_colour(full_frame, identity_colour) > 0u);
+    return full;
+}
+
 static void test_strip_equivalence(void)
 {
     ApsisState state;
     ApsisRuntime runtime;
-    uint32_t mother_full, mother_strips, gravity_full, gravity_strips;
+    uint32_t mother, gravity, string, drift, clock, spiral, bloom;
     fixture(&state, &runtime);
 
-    mother_full = render_full(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
-    mother_strips = render_two_strips(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
-    assert(mother_full == mother_strips);
-    assert(mother_full == P8A_MOTHER_REFERENCE);
-    assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
-    assert(count_colour(full_frame, APSIS_VISUAL_STRING) > 0u);
-    assert(count_colour(full_frame, APSIS_VISUAL_MOTHER) > 0u);
-
-    gravity_full = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
-    gravity_strips = render_two_strips(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
-    assert(gravity_full == gravity_strips);
-    assert(gravity_full == P8A_GRAVITY_REFERENCE);
-    assert(memcmp(full_frame, strip_frame, sizeof full_frame) == 0);
-    assert(count_colour(full_frame, APSIS_VISUAL_GRAVITY) > 0u);
+    mother = assert_strip_surface(APSIS_VISUAL_SURFACE_MOTHER,
+                                  APSIS_VISUAL_MOTHER, &state, &runtime);
+    assert(mother == P8A_MOTHER_REFERENCE);
+    gravity = assert_strip_surface(APSIS_VISUAL_SURFACE_GRAVITY,
+                                   APSIS_VISUAL_GRAVITY, &state, &runtime);
+    assert(gravity == P8A_GRAVITY_REFERENCE);
     assert(count_colour(full_frame, APSIS_VISUAL_CLOCK) > 0u);
-    assert(mother_full != gravity_full);
 
-    printf("P8A mother=%08x gravity=%08x\n", mother_full, gravity_full);
+    string = assert_strip_surface(APSIS_VISUAL_SURFACE_STRING,
+                                  APSIS_VISUAL_STRING, &state, &runtime);
+    assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
+    drift = assert_strip_surface(APSIS_VISUAL_SURFACE_DRIFT,
+                                 APSIS_VISUAL_DRIFT, &state, &runtime);
+    assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
+    clock = assert_strip_surface(APSIS_VISUAL_SURFACE_CLOCK,
+                                 APSIS_VISUAL_CLOCK, &state, &runtime);
+    spiral = assert_strip_surface(APSIS_VISUAL_SURFACE_SPIRAL,
+                                  APSIS_VISUAL_SPIRAL, &state, &runtime);
+    assert(count_colour(full_frame, APSIS_VISUAL_TUNING) > 0u);
+    bloom = assert_strip_surface(APSIS_VISUAL_SURFACE_BLOOM,
+                                 APSIS_VISUAL_BLOOM, &state, &runtime);
+
+    assert(mother != gravity);
+    assert(string != drift && drift != clock && clock != spiral && spiral != bloom);
+    printf("P8 refs mother=%08x gravity=%08x string=%08x drift=%08x clock=%08x spiral=%08x bloom=%08x\n",
+           mother, gravity, string, drift, clock, spiral, bloom);
 }
 
 static void test_state_is_live_not_shadowed(void)
 {
     ApsisState state;
     ApsisRuntime runtime;
-    uint32_t a, b, c;
+    uint32_t a, b;
     fixture(&state, &runtime);
     a = render_full(APSIS_VISUAL_SURFACE_MOTHER, &state, &runtime);
     state.mother.mix_q15[0] = 0u;
@@ -146,8 +222,32 @@ static void test_state_is_live_not_shadowed(void)
     fixture(&state, &runtime);
     a = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
     runtime.gravity_pending.degree = 1u;
-    c = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
-    assert(a != c);
+    b = render_full(APSIS_VISUAL_SURFACE_GRAVITY, &state, &runtime);
+    assert(a != b);
+
+    fixture(&state, &runtime);
+    a = render_full(APSIS_VISUAL_SURFACE_STRING, &state, &runtime);
+    state.string.right_split_q15 = 12000u;
+    b = render_full(APSIS_VISUAL_SURFACE_STRING, &state, &runtime);
+    assert(a != b);
+
+    fixture(&state, &runtime);
+    a = render_full(APSIS_VISUAL_SURFACE_CLOCK, &state, &runtime);
+    runtime.transport.melody_step = 2u;
+    b = render_full(APSIS_VISUAL_SURFACE_CLOCK, &state, &runtime);
+    assert(a != b);
+
+    fixture(&state, &runtime);
+    a = render_full(APSIS_VISUAL_SURFACE_SPIRAL, &state, &runtime);
+    runtime.spiral_attractor_pos = 17u;
+    b = render_full(APSIS_VISUAL_SURFACE_SPIRAL, &state, &runtime);
+    assert(a != b);
+
+    fixture(&state, &runtime);
+    a = render_full(APSIS_VISUAL_SURFACE_BLOOM, &state, &runtime);
+    runtime.last_bloom.plan.tone[1] = 5u;
+    b = render_full(APSIS_VISUAL_SURFACE_BLOOM, &state, &runtime);
+    assert(a != b);
 }
 
 static void test_clip_guard(void)
@@ -176,6 +276,6 @@ int main(void)
     test_strip_equivalence();
     test_state_is_live_not_shadowed();
     test_clip_guard();
-    puts("APSIS Phase 8A visual primitive tests passed");
+    puts("APSIS Phase 8A/P8B visual tests passed");
     return 0;
 }
