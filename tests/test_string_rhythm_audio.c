@@ -142,12 +142,56 @@ static int motion_contract(void)
     return 0;
 }
 
+static int manual_contract(void)
+{
+    ApsisState s;
+    ApsisStringPitchMemory memory;
+    ApsisStringTransientPool pool;
+    uint16_t i;
+    uint8_t delayed = 0u;
+
+    apsis_state_default(&s);
+    apsis_string_pitch_memory_reset(&memory);
+    apsis_string_transient_pool_reset(&pool);
+
+    CHECK(apsis_string_manual_trigger(&pool, &s, &memory, APSIS_SIDE_LEFT) == 1u);
+    CHECK(count_wave(&pool, APSIS_STRING_DSP_WAVE_BODY) == 1u);
+
+    apsis_string_transient_pool_reset(&pool);
+    apsis_string_pitch_memory_reset(&memory);
+    CHECK(apsis_string_manual_trigger(&pool, &s, &memory, APSIS_SIDE_RIGHT) == 6u);
+    CHECK(count_wave(&pool, APSIS_STRING_DSP_WAVE_BODY) == 0u);
+    CHECK(count_wave(&pool, APSIS_STRING_DSP_WAVE_TRIANGLE) == 4u);
+    CHECK(count_wave(&pool, APSIS_STRING_DSP_WAVE_SINE) == 2u);
+
+    s.string.surface_mode = APSIS_STRING_CLASSIC;
+    apsis_string_transient_pool_reset(&pool);
+    apsis_string_pitch_memory_reset(&memory);
+    CHECK(apsis_string_manual_trigger(&pool, &s, &memory, APSIS_SIDE_LEFT) == 7u);
+    CHECK(count_wave(&pool, APSIS_STRING_DSP_WAVE_BODY) == 1u);
+    for (i = 0u; i < APSIS_STRING_TRANSIENT_POOL_CAP; ++i) {
+        const ApsisStringTransientVoice *v = &pool.transient[i];
+        if (!v->active || v->waveform == APSIS_STRING_DSP_WAVE_BODY) continue;
+        if (v->start_delay_samples >= 176u) delayed = 1u;
+    }
+    CHECK(delayed); /* Classic keeps the frozen +4 ms WIRE leg. */
+
+    s.string.sound = 0u;
+    apsis_string_transient_pool_reset(&pool);
+    CHECK(apsis_string_manual_trigger(&pool, &s, &memory, APSIS_SIDE_RIGHT) == 0u);
+    s.string.sound = 1u;
+    s.string.level_q15 = 0u;
+    CHECK(apsis_string_manual_trigger(&pool, &s, &memory, APSIS_SIDE_RIGHT) == 0u);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(classic_contract() == 0);
     CHECK(dual_contract() == 0);
     CHECK(frozen_mode_and_late_state_contract() == 0);
     CHECK(motion_contract() == 0);
-    puts("PASS: APSIS M4b source-derived String Rhythm event/audio topology");
+    CHECK(manual_contract() == 0);
+    puts("PASS: APSIS M4b source-derived String Rhythm/manual event audio topology");
     return 0;
 }
