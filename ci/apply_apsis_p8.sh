@@ -7,7 +7,9 @@ cd "$ROOT"
 # add the native APSIS renderer without changing audio/runtime/persistence.
 bash ci/apply_apsis_p7.sh
 
-cp apsis/apsis_visual.h apsis/apsis_visual.c work/apsis/firmware/src/
+cp apsis/apsis_visual.h apsis/apsis_visual.c \
+   apsis/apsis_visual_p8b.h apsis/apsis_visual_p8b.c \
+   work/apsis/firmware/src/
 
 python3 - <<'PY'
 from pathlib import Path
@@ -18,12 +20,14 @@ s = p.read_text()
 h_anchor = '#include "apsis_project_fm1.h"'
 if h_anchor not in s:
     raise SystemExit('FAIL: P8 Phase-7 header anchor missing')
-s = s.replace(h_anchor, h_anchor + '\n#include "apsis_visual.h"', 1)
+s = s.replace(h_anchor,
+              h_anchor + '\n#include "apsis_visual.h"\n#include "apsis_visual_p8b.h"', 1)
 
 c_anchor = '#include "apsis_project_fm1.c"'
 if c_anchor not in s:
     raise SystemExit('FAIL: P8 Phase-7 source anchor missing')
-s = s.replace(c_anchor, c_anchor + '\n#include "apsis_visual.c"', 1)
+s = s.replace(c_anchor,
+              c_anchor + '\n#include "apsis_visual.c"\n#include "apsis_visual_p8b.c"', 1)
 
 start = s.find('static void draw_surface(void)')
 end = s.find('static void leds(void)', start)
@@ -37,15 +41,16 @@ native = r'''static uint8_t apsis_native_visual_surface(uint8_t ui_surface,
                                            ApsisVisualSurface *visual_surface)
 {
     if (!visual_surface) return 0u;
-    if (ui_surface == SURF_MOTHER) {
-        *visual_surface = APSIS_VISUAL_SURFACE_MOTHER;
-        return 1u;
+    switch (ui_surface) {
+    case SURF_MOTHER:  *visual_surface = APSIS_VISUAL_SURFACE_MOTHER;  return 1u;
+    case SURF_STRING:  *visual_surface = APSIS_VISUAL_SURFACE_STRING;  return 1u;
+    case SURF_DRIFT:   *visual_surface = APSIS_VISUAL_SURFACE_DRIFT;   return 1u;
+    case SURF_CLOCK:   *visual_surface = APSIS_VISUAL_SURFACE_CLOCK;   return 1u;
+    case SURF_SPIRAL:  *visual_surface = APSIS_VISUAL_SURFACE_SPIRAL;  return 1u;
+    case SURF_BLOOM:   *visual_surface = APSIS_VISUAL_SURFACE_BLOOM;   return 1u;
+    case SURF_GRAVITY: *visual_surface = APSIS_VISUAL_SURFACE_GRAVITY; return 1u;
+    default: return 0u;
     }
-    if (ui_surface == SURF_GRAVITY) {
-        *visual_surface = APSIS_VISUAL_SURFACE_GRAVITY;
-        return 1u;
-    }
-    return 0u;
 }
 
 static void draw_native_visual(ApsisVisualSurface visual_surface)
@@ -65,7 +70,7 @@ static void draw_native_visual(ApsisVisualSurface visual_surface)
     for (y = 0u; y < APSIS_VISUAL_HEIGHT; y += 120u) {
         cv_begin(240u, 120u, C_BLACK);
         apsis_visual_bind(&raster, cv_px, 240u, 120u, 240u, 0, (int16_t)y);
-        apsis_visual_render(&raster, &context);
+        apsis_visual_render_p8(&raster, &context);
         for (i = 0u; i < 240u * 120u; ++i)
             cv_px[i] = swap16(cv_px[i]);
         cv_blit(0u, y);
@@ -87,20 +92,23 @@ p.write_text(s)
 PY
 
 # Structural guards: Phase 8 reuses Dinghy's existing canvas, exposes no new
-# framebuffer, and remains outside the audio callback.
-grep -q '#include "apsis_visual.c"' work/apsis/firmware/src/dinghy.c
+# framebuffer, remains outside the audio callback, and preserves HOME->MOTHER.
+grep -q '#include "apsis_visual_p8b.c"' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_visual_bind(&raster, cv_px, 240u, 120u' work/apsis/firmware/src/dinghy.c
-grep -q 'draw_native_visual' work/apsis/firmware/src/dinghy.c
+grep -q 'apsis_visual_render_p8(&raster, &context)' work/apsis/firmware/src/dinghy.c
+grep -q 'case SURF_CLOCK:.*APSIS_VISUAL_SURFACE_CLOCK' work/apsis/firmware/src/dinghy.c
+grep -q 'if (b & (1u << BTN_HOME)) return SURF_MOTHER;' work/apsis/firmware/src/dinghy.c
 python3 - <<'PY'
 from pathlib import Path
 s = Path('work/apsis/firmware/src/dinghy.c').read_text()
 a = s.index('static void app_audio(')
 b = s.index('static const char *surface_name', a)
 audio = s[a:b]
-for forbidden in ('apsis_visual_render(', 'draw_native_visual(', 'cv_begin(', 'cv_blit('):
+for forbidden in ('apsis_visual_render(', 'apsis_visual_render_p8(',
+                  'draw_native_visual(', 'cv_begin(', 'cv_blit('):
     if forbidden in audio:
         raise SystemExit(f'FAIL: P8 display work leaked into app_audio: {forbidden}')
 if 'static uint16_t full_frame[' in s or 'static uint16_t strip_frame[' in s:
     raise SystemExit('FAIL: P8 test framebuffer leaked into target')
-print('PASS: P8 renderer reuses Dinghy canvas and stays outside app_audio')
+print('PASS: P8 renderer reuses Dinghy canvas, HOME maps to MOTHER, and display work stays outside app_audio')
 PY
