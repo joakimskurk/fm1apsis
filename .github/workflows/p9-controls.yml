@@ -39,3 +39,17 @@ jobs:
             tests/test_controls_bloom.c -o /tmp/test_controls_bloom_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_bloom_san
+      - name: P9F KEEP/CHAIN source-locked control contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_controls_keep_chain.c \
+            tests/test_controls_keep_chain.c -o /tmp/test_controls_keep_chain
+          /tmp/test_controls_keep_chain
+      - name: P9F KEEP/CHAIN ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_keep.c apsis/apsis_chain.c apsis/apsis_controls_keep_chain.c \
+            tests/test_controls_keep_chain.c -o /tmp/test_controls_keep_chain_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_keep_chain_san
