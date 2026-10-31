@@ -25,13 +25,13 @@ jobs:
             tests/test_controls.c -o /tmp/test_controls_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_san
-      - name: P9E1 BLOOM performance-intent contract
+      - name: P9E BLOOM source-locked performance/parameter contract
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             apsis/apsis_harmony.c apsis/apsis_bloom.c apsis/apsis_controls_bloom.c \
             tests/test_controls_bloom.c -o /tmp/test_controls_bloom
           /tmp/test_controls_bloom
-      - name: P9E1 BLOOM ASAN/UBSAN
+      - name: P9E BLOOM ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
             -fsanitize=address,undefined -Iapsis \

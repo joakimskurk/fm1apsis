@@ -8,6 +8,7 @@
 /* The FM-1 has 27 note keys; index 13 is the physical centre key. Individual
  * petals use the lowest 3..5 keys, so CORE never collides with a petal key. */
 #define APSIS_BLOOM_CORE_KEY 13u
+#define APSIS_BLOOM_GROW_STEP_Q15 APSIS_Q15_MILLI(40)
 
 typedef enum {
     APSIS_BLOOM_CONTROL_TRIGGER_NONE = 0,
@@ -15,10 +16,6 @@ typedef enum {
     APSIS_BLOOM_CONTROL_TRIGGER_CORE
 } ApsisBloomControlTrigger;
 
-/* P9E1 deliberately emits performance intent only. Grow sensitivity and the
- * browser's per-petal radial thresholds are not invented here: REC ownership,
- * SELECT detent motion and begin/end edges are preserved for P9H to bind to a
- * source-proven grow adapter. */
 typedef struct {
     uint8_t trigger;
     uint8_t petal_index;
@@ -27,8 +24,33 @@ typedef struct {
     int16_t grow_detents;
 } ApsisBloomControlFrame;
 
+typedef struct {
+    uint16_t open_q15;
+    uint8_t fired_mask;
+} ApsisBloomGrowGesture;
+
+typedef enum {
+    APSIS_BLOOM_PARAM_NONE = 0,
+    APSIS_BLOOM_PARAM_UNFURL,
+    APSIS_BLOOM_PARAM_SPREAD,
+    APSIS_BLOOM_PARAM_LENGTH,
+    APSIS_BLOOM_PARAM_BRIGHTNESS
+} ApsisBloomControlParam;
+
+typedef struct {
+    uint8_t param;
+    int32_t value;
+} ApsisBloomParamEdit;
+
 uint8_t apsis_controls_bloom_frame(const ApsisState *state,
                                    const ApsisFm1InputFrame *input,
                                    ApsisBloomControlFrame *out);
+void apsis_controls_bloom_grow_reset(ApsisBloomGrowGesture *gesture);
+uint8_t apsis_controls_bloom_grow_update(ApsisBloomGrowGesture *gesture,
+                                         uint8_t voices,
+                                         int32_t select_detents);
+uint8_t apsis_controls_bloom_param_edits(const ApsisBloomState *bloom,
+                                         const ApsisFm1InputFrame *input,
+                                         ApsisBloomParamEdit out[4]);
 
 #endif
