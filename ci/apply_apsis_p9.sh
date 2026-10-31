@@ -123,19 +123,18 @@ s = s.replace(led_tail,
               '    fm1_led_key(BTN_SAVE, surface == SURF_KEEP);\n'
               '    fm1_led_key(BTN_PLAY, apsis_runtime.transport.running);\n}', 1)
 
-old_input = '''        pressed = fm1_input_edges(&released);
-        (void)released;
-        next = surface_from_buttons(pressed, surface);
-        if (next != surface) surface = next;
-        leds();'''
-new_input = '''        pressed = fm1_input_edges(&released);
-        next = surface_from_buttons(pressed, fm1_in.buttons, surface);
-        if (next != surface) surface = next;
-        apsis_p9_apply_global(pressed, released, fm1_in.buttons);
-        leds();'''
-if old_input not in s:
-    raise SystemExit('FAIL: P9 main input anchor missing')
-s = s.replace(old_input, new_input, 1)
+# P7 deliberately inserts project-save request/service code around the original
+# input block, and P8 deliberately replaces only the draw tail. Do not match or
+# rewrite that larger block here. Patch the single P8 navigation call and append
+# the P9 global action immediately after it, preserving both earlier phases.
+input_anchor = '        next = surface_from_buttons(pressed, surface);'
+if s.count(input_anchor) != 1:
+    raise SystemExit(f'FAIL: P9 navigation-call anchor count {s.count(input_anchor)} != 1')
+s = s.replace(
+    input_anchor,
+    '        next = surface_from_buttons(pressed, fm1_in.buttons, surface);\n'
+    '        apsis_p9_apply_global(pressed, released, fm1_in.buttons);',
+    1)
 p.write_text(s)
 PY
 
@@ -162,5 +161,11 @@ for forbidden in ('apsis_controls_surface_from_fm1', 'apsis_controls_global_acti
                   'fm1_enc_take(', 'fm1_input_edges('):
     if forbidden in audio:
         raise SystemExit(f'FAIL: P9 control work leaked into app_audio: {forbidden}')
+# P7 save request and deferred service must survive P9 patching intact.
+for required in ('apsis_project_fm1_request_save(&project_store)',
+                 'project_store.save_pending && !apsis_runtime.transport.running',
+                 'apsis_project_fm1_service_save('):
+    if required not in s:
+        raise SystemExit(f'FAIL: P9 disturbed P7 project path: {required}')
 print('PASS: P9A target binds pinned panel ids, global navigation/transport and LEDs outside app_audio')
 PY
