@@ -42,6 +42,20 @@ if c_anchor not in s:
 s = s.replace(c_anchor,
               c_anchor + '\n#include "apsis_visual.c"\n#include "apsis_visual_p8b.c"\n#include "apsis_visual_p8c.c"', 1)
 
+# Phase 8 owns the visual surface vocabulary, not the final physical control
+# mapping. Make SPACE/CATHEDRAL an explicit target-addressable surface now while
+# leaving BTN -> SPACE assignment for Phase 9.
+enum_anchor = '    SURF_KEEP,\n    SURF_COUNT'
+if enum_anchor not in s:
+    raise SystemExit('FAIL: P8 UI surface enum anchor missing')
+s = s.replace(enum_anchor, '    SURF_KEEP,\n    SURF_SPACE,\n    SURF_COUNT', 1)
+name_anchor = '        "BLOOM", "GRAVITY", "CHAIN", "KEEP"\n    };'
+if name_anchor not in s:
+    raise SystemExit('FAIL: P8 UI surface name anchor missing')
+s = s.replace(name_anchor,
+              '        "BLOOM", "GRAVITY", "CHAIN", "KEEP", "SPACE / CATHEDRAL"\n    };',
+              1)
+
 start = s.find('static void draw_surface(void)')
 end = s.find('static void leds(void)', start)
 if start < 0 or end < 0:
@@ -72,6 +86,7 @@ static uint8_t apsis_native_visual_surface(uint8_t ui_surface,
     case SURF_GRAVITY: *visual_surface = APSIS_VISUAL_SURFACE_GRAVITY; return 1u;
     case SURF_CHAIN:   *visual_surface = APSIS_VISUAL_SURFACE_CHAIN;   return 1u;
     case SURF_KEEP:    *visual_surface = APSIS_VISUAL_SURFACE_KEEP;    return 1u;
+    case SURF_SPACE:   *visual_surface = APSIS_VISUAL_SURFACE_SPACE;   return 1u;
     default: return 0u;
     }
 }
@@ -163,7 +178,8 @@ PY
 
 # Structural guardrails: Phase 8 reuses Dinghy's existing canvas, exposes no new
 # framebuffer, remains outside the audio callback, preserves HOME->MOTHER, keeps
-# the frozen P7 legacy boot draw until sample 8192, and never begins a new native
+# the frozen P7 legacy boot draw until sample 8192, makes SPACE target-addressable
+# without stealing a Phase-9 physical mapping, and never begins a new native
 # strip while the previous LCD DMA is still active.
 grep -q 'FM1_INLINE uint8_t fm1_lcd_done(void)' work/apsis/firmware/hal/fm1_lcd_hw.h
 grep -q 'FM1_LCD_SPI_CON & 0x8000u' work/apsis/firmware/hal/fm1_lcd_hw.h
@@ -177,6 +193,8 @@ grep -q 'apsis_visual_bind(&raster, cv_px, APSIS_VISUAL_WIDTH, rows' work/apsis/
 grep -q 'apsis_visual_render_p8c(&raster, &context, &keep_bank, &chain_sequence)' work/apsis/firmware/src/dinghy.c
 grep -q 'case SURF_CHAIN:.*APSIS_VISUAL_SURFACE_CHAIN' work/apsis/firmware/src/dinghy.c
 grep -q 'case SURF_KEEP:.*APSIS_VISUAL_SURFACE_KEEP' work/apsis/firmware/src/dinghy.c
+grep -q 'case SURF_SPACE:.*APSIS_VISUAL_SURFACE_SPACE' work/apsis/firmware/src/dinghy.c
+grep -q '"SPACE / CATHEDRAL"' work/apsis/firmware/src/dinghy.c
 grep -q 'if (b & (1u << BTN_HOME)) return SURF_MOTHER;' work/apsis/firmware/src/dinghy.c
 python3 - <<'PY'
 from pathlib import Path
@@ -195,5 +213,9 @@ if 'static uint16_t full_frame[' in s or 'static uint16_t strip_frame[' in s:
     raise SystemExit('FAIL: P8 test framebuffer leaked into target')
 if 'draw_surface();' in s:
     raise SystemExit('FAIL: blocking P8 draw_surface path still present')
-print('PASS: P8 renderer defers native boot redraw, remains incremental/HAL-gated, reuses Dinghy canvas, and stays outside app_audio')
+input_a = s.index('static uint8_t surface_from_buttons(')
+input_b = s.index('static void app_main(', input_a)
+if 'SURF_SPACE' in s[input_a:input_b]:
+    raise SystemExit('FAIL: Phase 8 stole a physical SPACE mapping from Phase 9')
+print('PASS: P8 renderer defers native boot redraw, exposes all 10 surfaces, remains incremental/HAL-gated, reuses Dinghy canvas, and stays outside app_audio')
 PY
