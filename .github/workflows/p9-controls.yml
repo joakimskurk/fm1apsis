@@ -81,6 +81,22 @@ jobs:
             -o /tmp/test_controls_space_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_space_san
+      - name: P9G3 DRIFT/TUNING live + structural contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_controls_drift.c tests/test_controls_drift.c \
+            -o /tmp/test_controls_drift
+          /tmp/test_controls_drift
+      - name: P9G3 DRIFT/TUNING ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_gravity.c apsis/apsis_harmony.c \
+            apsis/apsis_controls_drift.c tests/test_controls_drift.c \
+            -o /tmp/test_controls_drift_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_drift_san
       - name: P9H1 MOTHER-aware structural apply bridge
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
