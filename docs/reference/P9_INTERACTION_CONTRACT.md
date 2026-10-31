@@ -1,7 +1,7 @@
 # Phase 9 Interaction Contract — FM-1 Physical Parity
 
 Date: 2026-10-31
-Status: P9A global panel/navigation, P9B CLOCK/GRAVITY and P9C STRING host contracts frozen; later surfaces follow, with generated target/LED integration in P9H.
+Status: P9A global panel/navigation, P9B CLOCK/GRAVITY, P9C STRING and P9D SPIRAL host contracts frozen; later surfaces follow, with generated target/LED integration in P9H.
 Base: Phase-8 merged main `de60b5afea868c0f663a2c0d70b27787b302c86a`.
 
 ## Purpose
@@ -51,13 +51,36 @@ The locked browser parameter surface is authoritative:
 
 The control core emits parameter intents in native state units; it does **not** mutate state. This is required because browser `motherShouldHold()` holds every non-MOTHER structural parameter while `->1` is armed. P9H must therefore route each String edit through the existing native MOTHER hold/pending/apply mechanism or apply it live only when hold is inactive.
 
+## P9D — SPIRAL route geometry and ordered editing
+
+Study 126 stores SPIRAL melody geometry as an **ordered list of raw point ids `0..35`**, max 30. `spiralAllowed(i)` is unconditional, so route entry must not pre-filter points through Gravity/scale. `derivedSequence()` owns the later musical interpretation; the drawn/stored route remains fixed when FOLLOW GRAVITY changes sounding pitch.
+
+FM-1 uses the two-bank design from `UI_MAPPING.md`:
+- bank 0: physical keys 0..26 -> Spiral points 0..26;
+- bank 1: keys 0..23 -> points 12..35;
+- keys 24..26 are intentionally inactive in bank 1;
+- OCT+ selects bank 1, OCT- selects bank 0;
+- simultaneous key edges resolve to the lowest valid physical key.
+
+The overlap `12..26` is deliberate and preserves hand continuity when changing bank.
+
+Route order and duplicate points are identity-bearing. The physical edit gestures therefore operate on **route indices**, not point membership:
+- plain key edge: append the addressed point and select the appended route index;
+- source max-30 append behaviour is retained: when already full, the oldest route item is dropped and the new point becomes index 29;
+- SELECT encoder: move the route cursor cyclically across existing route indices;
+- SEL + key edge: insert the addressed point **before** the current cursor; on an empty route this becomes index 0;
+- insert at 30 items is rejected rather than silently evicting/reordering a different node;
+- K1: move only the selected route node along raw Spiral point ids, clamped `0..35`, without changing route order;
+- REC: delete exactly the selected route index and keep the cursor on the successor where possible, otherwise the new final item.
+
+EDIT is **not** used as the delete modifier because its edge is already the global CHAIN navigation control. P9D does not include the SPIRAL attractor editor; that remains Phase 10. The browser pointer route editor mutates `state.spiral.selected` directly rather than going through `motherQueueParam()`, so P9D preserves that live route-edit identity. Parameter/toggle changes that already use `applyParam()`/`toggleParam()` remain subject to MOTHER `->1` in P9H.
+
 ## Reserved / later controls
 
 REC remains contextual. String Motion recording/capture, selected Gravity-point editing and String/Spiral attractor editors remain Phase 10. SEL is a momentary modifier, never a hidden latch. MASTER remains platform output gain.
 
 ## Remaining Phase 9
 
-- **P9D** — SPIRAL route entry/edit and bank semantics.
 - **P9E** — BLOOM petal/core/grow gesture and live parameters.
 - **P9F** — KEEP capture/recall + CHAIN editing/control.
 - **P9G** — MOTHER mixing/structural sync + SPACE editing + secondary pages.
@@ -65,7 +88,7 @@ REC remains contextual. String Motion recording/capture, selected Gravity-point 
 
 ## Gates
 
-Host tests cover P9A/P9B plus the source 3x9 String bank mapping, octave-window rules, scale/chord/chromatic/unquantized magnitude inversion, BODY/WIRE mirroring, source nudge quantum, Classic/Dual mode, and exact K1..K4 source bounds. The same suite runs under ASAN/UBSAN.
+Host tests cover P9A/P9B plus the source 3x9 String bank mapping, octave-window rules, scale/chord/chromatic/unquantized magnitude inversion, BODY/WIRE mirroring, source nudge quantum, Classic/Dual mode, exact K1..K4 source bounds, SPIRAL two-bank point mapping, route-cursor wrapping, duplicate-preserving append/insert/move/delete semantics, full-route append eviction and full-route insert refusal. The same suite runs under ASAN/UBSAN.
 
 ## Do not regress
 

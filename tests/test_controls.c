@@ -117,8 +117,45 @@ static int test_string_source_params(void)
     return 0;
 }
 
+static int test_spiral_banks(void)
+{
+    ApsisFm1InputFrame in; uint8_t point=99u;
+    memset(&in,0,sizeof in);
+    in.buttons_pressed=bit(APSIS_FM1_BTN_OCT_UP);CHECK(apsis_controls_spiral_bank_from_fm1(&in,0u)==1u);CHECK(apsis_controls_spiral_bank_from_fm1(&in,1u)==1u);
+    in.buttons_pressed=bit(APSIS_FM1_BTN_OCT_DOWN);CHECK(apsis_controls_spiral_bank_from_fm1(&in,1u)==0u);
+    in.buttons_pressed=bit(APSIS_FM1_BTN_OCT_DOWN)|bit(APSIS_FM1_BTN_OCT_UP);CHECK(apsis_controls_spiral_bank_from_fm1(&in,1u)==1u);
+
+    memset(&in,0,sizeof in);in.notes_pressed=(1u<<20)|(1u<<2);
+    CHECK(apsis_controls_spiral_point_from_fm1(&in,0u,&point)==1u&&point==2u);
+    CHECK(apsis_controls_spiral_point_from_fm1(&in,1u,&point)==1u&&point==14u);
+    in.notes_pressed=1u<<23;CHECK(apsis_controls_spiral_point_from_fm1(&in,1u,&point)==1u&&point==35u);
+    in.notes_pressed=(1u<<24)|(1u<<26);CHECK(apsis_controls_spiral_point_from_fm1(&in,1u,&point)==0u);
+    return 0;
+}
+
+static int test_spiral_route_edit(void)
+{
+    ApsisSpiralState s; uint8_t cursor=0u,i;
+    memset(&s,0,sizeof s);
+    CHECK(apsis_controls_spiral_append(&s,4u,&cursor)==1u&&s.route_count==1u&&s.route[0]==4u&&cursor==0u);
+    CHECK(apsis_controls_spiral_append(&s,4u,&cursor)==1u&&s.route_count==2u&&s.route[0]==4u&&s.route[1]==4u&&cursor==1u);
+    CHECK(apsis_controls_spiral_insert(&s,7u,&cursor)==1u&&s.route_count==3u&&s.route[0]==4u&&s.route[1]==7u&&s.route[2]==4u&&cursor==1u);
+    CHECK(apsis_controls_spiral_move_selected(&s,cursor,3)==1u&&s.route[1]==10u&&s.route[0]==4u&&s.route[2]==4u);
+    CHECK(apsis_controls_spiral_move_selected(&s,cursor,100)==1u&&s.route[1]==35u);
+    CHECK(apsis_controls_spiral_move_selected(&s,cursor,1)==0u&&s.route[1]==35u);
+    CHECK(apsis_controls_spiral_cursor_step(2u,3u,1)==0u);CHECK(apsis_controls_spiral_cursor_step(0u,3u,-1)==2u);
+    CHECK(apsis_controls_spiral_delete_selected(&s,&cursor)==1u&&s.route_count==2u&&s.route[0]==4u&&s.route[1]==4u&&cursor==1u);
+
+    memset(&s,0,sizeof s);cursor=0u;
+    for(i=0u;i<APSIS_SPIRAL_ROUTE_MAX;++i)CHECK(apsis_controls_spiral_append(&s,i,&cursor)==1u);
+    CHECK(s.route_count==APSIS_SPIRAL_ROUTE_MAX&&s.route[0]==0u&&s.route[29]==29u);
+    cursor=10u;CHECK(apsis_controls_spiral_insert(&s,35u,&cursor)==0u&&s.route[10]==10u&&s.route_count==APSIS_SPIRAL_ROUTE_MAX);
+    CHECK(apsis_controls_spiral_append(&s,35u,&cursor)==1u&&s.route_count==APSIS_SPIRAL_ROUTE_MAX&&s.route[0]==1u&&s.route[28]==29u&&s.route[29]==35u&&cursor==29u);
+    return 0;
+}
+
 int main(void)
 {
-    CHECK(test_p9a()==0);CHECK(test_clock_gravity()==0);CHECK(test_string_source_keyboard()==0);CHECK(test_string_source_params()==0);
-    puts("PASS: APSIS P9A/P9B/P9C source-locked FM-1 interaction contract");return 0;
+    CHECK(test_p9a()==0);CHECK(test_clock_gravity()==0);CHECK(test_string_source_keyboard()==0);CHECK(test_string_source_params()==0);CHECK(test_spiral_banks()==0);CHECK(test_spiral_route_edit()==0);
+    puts("PASS: APSIS P9A/P9B/P9C/P9D source-locked FM-1 interaction contract");return 0;
 }

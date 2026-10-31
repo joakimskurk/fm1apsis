@@ -11,6 +11,9 @@
 #define APSIS_STRING_KEYS_PER_BANK 9u
 #define APSIS_STRING_VISIBLE_BANKS 3u
 #define APSIS_STRING_BANK_BASE_MAX 1u
+#define APSIS_SPIRAL_BANK_COUNT 2u
+#define APSIS_SPIRAL_UPPER_BANK_OFFSET 12u
+#define APSIS_SPIRAL_UPPER_BANK_KEYS 24u
 
 /* Pinned Dinghy/FM-1 physical ids. The generated target adapter must static-
  * assert these against platform.c before using this contract. */
@@ -130,5 +133,29 @@ uint8_t apsis_controls_string_mode_step(uint8_t current_mode, int32_t detents);
 uint8_t apsis_controls_string_param_edits(const ApsisStringState *string,
                                           const ApsisFm1InputFrame *input,
                                           ApsisControlParamEdit out[4]);
+
+/* P9D SPIRAL keeps the Study-126 route as ordered raw point ids 0..35. Bank 0
+ * exposes points 0..26. Bank 1 exposes points 12..35 on keys 0..23; keys
+ * 24..26 are intentionally unused. Route mutators operate on route indices,
+ * so duplicates remain legal and ordinary edits never reorder other nodes. */
+uint8_t apsis_controls_spiral_bank_from_fm1(const ApsisFm1InputFrame *input,
+                                            uint8_t current_bank);
+uint8_t apsis_controls_spiral_point_from_fm1(const ApsisFm1InputFrame *input,
+                                             uint8_t bank,
+                                             uint8_t *point_out);
+uint8_t apsis_controls_spiral_cursor_step(uint8_t current_cursor,
+                                          uint8_t route_count,
+                                          int32_t detents);
+uint8_t apsis_controls_spiral_append(ApsisSpiralState *spiral,
+                                     uint8_t point,
+                                     uint8_t *cursor_io);
+uint8_t apsis_controls_spiral_insert(ApsisSpiralState *spiral,
+                                     uint8_t point,
+                                     uint8_t *cursor_io);
+uint8_t apsis_controls_spiral_move_selected(ApsisSpiralState *spiral,
+                                            uint8_t cursor,
+                                            int32_t detents);
+uint8_t apsis_controls_spiral_delete_selected(ApsisSpiralState *spiral,
+                                              uint8_t *cursor_io);
 
 #endif

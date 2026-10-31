@@ -185,6 +185,14 @@ static uint16_t apsis_controls_span_step(uint16_t current, int32_t detents)
     return values[idx];
 }
 
+static uint8_t apsis_controls_spiral_count(ApsisSpiralState *spiral)
+{
+    if (!spiral) return 0u;
+    if (spiral->route_count > APSIS_SPIRAL_ROUTE_MAX)
+        spiral->route_count = APSIS_SPIRAL_ROUTE_MAX;
+    return spiral->route_count;
+}
+
 uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
                                         uint8_t current_surface)
 {
@@ -335,4 +343,130 @@ uint8_t apsis_controls_string_param_edits(const ApsisStringState *string,
     d = input->encoder_steps[APSIS_FM1_ENC_K4];
     if (d) { out[count].param = APSIS_CONTROL_PARAM_STRING_SPAN; out[count++].value = apsis_controls_span_step(string->span_q15, d); }
     return count;
+}
+
+uint8_t apsis_controls_spiral_bank_from_fm1(const ApsisFm1InputFrame *input,
+                                            uint8_t current_bank)
+{
+    uint8_t bank = current_bank < APSIS_SPIRAL_BANK_COUNT ? current_bank : 0u;
+    uint8_t down, up;
+    if (!input) return bank;
+    down = (input->buttons_pressed & apsis_button_bit(APSIS_FM1_BTN_OCT_DOWN)) != 0u;
+    up = (input->buttons_pressed & apsis_button_bit(APSIS_FM1_BTN_OCT_UP)) != 0u;
+    if (down == up) return bank;
+    if (up) return 1u;
+    return 0u;
+}
+
+uint8_t apsis_controls_spiral_point_from_fm1(const ApsisFm1InputFrame *input,
+                                             uint8_t bank,
+                                             uint8_t *point_out)
+{
+    uint8_t key;
+    if (!input || !point_out) return 0u;
+    bank = bank < APSIS_SPIRAL_BANK_COUNT ? bank : 0u;
+    for (key = 0u; key < APSIS_FM1_KEY_COUNT; ++key) {
+        if (!(input->notes_pressed & (1u << key))) continue;
+        if (bank == 0u) {
+            *point_out = key;
+            return 1u;
+        }
+        if (key < APSIS_SPIRAL_UPPER_BANK_KEYS) {
+            *point_out = (uint8_t)(APSIS_SPIRAL_UPPER_BANK_OFFSET + key);
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+uint8_t apsis_controls_spiral_cursor_step(uint8_t current_cursor,
+                                          uint8_t route_count,
+                                          int32_t detents)
+{
+    int32_t cursor, count, delta;
+    route_count = route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : route_count;
+    if (!route_count) return 0u;
+    count = route_count;
+    cursor = current_cursor < route_count ? current_cursor : (int32_t)route_count - 1;
+    delta = detents % count;
+    cursor = (cursor + delta) % count;
+    if (cursor < 0) cursor += count;
+    return (uint8_t)cursor;
+}
+
+uint8_t apsis_controls_spiral_append(ApsisSpiralState *spiral,
+                                     uint8_t point,
+                                     uint8_t *cursor_io)
+{
+    uint8_t count, i;
+    if (!spiral || point >= APSIS_SPIRAL_POINTS) return 0u;
+    count = apsis_controls_spiral_count(spiral);
+    if (count < APSIS_SPIRAL_ROUTE_MAX) {
+        spiral->route[count] = point;
+        spiral->route_count = (uint8_t)(count + 1u);
+        if (cursor_io) *cursor_io = count;
+        return 1u;
+    }
+    for (i = 1u; i < APSIS_SPIRAL_ROUTE_MAX; ++i)
+        spiral->route[i - 1u] = spiral->route[i];
+    spiral->route[APSIS_SPIRAL_ROUTE_MAX - 1u] = point;
+    if (cursor_io) *cursor_io = APSIS_SPIRAL_ROUTE_MAX - 1u;
+    return 1u;
+}
+
+uint8_t apsis_controls_spiral_insert(ApsisSpiralState *spiral,
+                                     uint8_t point,
+                                     uint8_t *cursor_io)
+{
+    uint8_t count, cursor, i;
+    if (!spiral || point >= APSIS_SPIRAL_POINTS) return 0u;
+    count = apsis_controls_spiral_count(spiral);
+    if (count >= APSIS_SPIRAL_ROUTE_MAX) return 0u;
+    cursor = cursor_io && *cursor_io < count ? *cursor_io : count;
+    for (i = count; i > cursor; --i)
+        spiral->route[i] = spiral->route[i - 1u];
+    spiral->route[cursor] = point;
+    spiral->route_count = (uint8_t)(count + 1u);
+    if (cursor_io) *cursor_io = cursor;
+    return 1u;
+}
+
+uint8_t apsis_controls_spiral_move_selected(ApsisSpiralState *spiral,
+                                            uint8_t cursor,
+                                            int32_t detents)
+{
+    uint8_t count;
+    int32_t point;
+    if (!spiral || !detents) return 0u;
+    count = apsis_controls_spiral_count(spiral);
+    if (!count || cursor >= count) return 0u;
+    point = (int32_t)spiral->route[cursor] + detents;
+    if (point < 0) point = 0;
+    if (point >= (int32_t)APSIS_SPIRAL_POINTS) point = APSIS_SPIRAL_POINTS - 1;
+    if ((uint8_t)point == spiral->route[cursor]) return 0u;
+    spiral->route[cursor] = (uint8_t)point;
+    return 1u;
+}
+
+uint8_t apsis_controls_spiral_delete_selected(ApsisSpiralState *spiral,
+                                              uint8_t *cursor_io)
+{
+    uint8_t count, cursor, i;
+    if (!spiral) return 0u;
+    count = apsis_controls_spiral_count(spiral);
+    if (!count) {
+        if (cursor_io) *cursor_io = 0u;
+        return 0u;
+    }
+    cursor = cursor_io && *cursor_io < count ? *cursor_io : (uint8_t)(count - 1u);
+    for (i = (uint8_t)(cursor + 1u); i < count; ++i)
+        spiral->route[i - 1u] = spiral->route[i];
+    spiral->route[count - 1u] = 0u;
+    spiral->route_count = (uint8_t)(count - 1u);
+    if (cursor_io) {
+        if (!spiral->route_count) *cursor_io = 0u;
+        else if (cursor >= spiral->route_count) *cursor_io = (uint8_t)(spiral->route_count - 1u);
+        else *cursor_io = cursor;
+    }
+    return 1u;
 }
