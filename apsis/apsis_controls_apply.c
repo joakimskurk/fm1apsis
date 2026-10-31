@@ -40,6 +40,9 @@ static uint8_t p9h_key_valid(uint16_t key)
     case APSIS_P9_PARAM_STRING_BRIGHTNESS:
     case APSIS_P9_PARAM_STRING_GLIDE:
     case APSIS_P9_PARAM_STRING_SPAN:
+    case APSIS_P9_PARAM_DRIFT_DEPTH:
+    case APSIS_P9_PARAM_DRIFT_WIDTH:
+    case APSIS_P9_PARAM_TUNING_STRENGTH:
     case APSIS_P9_PARAM_BLOOM_UNFURL:
     case APSIS_P9_PARAM_BLOOM_SPREAD:
     case APSIS_P9_PARAM_BLOOM_LENGTH:
@@ -79,6 +82,17 @@ static uint8_t p9h_apply_key(ApsisState *state, uint16_t key, int32_t value)
         return 1u;
     case APSIS_P9_PARAM_STRING_SPAN:
         state->string.span_q15 = p9h_span_value(value);
+        return 1u;
+
+    case APSIS_P9_PARAM_DRIFT_DEPTH:
+        state->drift.depth_q15 = p9h_clamp_u16(
+            value, APSIS_Q15_MILLI(150), APSIS_Q15_ONE);
+        return 1u;
+    case APSIS_P9_PARAM_DRIFT_WIDTH:
+        state->drift.width_q15 = p9h_clamp_u16(value, 0u, APSIS_Q15_ONE);
+        return 1u;
+    case APSIS_P9_PARAM_TUNING_STRENGTH:
+        state->temper.strength_q15 = p9h_clamp_u16(value, 0u, APSIS_Q15_ONE);
         return 1u;
 
     case APSIS_P9_PARAM_BLOOM_UNFURL:
@@ -176,6 +190,23 @@ uint8_t apsis_controls_apply_string_edit(ApsisState *state,
     case APSIS_CONTROL_PARAM_STRING_BRIGHTNESS: key = APSIS_P9_PARAM_STRING_BRIGHTNESS; break;
     case APSIS_CONTROL_PARAM_STRING_GLIDE: key = APSIS_P9_PARAM_STRING_GLIDE; break;
     case APSIS_CONTROL_PARAM_STRING_SPAN: key = APSIS_P9_PARAM_STRING_SPAN; break;
+    default: return 0u;
+    }
+    return apsis_controls_apply_structural_param(state, pending, key,
+                                                  edit->value, last_abs_step);
+}
+
+uint8_t apsis_controls_apply_drift_edit(ApsisState *state,
+                                        ApsisMotherPending *pending,
+                                        const ApsisDriftParamEdit *edit,
+                                        int32_t last_abs_step)
+{
+    uint16_t key;
+    if (!edit) return 0u;
+    switch (edit->param) {
+    case APSIS_DRIFT_PARAM_DEPTH: key = APSIS_P9_PARAM_DRIFT_DEPTH; break;
+    case APSIS_DRIFT_PARAM_WIDTH: key = APSIS_P9_PARAM_DRIFT_WIDTH; break;
+    case APSIS_DRIFT_PARAM_TUNING_STRENGTH: key = APSIS_P9_PARAM_TUNING_STRENGTH; break;
     default: return 0u;
     }
     return apsis_controls_apply_structural_param(state, pending, key,
