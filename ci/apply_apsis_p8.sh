@@ -51,7 +51,9 @@ legacy = legacy.replace('static void draw_surface(void)',
                         'static void draw_legacy_surface(void)', 1)
 
 native = r'''#define APSIS_NATIVE_STRIP_ROWS 8u
+#define APSIS_NATIVE_START_SAMPLE 8192u
 
+static uint8_t apsis_native_boot_ready;
 static uint8_t apsis_native_draw_active;
 static uint8_t apsis_native_draw_ui_surface = 0xFFu;
 static uint16_t apsis_native_draw_y;
@@ -140,7 +142,16 @@ old_loop = '''        if (drawn != surface) {
             draw_surface();
         }
 '''
-new_loop = '''        if (drawn != surface) {
+new_loop = '''        if (!apsis_native_boot_ready) {
+            if (drawn != surface) {
+                drawn = surface;
+                draw_legacy_surface();
+            }
+            if ((uint32_t)apsis_runtime.cursor_sample >= APSIS_NATIVE_START_SAMPLE) {
+                apsis_native_boot_ready = 1u;
+                drawn = 0xFFu;
+            }
+        } else if (drawn != surface) {
             if (draw_surface_step()) drawn = surface;
         }
 '''
@@ -150,13 +161,17 @@ s = s.replace(old_loop, new_loop, 1)
 p.write_text(s)
 PY
 
-# Structural guards: Phase 8 reuses Dinghy's existing canvas, exposes no new
-# framebuffer, remains outside the audio callback, preserves HOME->MOTHER, and
-# never begins a new native strip while the previous LCD DMA is still active.
+# Structural guardrails: Phase 8 reuses Dinghy's existing canvas, exposes no new
+# framebuffer, remains outside the audio callback, preserves HOME->MOTHER, keeps
+# the frozen P7 legacy boot draw until sample 8192, and never begins a new native
+# strip while the previous LCD DMA is still active.
 grep -q 'FM1_INLINE uint8_t fm1_lcd_done(void)' work/apsis/firmware/hal/fm1_lcd_hw.h
 grep -q 'FM1_LCD_SPI_CON & 0x8000u' work/apsis/firmware/hal/fm1_lcd_hw.h
 grep -q '#include "apsis_visual_p8c.c"' work/apsis/firmware/src/dinghy.c
 grep -q '#define APSIS_NATIVE_STRIP_ROWS 8u' work/apsis/firmware/src/dinghy.c
+grep -q '#define APSIS_NATIVE_START_SAMPLE 8192u' work/apsis/firmware/src/dinghy.c
+grep -q 'draw_legacy_surface();' work/apsis/firmware/src/dinghy.c
+grep -q 'apsis_runtime.cursor_sample >= APSIS_NATIVE_START_SAMPLE' work/apsis/firmware/src/dinghy.c
 grep -q 'return (uint8_t)(!lcd_busy || fm1_lcd_done());' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_visual_bind(&raster, cv_px, APSIS_VISUAL_WIDTH, rows' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_visual_render_p8c(&raster, &context, &keep_bank, &chain_sequence)' work/apsis/firmware/src/dinghy.c
@@ -180,5 +195,5 @@ if 'static uint16_t full_frame[' in s or 'static uint16_t strip_frame[' in s:
     raise SystemExit('FAIL: P8 test framebuffer leaked into target')
 if 'draw_surface();' in s:
     raise SystemExit('FAIL: blocking P8 draw_surface path still present')
-print('PASS: P8 renderer is incremental, HAL-gated, reuses Dinghy canvas, and stays outside app_audio')
+print('PASS: P8 renderer defers native boot redraw, remains incremental/HAL-gated, reuses Dinghy canvas, and stays outside app_audio')
 PY
