@@ -46,6 +46,11 @@ int main(void)
     in.buttons_held = bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
     CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_SPACE);
 
+    /* SEL+FX pressed in one consumed input frame also qualifies: the contract
+     * is edge-on-FX plus current SEL-held state, exactly what Dinghy exposes. */
+    in.buttons_pressed |= bit(APSIS_FM1_BTN_SEL);
+    CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_SPACE);
+
     /* Pressing SEL while FX is merely held is not the SPACE gesture. */
     memset(&in, 0, sizeof in);
     in.buttons_pressed = bit(APSIS_FM1_BTN_SEL);

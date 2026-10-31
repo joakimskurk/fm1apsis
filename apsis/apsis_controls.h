@@ -68,7 +68,7 @@ typedef enum {
 } ApsisGlobalAction;
 
 /* P9A global navigation. HOME is absolute. SPACE is deliberately a chord:
- * SEL must already be held when the FX press edge arrives. */
+ * an FX press edge is interpreted as SPACE when SEL is held at consumption. */
 uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
                                         uint8_t current_surface);
 

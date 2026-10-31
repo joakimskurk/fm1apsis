@@ -17,12 +17,12 @@ uint8_t apsis_controls_surface_from_fm1(const ApsisFm1InputFrame *input,
     h = input->buttons_held;
 
     /* HOME is intentionally absolute even if another modifier/button edge is
-     * present in the same scan frame. */
+     * present in the same consumed input frame. */
     if (p & apsis_button_bit(APSIS_FM1_BTN_HOME))
         return APSIS_SURFACE_MOTHER;
 
-    /* SPACE is a secondary shared-room surface, not a sixth source. Requiring
-     * SEL to be held before the FX edge avoids stealing BLOOM's direct button. */
+    /* SPACE is a secondary shared-room surface, not a sixth source. The FX
+     * press edge is interpreted contextually from SEL's held state. */
     if ((h & apsis_button_bit(APSIS_FM1_BTN_SEL)) &&
         (p & apsis_button_bit(APSIS_FM1_BTN_FX)))
         return APSIS_SURFACE_SPACE;

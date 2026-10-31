@@ -45,8 +45,8 @@ These direct surface mappings retain the proven Phase-8 shell:
 | SEL held + FX press | SPACE / CATHEDRAL |
 
 Rules:
-1. HOME is absolute and wins if several navigation edges arrive in the same scan frame.
-2. SPACE requires SEL to be held when the FX **press edge** arrives. Pressing SEL while FX is already held does not navigate.
+1. HOME is absolute and wins if several navigation edges arrive in the same consumed input frame.
+2. SPACE requires an FX **press edge** while SEL is held at input consumption. SEL+FX arriving together therefore qualifies; pressing SEL later while FX is merely held does not.
 3. FX without SEL remains BLOOM. SPACE is a shared-room secondary surface, not a sixth source.
 4. OCT-/OCT+, SEL, PLAY and REC are not stolen as additional primary surface buttons.
 5. Navigation state is UI-only; it is not musical shadow state.
@@ -95,7 +95,7 @@ Host tests must prove:
 - the pinned 14-button / 7-encoder / 27-key vocabulary;
 - all nine direct Phase-8 surface mappings;
 - SEL+FX reaches SPACE while FX alone reaches BLOOM;
-- press-order semantics for the SPACE chord;
+- FX-edge/current-SEL-held semantics for the SPACE chord, including simultaneous SEL+FX;
 - HOME precedence;
 - invalid UI surface recovery to MOTHER;
 - PLAY alone produces a global transport toggle action;
