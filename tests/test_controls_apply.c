@@ -70,6 +70,33 @@ static void test_hold_coalesce_and_commit(void)
     assert(apsis_mother_pending_count(&pending) == 0u);
 }
 
+static void test_drift_queue(void)
+{
+    ApsisState state;
+    ApsisMotherPending pending;
+    ApsisDriftParamEdit edit;
+    uint16_t old_depth, old_strength;
+    reset(&state, &pending);
+    old_depth = state.drift.depth_q15;
+    old_strength = state.temper.strength_q15;
+    apsis_mother_set_sync(&state.mother, &pending, 1u);
+
+    edit.param = APSIS_DRIFT_PARAM_DEPTH;
+    edit.value = APSIS_Q15_MILLI(510);
+    assert(apsis_controls_apply_drift_edit(&state, &pending, &edit, 17) == 1u);
+    assert(state.drift.depth_q15 == old_depth);
+
+    edit.param = APSIS_DRIFT_PARAM_TUNING_STRENGTH;
+    edit.value = APSIS_Q15_MILLI(730);
+    assert(apsis_controls_apply_drift_edit(&state, &pending, &edit, 17) == 1u);
+    assert(state.temper.strength_q15 == old_strength);
+    assert(apsis_mother_pending_count(&pending) == 2u);
+
+    commit_all(&state, &pending);
+    assert(state.drift.depth_q15 == APSIS_Q15_MILLI(510));
+    assert(state.temper.strength_q15 == APSIS_Q15_MILLI(730));
+}
+
 static void test_bloom_and_space_queue(void)
 {
     ApsisState state;
@@ -121,6 +148,10 @@ static void test_defensive_bounds_and_dispatch(void)
         APSIS_Q15_MILLI(1010), 0) == 1u);
     assert(state.string.span_q15 == APSIS_Q15_ONE);
 
+    assert(apsis_controls_apply_structural_param(
+        &state, &pending, APSIS_P9_PARAM_DRIFT_DEPTH, 0, 0) == 1u);
+    assert(state.drift.depth_q15 == APSIS_Q15_MILLI(150));
+
     item.kind = APSIS_MOTHER_PENDING_TOGGLE;
     item.key = APSIS_P9_PARAM_STRING_RESONANCE;
     item.value = APSIS_Q15_MILLI(500);
@@ -136,6 +167,7 @@ int main(void)
 {
     test_live_string_apply();
     test_hold_coalesce_and_commit();
+    test_drift_queue();
     test_bloom_and_space_queue();
     test_defensive_bounds_and_dispatch();
     puts("PASS: P9H structural apply bridge preserves live/->1/commit semantics");
