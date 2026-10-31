@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <string.h>
+#include "apsis_controls.h"
+
+#define CHECK(x) do { if (!(x)) { \
+    fprintf(stderr, "FAIL:%d: %s\n", __LINE__, #x); return 1; \
+} } while (0)
+
+static uint32_t bit(uint8_t b) { return 1u << b; }
+
+static uint8_t nav(uint8_t button, uint8_t current)
+{
+    ApsisFm1InputFrame in;
+    memset(&in, 0, sizeof in);
+    in.buttons_pressed = bit(button);
+    in.buttons_held = bit(button);
+    return apsis_controls_surface_from_fm1(&in, current);
+}
+
+int main(void)
+{
+    ApsisFm1InputFrame in;
+    static const struct { uint8_t button, surface; } direct[] = {
+        {APSIS_FM1_BTN_HOME, APSIS_SURFACE_MOTHER},
+        {APSIS_FM1_BTN_ENV, APSIS_SURFACE_STRING},
+        {APSIS_FM1_BTN_LFO, APSIS_SURFACE_DRIFT},
+        {APSIS_FM1_BTN_SEQ, APSIS_SURFACE_CLOCK},
+        {APSIS_FM1_BTN_ARP, APSIS_SURFACE_SPIRAL},
+        {APSIS_FM1_BTN_FX, APSIS_SURFACE_BLOOM},
+        {APSIS_FM1_BTN_GLO, APSIS_SURFACE_GRAVITY},
+        {APSIS_FM1_BTN_EDIT, APSIS_SURFACE_CHAIN},
+        {APSIS_FM1_BTN_SAVE, APSIS_SURFACE_KEEP}
+    };
+    uint32_t i;
+
+    CHECK(APSIS_FM1_BUTTON_COUNT == 14u);
+    CHECK(APSIS_FM1_ENCODER_COUNT == 7u);
+    CHECK(APSIS_FM1_KEY_COUNT == 27u);
+    CHECK(APSIS_SURFACE_COUNT == 10u);
+
+    for (i = 0u; i < sizeof direct / sizeof direct[0]; ++i)
+        CHECK(nav(direct[i].button, APSIS_SURFACE_MOTHER) == direct[i].surface);
+
+    memset(&in, 0, sizeof in);
+    in.buttons_pressed = bit(APSIS_FM1_BTN_FX);
+    in.buttons_held = bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
+    CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_SPACE);
+
+    /* Pressing SEL while FX is merely held is not the SPACE gesture. */
+    memset(&in, 0, sizeof in);
+    in.buttons_pressed = bit(APSIS_FM1_BTN_SEL);
+    in.buttons_held = bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
+    CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_BLOOM) == APSIS_SURFACE_BLOOM);
+
+    /* HOME stays absolute even if the SPACE chord edge arrives simultaneously. */
+    memset(&in, 0, sizeof in);
+    in.buttons_pressed = bit(APSIS_FM1_BTN_HOME) | bit(APSIS_FM1_BTN_FX);
+    in.buttons_held = bit(APSIS_FM1_BTN_HOME) | bit(APSIS_FM1_BTN_SEL) | bit(APSIS_FM1_BTN_FX);
+    CHECK(apsis_controls_surface_from_fm1(&in, APSIS_SURFACE_SPACE) == APSIS_SURFACE_MOTHER);
+
+    memset(&in, 0, sizeof in);
+    CHECK(apsis_controls_surface_from_fm1(&in, 255u) == APSIS_SURFACE_MOTHER);
+    CHECK(apsis_controls_surface_from_fm1(0, APSIS_SURFACE_CLOCK) == APSIS_SURFACE_CLOCK);
+
+    memset(&in, 0, sizeof in);
+    in.buttons_pressed = bit(APSIS_FM1_BTN_PLAY);
+    in.buttons_held = bit(APSIS_FM1_BTN_PLAY);
+    CHECK(apsis_controls_global_action(&in) == APSIS_GLOBAL_ACTION_TRANSPORT_TOGGLE);
+
+    in.buttons_held |= bit(APSIS_FM1_BTN_SEL);
+    CHECK(apsis_controls_global_action(&in) == APSIS_GLOBAL_ACTION_NONE);
+    CHECK(apsis_controls_global_action(0) == APSIS_GLOBAL_ACTION_NONE);
+
+    puts("PASS: APSIS P9A FM-1 panel vocabulary/navigation contract");
+    return 0;
+}
