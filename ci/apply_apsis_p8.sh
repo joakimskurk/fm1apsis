@@ -15,6 +15,18 @@ cp apsis/apsis_visual.h apsis/apsis_visual.c \
 python3 - <<'PY'
 from pathlib import Path
 
+# Keep the raw SPI status register at the hardware-abstraction boundary.  The
+# UI adapter only asks whether the current LCD DMA has completed; existing
+# lcd_sync() still owns acknowledge/deselect and lcd_busy lifecycle.
+hp = Path('work/apsis/firmware/hal/fm1_lcd_hw.h')
+h = hp.read_text()
+h_anchor = 'FM1_INLINE void fm1_lcd_baud(uint32_t b) { FM1_LCD_SPI_BAUD = b; }\n'
+if h_anchor not in h:
+    raise SystemExit('FAIL: P8 LCD HAL anchor missing')
+h_helper = '''FM1_INLINE void fm1_lcd_baud(uint32_t b) { FM1_LCD_SPI_BAUD = b; }\n\nFM1_INLINE uint8_t fm1_lcd_done(void)\n{\n    return (uint8_t)((FM1_LCD_SPI_CON & 0x8000u) != 0u);\n}\n'''
+h = h.replace(h_anchor, h_helper, 1)
+hp.write_text(h)
+
 p = Path('work/apsis/firmware/src/dinghy.c')
 s = p.read_text()
 
@@ -64,12 +76,11 @@ static uint8_t apsis_native_visual_surface(uint8_t ui_surface,
 
 static uint8_t apsis_lcd_dma_ready(void)
 {
-    /* lcd_busy and FM1_LCD_SPI_CON are owned by pinned Dinghy and are visible
-     * in this single translation unit. If DMA is still active, return to the
-     * main loop immediately. When the done bit is set, cv_begin()->lcd_sync()
-     * only acknowledges/deselects an already-complete transfer and cannot
-     * become the old multi-millisecond spin wait. */
-    return (uint8_t)(!lcd_busy || (FM1_LCD_SPI_CON & 0x8000u));
+    /* lcd_busy is owned by pinned Dinghy. Hardware completion is queried only
+     * through the HAL helper; no UI code reaches into SPI registers. When the
+     * helper reports done, cv_begin()->lcd_sync() merely acknowledges and
+     * deselects an already-complete transfer instead of spin-waiting for it. */
+    return (uint8_t)(!lcd_busy || fm1_lcd_done());
 }
 
 static uint8_t draw_native_visual_step(ApsisVisualSurface visual_surface)
@@ -142,9 +153,11 @@ PY
 # Structural guards: Phase 8 reuses Dinghy's existing canvas, exposes no new
 # framebuffer, remains outside the audio callback, preserves HOME->MOTHER, and
 # never begins a new native strip while the previous LCD DMA is still active.
+grep -q 'FM1_INLINE uint8_t fm1_lcd_done(void)' work/apsis/firmware/hal/fm1_lcd_hw.h
+grep -q 'FM1_LCD_SPI_CON & 0x8000u' work/apsis/firmware/hal/fm1_lcd_hw.h
 grep -q '#include "apsis_visual_p8c.c"' work/apsis/firmware/src/dinghy.c
 grep -q '#define APSIS_NATIVE_STRIP_ROWS 8u' work/apsis/firmware/src/dinghy.c
-grep -q 'return (uint8_t)(!lcd_busy || (FM1_LCD_SPI_CON & 0x8000u));' work/apsis/firmware/src/dinghy.c
+grep -q 'return (uint8_t)(!lcd_busy || fm1_lcd_done());' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_visual_bind(&raster, cv_px, APSIS_VISUAL_WIDTH, rows' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_visual_render_p8c(&raster, &context, &keep_bank, &chain_sequence)' work/apsis/firmware/src/dinghy.c
 grep -q 'case SURF_CHAIN:.*APSIS_VISUAL_SURFACE_CHAIN' work/apsis/firmware/src/dinghy.c
@@ -161,9 +174,11 @@ for forbidden in ('apsis_visual_render(', 'apsis_visual_render_p8(',
                   'cv_begin(', 'cv_blit('):
     if forbidden in audio:
         raise SystemExit(f'FAIL: P8 display work leaked into app_audio: {forbidden}')
+if 'FM1_LCD_SPI_CON' in s:
+    raise SystemExit('FAIL: P8 UI reached past HAL into LCD SPI registers')
 if 'static uint16_t full_frame[' in s or 'static uint16_t strip_frame[' in s:
     raise SystemExit('FAIL: P8 test framebuffer leaked into target')
 if 'draw_surface();' in s:
     raise SystemExit('FAIL: blocking P8 draw_surface path still present')
-print('PASS: P8 renderer is incremental, DMA-gated, reuses Dinghy canvas, and stays outside app_audio')
+print('PASS: P8 renderer is incremental, HAL-gated, reuses Dinghy canvas, and stays outside app_audio')
 PY
