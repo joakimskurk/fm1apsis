@@ -106,7 +106,10 @@ uint8_t apsis_controls_keep_erase_selected(ApsisKeepBank *bank,
 {
     int8_t selected;
     uint8_t read, write = 0u, removed = 0u;
-    uint8_t old_pos = 0u;
+    uint8_t old_count, old_pos, old_selected = 0u;
+    uint8_t removed_before_pos = 0u, removed_before_selected = 0u;
+    uint8_t selected_valid, active_removed = 0u;
+
     if (!bank) return 0u;
     selected = bank->selected_slot;
     if (selected < 0 || selected >= (int8_t)APSIS_KEEP_SLOTS) return 0u;
@@ -116,18 +119,29 @@ uint8_t apsis_controls_keep_erase_selected(ApsisKeepBank *bank,
     if (!chain) return 1u;
 
     if (chain->count > APSIS_CHAIN_MAX) chain->count = APSIS_CHAIN_MAX;
-    old_pos = chain->pos < chain->count ? chain->pos : 0u;
-    for (read = 0u; read < chain->count; ++read) {
+    old_count = chain->count;
+    old_pos = chain->pos < old_count ? chain->pos : 0u;
+    selected_valid = chain->selected >= 0 && chain->selected < (int8_t)old_count;
+    if (selected_valid) old_selected = (uint8_t)chain->selected;
+
+    for (read = 0u; read < old_count; ++read) {
         if (chain->cells[read].slot == (uint8_t)selected) {
+            if (read < old_pos) ++removed_before_pos;
+            if (selected_valid && read < old_selected) ++removed_before_selected;
+            if (read == old_pos) active_removed = 1u;
             ++removed;
             continue;
         }
         if (write != read) chain->cells[write] = chain->cells[read];
         ++write;
     }
-    while (write < chain->count) p9f_zero(&chain->cells[write++], (uint32_t)sizeof(chain->cells[0]));
-    chain->count = (uint8_t)(chain->count - removed);
+    chain->count = write;
+    while (write < old_count) {
+        p9f_zero(&chain->cells[write], (uint32_t)sizeof(chain->cells[0]));
+        ++write;
+    }
 
+    if (!removed) return 1u;
     if (!chain->count) {
         chain->selected = -1;
         chain->playing = 0u;
@@ -141,33 +155,20 @@ uint8_t apsis_controls_keep_erase_selected(ApsisKeepBank *bank,
         return 1u;
     }
 
-    if (chain->selected >= 0) {
-        uint8_t s = (uint8_t)chain->selected;
-        uint8_t before = 0u;
-        for (read = 0u; read < s && read < (uint8_t)(chain->count + removed); ++read)
-            if (read < (uint8_t)(chain->count + removed) && read < APSIS_CHAIN_MAX &&
-                chain->cells[read].slot == (uint8_t)selected) ++before;
-        /* The array has already been compacted, so clamp selected rather than
-         * trying to infer object identity from equal-valued cells. */
-        (void)before;
-        if (s >= chain->count) s = (uint8_t)(chain->count - 1u);
-        chain->selected = (int8_t)s;
+    if (selected_valid) {
+        uint8_t next_selected = (uint8_t)(old_selected - removed_before_selected);
+        if (next_selected >= chain->count) next_selected = (uint8_t)(chain->count - 1u);
+        chain->selected = (int8_t)next_selected;
+    } else {
+        chain->selected = -1;
     }
 
-    /* Preserve the active cell's order position as closely as possible after
-     * source-style filtering of every reference to the erased KEEP slot. */
     {
-        uint8_t removed_before = 0u;
-        uint8_t original_count = (uint8_t)(chain->count + removed);
-        for (read = 0u; read < old_pos && read < original_count; ++read) {
-            /* Original slot identities are unavailable after compaction; the
-             * robust native rule is simply to clamp the active index. */
-            (void)read;
-        }
-        (void)removed_before;
-        if (old_pos >= chain->count) chain->pos = (uint8_t)(chain->count - 1u);
-        else chain->pos = old_pos;
+        uint8_t next_pos = (uint8_t)(old_pos - removed_before_pos);
+        if (next_pos >= chain->count) next_pos = (uint8_t)(chain->count - 1u);
+        chain->pos = next_pos;
     }
+    if (active_removed) chain->pulse = 0u;
     return 1u;
 }
 
@@ -216,11 +217,12 @@ uint8_t apsis_controls_chain_apply_encoders(ApsisChainSequence *chain,
 {
     ApsisChainCell *cell;
     uint8_t changed = 0u, n, slot;
-    int32_t d, v;
+    int32_t d, v, max_fine;
     if (!chain || !input || chain->selected < 0 || chain->selected >= (int8_t)chain->count)
         return 0u;
     cell = &chain->cells[(uint8_t)chain->selected];
     n = p9f_clock_n(clock_n);
+    max_fine = (int32_t)n - 1;
 
     d = input->encoder_steps[APSIS_FM1_ENC_PRESETS];
     if (d && p9f_next_valid_slot(bank, cell->slot, d, &slot) && slot != cell->slot) {
@@ -237,7 +239,7 @@ uint8_t apsis_controls_chain_apply_encoders(ApsisChainSequence *chain,
     d = input->encoder_steps[APSIS_FM1_ENC_K2];
     if (d) {
         v = (int32_t)cell->fine_pulses + d;
-        cell->fine_pulses = (uint8_t)(v < 0 ? 0 : (v >= n ? n - 1u : v));
+        cell->fine_pulses = (uint8_t)(v < 0 ? 0 : (v > max_fine ? max_fine : v));
         if (!cell->cycles && !cell->fine_pulses) cell->fine_pulses = 1u;
         ++changed;
     }
