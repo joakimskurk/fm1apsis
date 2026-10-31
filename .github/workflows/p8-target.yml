@@ -69,6 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 \
           APSIS_EMU_EXPECT_CURSOR=123392 \
             bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee build/evidence/emulator_p8_audible.txt
@@ -81,6 +82,7 @@ jobs:
           if r.get('wav_raw_sha256') != expected_pcm:
               raise SystemExit(f"FAIL: P8 changed frozen P7/P6 PCM {r.get('wav_raw_sha256')} != {expected_pcm}")
           expected = {
+              'dynamic_home_surface': True,
               'runtime_queue_high_water': 28,
               'runtime_queue_overflowed': 0,
               'runtime_late_flags': 0,
