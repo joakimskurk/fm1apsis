@@ -67,3 +67,17 @@ jobs:
             tests/test_controls_mother.c -o /tmp/test_controls_mother_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_controls_mother_san
+      - name: P9G2 SPACE shared-room control contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_controls_space.c tests/test_controls_space.c \
+            -o /tmp/test_controls_space
+          /tmp/test_controls_space
+      - name: P9G2 SPACE ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_controls_space.c tests/test_controls_space.c \
+            -o /tmp/test_controls_space_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_space_san
