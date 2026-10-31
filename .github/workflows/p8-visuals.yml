@@ -11,15 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: P8A deterministic visual primitives
+      - name: P8 deterministic native visual surfaces
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            apsis/apsis_visual.c tests/test_visual.c -o /tmp/test_visual
+            apsis/apsis_visual.c apsis/apsis_visual_p8b.c tests/test_visual.c \
+            -o /tmp/test_visual
           /tmp/test_visual
-      - name: P8A ASAN/UBSAN
+      - name: P8 ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
             -fsanitize=address,undefined -Iapsis \
-            apsis/apsis_visual.c tests/test_visual.c -o /tmp/test_visual_san
+            apsis/apsis_visual.c apsis/apsis_visual_p8b.c tests/test_visual.c \
+            -o /tmp/test_visual_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_visual_san
