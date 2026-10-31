@@ -106,10 +106,6 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 
 **Decision:** Tests read scheduler/attractor identity from existing M3c token/slot state rather than duplicating structural fields in acoustic snapshots.
 
-## 2026-10-30 - Phase 6 starts with topology + memory prototypes
-
-**Decision:** Freeze the Space/Cathedral contract and compare compact modulated FDN and nested allpass/Schroeder candidates before target integration.
-
 ## 2026-10-30 - Phase 6 selects the compact 8-line modulated FDN
 
 **Decision:** Use the deterministic 8-line modulated FDN as native Cathedral tail topology. It tracks the reference proxy with much lower metallicity than the tested Schroeder candidate and lower tail storage.
@@ -128,28 +124,44 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 
 **Decision:** Source engines, scheduler and final audio remain 44.1 kHz, while the generated FM-1 Space/Cathedral renderer runs at **11.025 kHz**. The target bridge performs 4:1 send averaging and wet hold; target-only generation retimes delay lengths, milliseconds, filter coefficients, decay law and modulation increments so their real-time roles remain equivalent.
 
-**Why:** A full-rate room passed memory/link tests but consumed too much emulated target execution budget. Quarter-rate processing restores the complete pinned emulator scenario while preserving the selected shared-room topology and perceptual role. The high-precision host/reference room remains untouched at 44.1 kHz.
-
 ## 2026-10-30 - Phase-6 integrated scenario has an explicit 123,392 boot-to-stop baseline
 
 **Decision:** Keep the historical M4/M5 cursor baseline at **123,648** for those gates. The integrated P6 scenario is separately frozen at **123,392** for both audible and room-return-disabled P6 builds.
-
-**Why:** Both P6 variants have the same one-callback-lower boot-to-stop cursor while preserving exact dry PCM in the disabled-return variant, queue 28/512, overflow 0, late flags 0 and late trace `811c9dc5`. This is an explicit scenario rebaseline, not permission to relax M4/M5 regressions or alter the shared scheduler.
 
 ## 2026-10-30 - Multi-variant target reports use the latest build summary
 
 **Decision:** `inspect_target_build.py` reads the last resource summary from the append-only target build log.
 
-**Why:** staged workflows intentionally build several variants in one workspace. Reading the first summary misreported a correct 95,804 B M4f Bloom-bypass as the preceding 100,944 B M4g build. Package bytes were correct; only reporting was stale.
-
 ## 2026-10-30 - Phase-7 project sectors and commit protocol are frozen
 
 **Decision:** APSIS owns two 4 KiB project sectors at `0x000F4000` and `0x000F5000`. Project records use explicit little-endian v1 encoding, CRC-protected header/payload, wrap-safe generations and payload-first/header-last commit. Dinghy's `0x000FC000` settings sector remains separate.
-
-**Why:** Two validatable generations let a torn/corrupt new save fall back to the prior project, while explicit serialization prevents compiler layout from becoming the storage ABI.
 
 ## 2026-10-30 - Project NOR is never touched by active audio
 
 **Decision:** Boot project NOR prefetch happens before `fm1_audio_init()` / ALNK0 DMA. Runtime project saves are deferred to `app_main()`, require stopped transport and explicitly quiesce audio before erase/program. No project flash mutation may occur from `app_audio()`.
 
 **Why:** A post-audio-start boot read measurably perturbed 202 frames in the first active block by up to two Q15 steps even though later PCM and runtime were exact. The project rejected a new baseline and restored bit-exact P6 behaviour by moving the read before audio startup.
+
+## 2026-10-31 - Phase-8 visuals are read-only views of existing APSIS state
+
+**Decision:** Native visuals consume `ApsisState` / `ApsisRuntime` directly. KEEP and CHAIN may additionally observe the existing `ApsisKeepBank` and `ApsisChainSequence`. The UI layer does not own a duplicate musical model.
+
+**Why:** Visual adaptation must not create a second source of truth or alter scheduler/audio semantics.
+
+## 2026-10-31 - Phase-8 target redraw reuses Dinghy canvas and is incremental
+
+**Decision:** Reuse the existing `cv_px` canvas scratch. Do not allocate a second 240×240 framebuffer. Native full-screen changes are emitted as 8-row strips, and a strip may start only when the previous LCD DMA has completed via a HAL-level readiness helper.
+
+**Why:** Large back-to-back LCD blits can block in `lcd_sync()` and perturb the otherwise frozen audio timeline. The final design keeps POOL at 309,532 B and register access inside HAL.
+
+## 2026-10-31 - Native visual takeover is deferred past frozen audio bootstrap
+
+**Decision:** Preserve the exact Phase-7 legacy boot draw until the shared runtime cursor reaches sample **8192**, then enable native incremental rendering.
+
+**Why:** Even non-blocking strip rendering during the initial bootstrap changed only early PCM frames 1795..4351 while later audio and all runtime telemetry were exact. We rejected a new PCM baseline; deferred native takeover restores the full P6/P7 hash exactly.
+
+## 2026-10-31 - Phase 8 defines SPACE as a surface, Phase 9 defines its physical access
+
+**Decision:** SPACE/CATHEDRAL is one of the ten native target-addressable surfaces, but Phase 8 does not assign it an FM-1 button gesture. Final physical routing belongs to Phase 9.
+
+**Why:** Surface identity and rendering are visual architecture; control ergonomics must be frozen separately so the visual phase does not silently choose interaction policy.

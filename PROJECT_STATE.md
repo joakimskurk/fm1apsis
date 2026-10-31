@@ -1,17 +1,17 @@
 # PROJECT_STATE
 
-Last updated: 2026-10-30
+Last updated: 2026-10-31
 
 ## Current milestone
 
-**Phase 8 — native 240×240 visual surfaces is current. Phase 7 persistence is complete and merged.**
+**Phase 8 — native 240×240 visual surfaces is technically complete on branch `p8-visuals`; PR #18 merge is pending. Phase 9 physical interaction parity is next after merge.**
 
-Phase 7:
-- PR #17 merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285`
-- frozen technical firmware candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
-- final documentation/CI head `2fd054d90a49ff8e52544c092937dadc8e4097d9`
-- final exact-head gates: core, staged, P6-final, P7-storage and P7-target **all PASS**
+Current Phase-8 technical head:
+- `87575aa829f3fab6af43092b440d585745eecc25`
+- PR #18 `Phase 8: native 240×240 APSIS visual surfaces`
+- final technical P8 host + target gates on this head: **PASS**
 
+Phase 7 remains merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.
 Phase 6 remains merged as `cd321e9f7999d0568d280d89e7e3574c3da66054` via PR #16.
 
 Physical FM-1 hardware remains unavailable. Nothing is promoted to physical-hardware verification.
@@ -50,7 +50,7 @@ Historical M4/M5 pinned emulator baseline:
 - cursor **123,648**
 - late trace `811c9dc5`
 
-Integrated P6/P7 boot-to-stop scenario:
+Integrated P6/P7/P8 boot-to-stop scenario:
 - queue 28/512
 - overflow 0
 - late flags 0
@@ -83,32 +83,61 @@ Wire format v1:
 Journal:
 - sector A `0x000F4000`
 - sector B `0x000F5000`
-- each owns one 4 KiB erase sector
-- payload programmed and verified first
-- 24-byte commit header programmed last
+- payload programmed/verified first; commit header last
 - boot selects newest fully valid generation; corrupt/torn newest falls back to older valid generation
 
 Audio safety:
 - boot NOR prefetch runs before `fm1_audio_init()` / ALNK0 DMA startup
-- record decode runs later from RAM after APSIS defaults/KEEP/CHAIN reset
+- record decode runs later from RAM after defaults/KEEP/CHAIN reset
 - save request is a flag only
 - erase/program is serviced only from main loop with transport stopped and audio quiesced
 - no flash write/erase path is reachable from `app_audio()`
 
-## Frozen Phase-7 target evidence
+## Phase 8 frozen visual contract
 
-Real JieLi target, audible:
+Native 240×240 surfaces:
+- MOTHER `27373657`
+- GRAVITY `55aff30b`
+- STRING `00532f1d`
+- DRIFT/TUNING `9ff4af95`
+- CLOCK `903a5f21`
+- SPIRAL `562a4043`
+- BLOOM `7fcc0856`
+- KEEP `df715375`
+- CHAIN `709ed554`
+- SPACE/CATHEDRAL `9605ed04`
+
+Visual architecture:
+- allocation-free integer raster with bounded clipping/primitives
+- reads existing `ApsisState` / `ApsisRuntime` directly
+- KEEP/CHAIN additionally observe the existing `ApsisKeepBank` / `ApsisChainSequence` read-only
+- no visual layer owns musical state
+- full-frame output is deterministic and equivalent to strip rendering in host tests
+- normal and ASAN/UBSAN visual tests pass
+
+Target adapter:
+- reuses Dinghy `cv_px`; no second framebuffer and no POOL growth
+- native redraw uses 8-row strips
+- strip starts only when prior LCD DMA is complete, via HAL helper `fm1_lcd_done()`
+- display work remains outside `app_audio()`
+- frozen Phase-7 legacy boot draw is retained until runtime cursor sample **8192**, then native rendering takes over
+- all 10 surfaces are target-addressable
+- SPACE deliberately has no physical button mapping until Phase 9
+
+## Phase 8 frozen target evidence
+
+Technical head `87575aa829f3fab6af43092b440d585745eecc25`:
 - product `FM-1_972`
-- image **110,848 / 581,564 B**
-- RAM **88,628 / 98,304 B**
-- RAM headroom **9,676 B**
+- image **118,040 / 581,564 B**
+- RAM **88,644 / 98,304 B**
+- RAM headroom **9,660 B**
 - POOL **309,532 / 344,064 B**
 - POOL headroom **34,532 B**
 - package bytes 610,110
-- package SHA-256 `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
+- package SHA-256 `2f79a9dada63b950bbe77f9c3f6987f1c72c78cc39f8262e7590f06dcce3d743`
 
 Pinned emulator, audible:
-- PCM exact P6 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- PCM exact P6/P7 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - peak 856
 - RMS 144/144
 - stereo delta 126
@@ -117,42 +146,29 @@ Pinned emulator, audible:
 - late flags 0
 - cursor 123,392
 - late trace `811c9dc5`
+- HOME returns to the live MOTHER surface; MOTHER is not required to be byte-identical at different runtime times
 
-P7 room-return-disabled regression:
-- image 106,192 B
-- RAM 88,628 B
-- POOL 309,532 B
-- package SHA-256 `36524423cc5744988abaa49970d8134ada531c514517104dbb9ac50050b2ee29`
-- PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- queue 28/512
-- overflow 0
-- late flags 0
-- cursor 123,392
-- late trace `811c9dc5`
+## Phase-8 regression lesson
 
-## Phase-7 regression lesson
+The first native full-screen target integration changed PCM despite perfect runtime telemetry. Large LCD updates could block in `cv_begin()`/`lcd_sync()` on the previous 12 MHz LCD DMA. Moving to DMA-gated 8-row strips removed the blocking redraw, but repeated native rendering during boot still changed only frames 1795..4351; frames from 4352 onward were already bit-identical to a fresh Phase-7 reference.
 
-Reading project NOR from `app_main()` after FM-1 audio/DMA had already started changed only frames 1804..2047 of the first active block by at most 2 Q15 steps; runtime telemetry and all audio after frame 2048 were already identical. We did **not** accept this as a new baseline. Splitting boot into pre-audio NOR prefetch plus later RAM-only decode restored the full P6/Phase-5 hashes exactly.
+We did **not** accept a new audio baseline. Retaining the exact Phase-7 legacy boot draw through runtime sample 8192 and only then switching to the native incremental renderer restored the complete frozen PCM hash while keeping all ten native surfaces available.
 
-## Exact next action — Phase 8A
+## Verification boundary
 
-1. freeze a 240×240 visual/layout contract for all APSIS surfaces;
-2. inventory the pinned Dinghy/FM-1 graphics primitives, framebuffer cost and display update path;
-3. implement reusable bounded-cost native primitives without touching musical/audio/persistence state;
-4. render first static/state-driven reference surfaces from the existing APSIS state graph;
-5. add deterministic visual tests/evidence before expanding across all surfaces.
+Phase 8 is verified through implementation, desktop deterministic tests, ASAN/UBSAN, real JieLi target build and pinned emulator. It is **not** physical-FM-1 verified.
 
-Phase 8 target surface set:
-- MOTHER
-- GRAVITY
-- STRING
-- CLOCK
-- SPIRAL
-- BLOOM
-- DRIFT/TUNING
-- CHAIN
-- KEEP
-- SPACE
+The visual contract is source-derived and deterministic; screenshot/pixel-identical parity with the browser has not been claimed. Real LCD colour/contrast, redraw timing under physical IRQ load and control ergonomics remain unverified.
+
+## Exact next action — Phase 9
+
+After guarded merge of PR #18:
+1. freeze the FM-1 physical interaction/control contract before changing mappings;
+2. map direct access for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER and SPACE using the existing shared state graph;
+3. preserve HOME -> MOTHER and avoid UI shadow musical state;
+4. define encoder/pot pickup and edit semantics without mutating untouched parameters;
+5. add deterministic input-routing tests before target integration;
+6. validate that physical-control polling/LED work does not change the frozen audio/runtime baseline.
 
 ## Do not regress
 
@@ -163,8 +179,10 @@ Phase 8 target surface set:
 - `ApsisRuntime` stays 21,928 B unless explicitly re-approved
 - long Space storage stays in dedicated pre-`.pool` NOLOAD memory
 - historical M4/M5 gates retain cursor 123,648
-- integrated P6/P7 scenario retains cursor 123,392 with zero late/overflow flags
-- P7 audible PCM remains exact P6; P7 dry-only remains exact Phase 5
+- integrated P6/P7/P8 scenario retains cursor 123,392 with zero late/overflow flags
+- audible PCM remains exact P6/P7; dry-only remains exact Phase 5
 - project persistence stays versioned/journaled/CRC-protected and never blocks active audio
-- Phase 8 visuals consume the shared APSIS state graph; no UI shadow musical state
-- physical FM-1 and real ISR/storage power-cut behaviour remain unverified
+- native visuals consume existing APSIS state; no UI shadow musical state
+- native boot takeover remains after sample 8192 unless revalidated against exact PCM
+- Phase 9 owns physical mapping; Phase 8 does not invent a SPACE button binding
+- physical FM-1 and real ISR/storage/display behaviour remain unverified
