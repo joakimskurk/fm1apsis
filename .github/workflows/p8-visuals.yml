@@ -17,6 +17,10 @@ jobs:
             apsis/apsis_visual.c apsis/apsis_visual_p8b.c tests/test_visual.c \
             -o /tmp/test_visual
           /tmp/test_visual
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_visual.c apsis/apsis_visual_p8b.c apsis/apsis_visual_p8c.c \
+            tests/test_visual_p8c.c -o /tmp/test_visual_p8c
+          /tmp/test_visual_p8c
       - name: P8 ASAN/UBSAN
         run: |
           cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
@@ -25,3 +29,9 @@ jobs:
             -o /tmp/test_visual_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_visual_san
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_visual.c apsis/apsis_visual_p8b.c apsis/apsis_visual_p8c.c \
+            tests/test_visual_p8c.c -o /tmp/test_visual_p8c_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_visual_p8c_san
