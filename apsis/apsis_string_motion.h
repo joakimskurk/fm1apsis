@@ -7,6 +7,7 @@
 #define APSIS_STRING_MOTION_POINTS_MAX 1200u
 #define APSIS_STRING_MOTION_CAPTURE_HZ 32u
 #define APSIS_STRING_MOTION_RATE 44100u
+#define APSIS_STRING_MOTION_CACHE_INVALID 0xffffu
 
 typedef enum {
     APSIS_STRING_MOTION_TARGET_LEFT = 0,
@@ -60,6 +61,15 @@ typedef struct {
 
 typedef struct {
     ApsisStringMotionPitchContext pitch;
+    /* P11C playback caches retain only the two derived endpoint pitches for the
+     * currently sampled segment. They avoid recomputing quantization/tuning on
+     * every audio block while keeping all per-point storage compact. */
+    int32_t left_cache_a_pitch_milli;
+    int32_t left_cache_b_pitch_milli;
+    int32_t right_cache_a_pitch_milli;
+    int32_t right_cache_b_pitch_milli;
+    uint16_t left_cache_hi;
+    uint16_t right_cache_hi;
     uint64_t record_pulse_sample;
     uint64_t play_pulse_sample;
     uint64_t last_capture_sample;
@@ -138,7 +148,7 @@ void apsis_string_motion_manual_override(ApsisStringMotionRuntime *runtime,
                                          uint8_t active);
 
 uint8_t apsis_string_motion_playback(const ApsisStringMotionStore *store,
-                                     const ApsisStringMotionRuntime *runtime,
+                                     ApsisStringMotionRuntime *runtime,
                                      const ApsisState *state,
                                      uint64_t now_sample,
                                      ApsisStringMotionPlayback *out);
