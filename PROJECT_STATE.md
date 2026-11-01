@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11N are complete. P11L remains the production baseline; P11N proved and target-projected the invariant-simplified FDN line reader, and P11O is authorized as the separate production-validation phase.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11O are complete. P11O is the current accepted production baseline after the invariant-simplified FDN line reader; P11P is the next measurement-only phase.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -29,9 +29,9 @@ Phase 10 merge authority:
 - 22/22 required workflows PASS
 - squash merge `378d2023df2afe59475be53c09cc001788586514` via PR #20
 
-## Current frozen production baseline — P11L
+## Current frozen production baseline — P11O
 
-P11L is the current accepted production target after the P11J/P11K measured-and-proved FDN feedback-gain cache:
+P11O is the current accepted production target after the P11M/P11N measured-and-proved FDN line-read simplification layered over the P11L feedback-gain cache:
 
 - product `FM-1_972`
 - image **140,440 / 581,564 B**
@@ -40,7 +40,8 @@ P11L is the current accepted production target after the P11J/P11K measured-and-
 - POOL **319,176 / 344,064 B**
 - POOL headroom **24,888 B**
 - package bytes **610,110**
-- package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
+- package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- inlined FDN render **1,114 B / 374** static instruction lines
 
 Integrated frozen idle baseline:
 - PCM SHA-256 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
@@ -530,9 +531,46 @@ P11M provides the repeated-work rationale: 100% of warm measured line reads and 
 
 Decision: P11O may apply only the proved candidate to production `space_line_read()`. No other DSP/state/header change is authorized.
 
-## Exact next phase — P11O production FDN line-read validation
+## P11O — production FDN line-read validation complete
 
-Apply the proved candidate to production DSP, then require actual-production equivalence against frozen P11L authority, complete historical host/sanitizer behavior, exact real-target match to the P11N projection, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
+Production authority:
+- validated production head `6560118c1cf7dfa6e40d1e33e86167d4f0b6ea5b`
+- validation run `41356749785` — PASS
+- workflow frozen manual-only at that production head
+- evidence artifact ID `13104130300`
+- evidence ZIP SHA-256 `0d747a515218da33e6bd9d61ae027aea64ce0a18033f6c4af64d32b27ccd0d9d`
+
+Actual production equivalence:
+- **905,504** helper comparisons against frozen P11L reader
+- **3,328 blocks / 210,677 frames** complete-FDN comparison
+- optimized + ASAN/UBSAN PASS
+- complete historical host + sanitizer behavior PASS
+- exact partial-fill zero-return, negative wrap, fractional interpolation and `i1` wrap retained
+
+Frozen production target:
+- image **140,440 / 581,564 B**
+- RAM **87,492 / 98,304 B**; headroom **10,812 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- inlined FDN render **1,114 B / 374** static instruction lines
+
+Idle authority remains exact:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Active Motion authority remains exact:
+- active image **137,704 B**
+- RAM **87,540 B**; headroom **10,764 B**
+- POOL **319,176 B**
+- package SHA-256 `adb581ff61ab1dc48c7bd08f7ca83bfa33f786fb635c31f36813f40d964b54ed`
+- seen `ff`, final `14`, 149/149 points, record 220,672→441,088, manual 450,560→466,176, cursor 481,024, queue 30/512, overflow 0, late flags 0, WAV peak 1,171, RMS 173
+
+P11O therefore replaces P11L as the accepted production baseline. It proves exact behavior and target code shape, not physical FM-1 cycle or ISR improvement.
+
+## Exact next phase — P11P FDN LFO/sine workload census
+
+Measure the remaining high-frequency FDN LFO/sine path without changing production DSP. Quantify sine lookup/interpolation behavior and target code shape, then authorize a later proof phase only if the evidence identifies a narrow exact candidate.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 
