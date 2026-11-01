@@ -4,15 +4,14 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 9 — physical interaction parity is complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19. Phase 10 — String Motion and advanced interactive parity is current. String Motion checkpoint P10D3 is green; Phase 10E String Attractor editor is next.**
+**Phase 10 — String Motion and advanced interactive parity is feature-complete on technical head `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`. PR #20 is at the final exact-head documentation/CI merge gate. Phase 11 — FM-1 optimisation is the next development phase after that gate.**
 
-Phase-9 freeze:
+Phase-9 freeze remains authoritative:
 - technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`
 - final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675`
 - merge commit `bbfab322557b6760425503268b550b789f796c23`
 - target image 132,264 B; RAM 89,492 B; POOL 309,532 B
 - package `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
-- final exact-head matrix: core #504, staged #493, P6-final #96, P7-storage #83, P7-target #76, P8-visuals #86, P8-target #61, P9-controls #84, P9-H4b #8, P9-target #41 — **all PASS**
 
 Phase 8 remains merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18.
 Phase 7 remains merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.
@@ -54,13 +53,14 @@ Historical M4/M5 pinned emulator baseline:
 - cursor **123,648**
 - late trace `811c9dc5`
 
-Integrated P6/P7/P8/P9 idle boot-to-stop scenario:
+Integrated frozen idle boot-to-stop scenario used by P6/P7/P8/P9 and Phase-10 inactive-editor regression:
 - queue 28/512
 - overflow 0
 - late flags 0
 - cursor **123,392**
 - late trace `811c9dc5`
 - audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- peak 856; RMS 144/144; stereo delta 126
 
 Frozen Phase-5 dry PCM:
 - `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
@@ -189,107 +189,170 @@ Technical head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 - package bytes 610,110
 - package SHA-256 `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
 
-Pinned emulator:
-- PCM exact P6/P7/P8 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- peak 856
-- RMS 144/144
-- stereo delta 126
-- queue 28/512
-- overflow 0
-- late flags 0
-- cursor 123,392
-- late trace `811c9dc5`
-- dynamic HOME -> MOTHER PASS
-
 Historical M4f bypass remains exactly **95,804 B**; its historical cursor/PCM gate is not relaxed.
 
-## Phase-9 regression lesson
+## Phase 10 completed scope
 
-The first direct String implementation placed manual-audio helpers inside the historical M4b String Rhythm source. That moved the frozen M4f bypass image from 95,804 to 95,820 B even though Phase 9 was not supposed to change M4f. The project rejected the new size rather than updating the baseline.
+Phase 10 layers advanced interaction deliberately deferred from Phase 9 without reopening frozen Phase-9 mappings:
+1. Clock-quantized String Motion capture;
+2. Classic/Dual ownership, overdub and frozen pitch context;
+3. manual override/resume on the shared Clock timeline;
+4. String Attractor editor over existing M4c authority;
+5. Spiral Attractor editor over existing M4f state/runtime;
+6. selected Gravity-point editor over the existing 24-point grid;
+7. host/sanitizer contracts before target integration;
+8. real JieLi builds, exact frozen idle regression and active pinned-emulator lifecycles.
 
-The final implementation restores the M4b `.c/.h/test` blobs exactly and moves manual String into a P9-only module. The P9 generator hard-checks the frozen blob hashes before target generation. This keeps Phase-9 performance work layered above historical audio authorities.
+No Phase-10 editor introduces a private scheduler, private musical RNG or duplicate musical state.
 
-## Phase 10 current scope
-
-Phase 10 owns advanced interaction deliberately deferred from Phase 9:
-1. Clock-quantized String Motion capture contract;
-2. Classic/Dual ownership and frozen pitch context;
-3. overdub/manual override behavior;
-4. String Attractor editor;
-5. Spiral Attractor editor;
-6. selected Gravity-point editor;
-7. deterministic host/sanitizer contracts before target integration;
-8. target/emulator regression preserving frozen Phase-9 idle audio/runtime.
-
-Do not reopen the frozen Phase-9 mappings merely to make Phase-10 editors convenient. Phase 10 must layer advanced edit state onto the existing shared APSIS model and shared M3c timeline.
-
-## Phase 10 String Motion checkpoint — P10D3 green
+## P10D3 — String Motion complete
 
 Technical checkpoint head: `e750655141bb87e83949bb262426ab2ee42d734b`.
 
-Completed contract:
+Contract:
 - REC arms/cancels at the next Clock step 1; SEL+REC toggles playback when a loop exists
 - 1/2/4/8-cycle capture remains source-bounded
 - Classic owns the single/right lane; linked Dual owns BOTH; free Dual can own BODY/WIRE/BOTH
 - overdub preserves the unowned side in free Dual
 - captured pitch context is frozen against later Gravity changes
 - held String performance temporarily overrides playback and releases back into the loop at current phase
-- capture/playback uses the shared M3c Clock observation only; no private scheduler is introduced
-- main→audio control is a compact finite mailbox; audio callback owns Motion runtime/store mutation
-- two Motion lanes are stored in dedicated `.apsis_motion_pool` NOLOAD memory, exactly 19,208 B total
+- capture/playback observes shared M3c Clock only; no private scheduler
+- compact main→audio mailbox; audio callback owns Motion runtime/store mutation
+- two Motion lanes live in dedicated `.apsis_motion_pool` NOLOAD memory, exactly **19,208 B** total
 
-Production P10D2 target evidence:
-- product `FM-1_972`
+Production P10D2 target:
 - image **136,984 / 581,564 B**
 - RAM **89,668 / 98,304 B**; headroom **8,636 B**
 - POOL **328,740 / 344,064 B**; headroom **15,324 B**
-- package bytes 610,110
 - package SHA-256 `25f87a83b39b48e9c1f11826741d9bc4da45b3fe1783e5c4041020ffcd4bf55b`
-- inactive Motion keeps exact Phase-9 audible PCM/runtime baseline
 
-P10D3 test-only telemetry target:
-- image **137,240 B**
-- RAM **89,732 B**
+Active P10D3 lifecycle:
+- seen flags `ff`; final flags `14`
+- Dual+LINK capture 149 points left / 149 right
+- record start 220,672; finish 441,088; cycle 220,416 samples
+- manual override 450,560; resume 466,176
+- cursor 481,024; queue high-water 30/512; overflow 0; late flags 0
+- active WAV peak 1,171; RMS 173
+
+## P10E — String Attractor editor complete
+
+Editor semantics:
+- ordinary Phase-9 MOTHER `SEL+ENV` mute gesture remains frozen
+- enter STRING with ENV, then `SEL+ENV` enters/exits String Attractor edit context
+- direct key gate toggles edit existing active attractor cells only
+- REC reroll changes the existing bounded seed and regenerates through existing M4c authority
+- existing renderer/state are reused; no new DSP/runtime authority
+
+Production target:
+- image **137,304 B**
+- RAM **89,668 B**
 - POOL **328,740 B**
-- package SHA-256 `0c94bee67e5e727efa4e4f5656a597df5dc9d866b87c069fd783f77c04bd0ef9`
+- inactive editor preserves exact frozen PCM and cursor 123,392
 
-Pinned active-emulator lifecycle evidence:
-- lifecycle seen flags **`ff`**; final flags **`14`**
-- Dual+LINK capture **149 points left / 149 right**
-- record start sample **220,672**
-- record finish sample **441,088**
-- recorded cycle **220,416 samples**
-- manual override sample **450,560**; resume **466,176**
-- runtime cursor **481,024**
-- queue high-water **30/512**
-- queue overflow **0**; late flags **0**
-- active WAV peak **1,171**; RMS **173**
+Active emulator:
+- seen flags `3f`
+- gate `9535 -> 9534`
+- seed `317 -> 8236`
+- zero violations, zero Motion leakage, zero overflow, zero late flags
 
-The earlier P10D3 `seen=0xc8` failure was a CI-instrumentation false negative. The test-only generator matched the first generic `apsis_string_motion_playback_valid = 0u` occurrence inside `apsis_p10_motion_recompute_active()` rather than the boot block. Because that line is the single body of a brace-less `if`, the subsequently injected multi-statement probe reset became unconditional and cleared lifecycle history every active callback. P10D3 now anchors initialization to the unique boot sequence and guards that exactly one lifecycle-reset site exists in `app_main()`.
+## P10F — Spiral Attractor editor complete
 
-## Verification boundary
+Editor semantics:
+- ALGORITHM selects the existing Spiral ATTRACTOR page without replacing frozen P9 ROUTE behavior outside that page
+- gate/length/rate/note-length/energy edits act on existing Spiral attractor state
+- REC reroll calls existing `apsis_spiral_reset_attractor(..., 1)` authority
+- route_count/hash remain isolated from attractor editing
+- existing P8 Spiral attractor visual/runtime position are reused
 
-Phase 10 String Motion is verified through host implementation, deterministic tests, ASAN/UBSAN, real JieLi target build, exact idle emulator regression and active pinned-emulator lifecycle. It is **not** physical-FM-1 verified.
+Deterministic reset note:
+- with default length 16 and seed reroll 911 -> 4825, source reset vector is **`0x002DA5FD`**
+- final gate masks are not treated as static after transport runs because M3c legitimately evolves Spiral attractor gates when lock < 1.0
 
-Still unverified:
-- physical control feel/ergonomics and switch/encoder behavior
-- actual LEDs/display on hardware
-- real ISR margin under active manual performance
-- DAC/listening quality
+Production target:
+- image **138,840 B**
+- RAM **89,684 B**
+- POOL **328,740 B**
+- package SHA-256 begins `593ae412`
+- inactive editor preserves exact frozen PCM and cursor 123,392
+
+Active emulator:
+- seen flags `3f`
+- seed `911 -> 4825`
+- route count `0 -> 0`, route hash unchanged
+- queue high-water 28; overflow 0; late flags 0
+
+## P10G — Gravity selected-point editor complete
+
+Feature-complete technical head: `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`.
+
+Editor semantics:
+- ALGORITHM cycles Harmony / Timing / Selected Point
+- on Selected Point, `SEL+degree` chooses one of 24 existing points without sending a normal Gravity audition/request
+- K1 offset; K2 octave; K3 level; K4 brightness; SELECT attack; PRESET release; REC enabled
+- only the `SEL+degree` note bits are filtered before the frozen P9 Gravity dispatcher
+- plain degree keys still use normal `apsis_runtime_request_gravity()` behavior
+- edits are live existing project state; no per-knob flash write or new persistence mechanism
+
+Final stacked Phase-10 production target on P10G:
+- product `FM-1_972`
+- image **140,152 / 581,564 B**
+- RAM **89,684 / 98,304 B**; headroom **8,620 B**
+- POOL **328,740 / 344,064 B**; headroom **15,324 B**
+- package bytes 610,110
+- package SHA-256 `5a82ea63c9fac432d3a4ca98119defcfc1c51e04ad59317e8633e072e868b9ce`
+- exact frozen idle PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- idle cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+P10G active telemetry target:
+- image **140,712 B**
+- RAM **89,764 B**
+- POOL **328,740 B**
+- package SHA-256 `21df63ad9bd785e8415ef91a9389e10888db67c983f98c11da51f4e266bc9ed9`
+
+P10G active emulator:
+- seen flags `7f`; violations 0
+- selected ANCHOR degree 4 without audition
+- offset 0 -> 1; octave 0 -> 1
+- level q15 24903 -> 25559; brightness q15 7864 -> 7536
+- attack 58 -> 66 ms; release 990 -> 1040 ms; enabled 1 -> 0
+- other 23 points remain stable (`other_points_hash=23b8dbda`)
+- later plain degree 6 produces the normal Gravity request
+- cursor 176,384; queue high-water 29; overflow 0; late flags 0
+
+## Phase 10 verification boundary
+
+All four advanced-interaction layers are now verified at the strongest level currently possible without physical hardware:
+- deterministic host contracts
+- ASAN/UBSAN
+- generated target ownership/guard checks
+- real JieLi AC79 target builds
+- exact inactive-editor regression against the same frozen Phase-9 PCM/runtime baseline
+- active pinned-emulator control lifecycles
+
+Phase 10 is **not physical-FM-1 verified**.
+
+Still unverified and intentionally deferred to Phase 11/12:
+- real ISR margin/timing under combined DSP + UI + control load
+- physical control feel, debounce and encoder/switch behavior
+- actual LEDs/LCD transfer behavior on hardware
+- DAC/listening quality and Cathedral tuning on hardware
 - real NOR timing/power interruption
-- worst-case combined control/UI/audio stress
+- worst-case combined control/UI/audio stress on device
+
+## Phase 11 entry rule
+
+Phase 11 is optimisation, not redesign. Begin from measured evidence before changing arithmetic, memory ownership or scheduling. Preserve all Phase-10 musical/control behavior and frozen regression gates unless a change is explicitly re-approved by evidence.
+
+Initial optimisation targets:
+1. establish real/target-side ISR and callback cost measurements that can be obtained without physical hardware, while clearly separating emulator/toolchain proxies from hardware timing;
+2. inventory RAM, POOL, stack and image headroom with the final Phase-10 stacked target;
+3. identify proven-safe memory/arithmetic reductions, especially around Motion storage and UI redraw work;
+4. stress shared queue/voice limits and redraw load without creating private schedulers or relaxing audio baselines;
+5. leave physical Cathedral listening/tuning and true ISR margin claims for hardware validation.
 
 ## Exact next action
 
-Begin **Phase 10E — String Attractor editor** on `p10-string-motion`:
-1. keep the frozen M4c String Attractor runtime/DSP as authority;
-2. add a host-first edit contract over the existing `filter_attractor_gates`, bounded seed and length/state fields rather than new musical shadow state;
-3. map active attractor cells (max 16) to direct key gate toggles in an explicit String Attractor edit context while preserving ordinary Phase-9 String performance outside that context;
-4. make reroll deterministic/bounded at the control contract and rely on existing `apsis_string_attractor_sync()` regeneration when seed/length changes;
-5. host-test gate edits, bounds, reroll/regeneration and no unintended musical-state mutation under ASAN/UBSAN;
-6. only then bind P10E into the generated FM-1 target and re-run exact Phase-9 idle audio/runtime regression.
-
-After P10E: Spiral Attractor editor, then selected Gravity-point editor, then the final Phase-10 target/emulator matrix before Phase 11 optimization.
+Run the **final exact-head CI matrix on this Phase-10 documentation head**. Merge PR #20 with squash only if every required core/staged/P6/P7/P8/P9/P10 host, target and active workflow is green on that same head. After merge, create the Phase-11 optimisation branch from `main` and start with measurement/budget inventory before making optimisation changes.
 
 ## Do not regress
 
@@ -301,11 +364,12 @@ After P10E: Spiral Attractor editor, then selected Gravity-point editor, then th
 - long Space storage stays in dedicated pre-`.pool` NOLOAD memory
 - historical M4/M5 gates retain cursor 123,648
 - historical M4f bypass retains image 95,804 B
-- integrated P6/P7/P8/P9 idle scenario retains cursor 123,392 with zero late/overflow flags
+- integrated inactive-editor scenario retains cursor 123,392 with zero late/overflow flags
 - audible idle PCM remains exact P6/P7/P8; dry-only remains exact Phase 5
 - project persistence stays versioned/journaled/CRC-protected and never blocks active audio
 - native visuals consume existing APSIS state; no UI shadow musical state
 - native boot takeover remains after sample 8192 unless revalidated against exact PCM
 - Phase-9 direct performance uses finite mailboxes/adapters; no private scheduler/RNG
 - Phase-10 Motion store remains the bounded 19,208-B dedicated POOL allocation; no heap/private scheduler
+- Phase-10 Attractor/Gravity editors keep existing DSP/runtime/state authorities; no duplicate musical state
 - physical FM-1 and real ISR/storage/display/control behaviour remain unverified

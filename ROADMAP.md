@@ -106,7 +106,7 @@ Status: **[x] complete and merged as `bbfab322557b6760425503268b550b789f796c23` 
 - [x] direct BLOOM performance via P9-only finite manual queue, shared M3c RNG and existing M4g binding/DSP
 - [x] historical M4f 95,804-B bypass preserved; no baseline relaxation
 - [x] real JieLi target + exact P8 idle PCM/runtime emulator regression
-- [x] final documentation-head 10-workflow matrix PASS on `dc288b6424b957ad382997f62cd6924b4146f675`
+- [x] final documentation-head matrix PASS
 - [x] guarded PR #19 squash merge
 
 Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
@@ -119,38 +119,53 @@ Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 
 ## Phase 10 — String Motion and advanced interactive parity
 
-Status: **[~] current. String Motion checkpoint P10D3 is green; P10E String Attractor editor is next.**
+Status: **[x] feature-complete on technical head `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`; final exact-head documentation/CI gate on PR #20 is the only remaining merge step.**
 
 - [x] Clock-quantized String Motion capture
 - [x] Classic/Dual ownership and frozen pitch context
-- [x] overdub/manual override
+- [x] overdub/manual override/resume on shared Clock timeline
 - [x] finite main→audio mailbox + dedicated 19,208-B Motion POOL
 - [x] deterministic Motion host/sanitizer contracts
 - [x] real JieLi Motion target + exact frozen Phase-9 idle PCM/runtime regression
-- [x] active pinned-emulator lifecycle: arm → next Clock 1 → record → loop → manual override → resume
-- [ ] String Attractor editor
-- [ ] Spiral Attractor editor
-- [ ] selected Gravity-point editor
-- [ ] final advanced-interaction target/emulator regression preserving frozen Phase-9 idle audio/runtime
+- [x] active pinned-emulator Motion lifecycle
+- [x] String Attractor editor over existing M4c authority
+- [x] String Attractor real target + frozen idle + active emulator lifecycle
+- [x] Spiral Attractor editor over existing M4f state/runtime
+- [x] Spiral Attractor real target + frozen idle + active emulator lifecycle
+- [x] selected Gravity-point editor over existing 24-point grid
+- [x] Gravity selected-point real target + frozen idle + active emulator lifecycle
+- [x] all advanced editors preserve Phase-9 mappings outside explicit edit contexts
+- [x] no new private scheduler, musical RNG or duplicate musical state
+- [x] final stacked target remains inside image/RAM/POOL budgets
+- [x] same frozen Phase-9 idle PCM/runtime baseline preserved through P10G
+- [ ] squash merge PR #20 after exact-head documentation matrix is green
 
-P10D3 evidence on `e750655141bb87e83949bb262426ab2ee42d734b`:
-- production P10D2 target: image 136,984 B; RAM 89,668 B; POOL 328,740 B
-- production RAM headroom 8,636 B; POOL headroom 15,324 B
-- active D3 telemetry target: image 137,240 B; RAM 89,732 B; POOL 328,740 B
-- active lifecycle flags `ff`; final flags `14`
-- Dual+LINK capture 149 points left / 149 right
-- record start sample 220,672; finish 441,088; cycle 220,416 samples
-- manual override sample 450,560 → resume 466,176
-- runtime cursor 481,024; queue high-water 30/512; overflow 0; late flags 0
-- active WAV peak 1,171; RMS 173
+Phase-10 evidence summary:
+- P10D3 Motion: active flags `ff`, Dual+LINK 149/149 points, cycle 220,416 samples, queue 30, overflow/late 0
+- P10E String Attractor: image 137,304 B; RAM 89,668 B; POOL 328,740 B; active `seen=3f`, gate `9535→9534`, seed `317→8236`
+- P10F Spiral Attractor: image 138,840 B; RAM 89,684 B; POOL 328,740 B; active `seen=3f`, seed `911→4825`, route isolated
+- P10G Gravity selected-point: final production image **140,152 / 581,564 B**, RAM **89,684 / 98,304 B**, POOL **328,740 / 344,064 B**
+- P10G production package SHA-256 `5a82ea63c9fac432d3a4ca98119defcfc1c51e04ad59317e8633e072e868b9ce`
+- P10G active `seen=7f`, degree 4 selected without audition, six numeric fields + enabled edited, other 23 points stable, later plain degree 6 request preserved
+- final inactive PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- final inactive cursor 123,392; queue 28/512; overflow 0; late flags 0
+
+Phase 10 is emulator/JieLi-target verified, **not physical-FM-1 verified**.
 
 ## Phase 11 — FM-1 optimisation
-- [ ] real ISR timing under DSP load
+
+Status: **[ ] next after Phase-10 merge. Measurement first; no redesign.**
+
+- [ ] establish target/emulator timing proxies and explicitly separate them from real hardware ISR claims
+- [ ] final Phase-10 image/RAM/POOL/stack budget inventory
 - [ ] proven-safe arithmetic/memory optimization
-- [ ] RAM/pool/stack headroom
-- [ ] queue/voice stress
-- [ ] UI redraw load
-- [ ] Cathedral listening/tuning on hardware
+- [ ] Motion POOL/storage efficiency review without changing musical semantics
+- [ ] queue/voice stress and worst-case shared-runtime pressure
+- [ ] UI redraw/DMA workload reduction without changing visual authority
+- [ ] combined control/UI/audio stress gates
+- [ ] Cathedral listening/tuning on hardware when physical FM-1 becomes available
+
+Phase-11 invariant: optimise only from measured evidence; preserve Phase-10 behavior and all frozen regression gates unless a change is explicitly re-approved.
 
 ## Phase 12 — hardware validation/release
 - [ ] physical FM-1 install
@@ -158,10 +173,12 @@ P10D3 evidence on `e750655141bb87e83949bb262426ab2ee42d734b`:
 - [ ] controls/LEDs/display
 - [ ] worst-case audio stress
 - [ ] storage power interruption
+- [ ] real ISR margin and hardware timing
+- [ ] DAC/listening quality
 - [ ] release SHA-256
 
 Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Begin **Phase 10E — String Attractor editor** as a host-first control/state layer above the already-frozen M4c String Attractor runtime. The first N physical keys must edit the existing `filter_attractor_gates` cells (maximum 16), reroll must change the existing bounded seed and let `apsis_string_attractor_sync()` regenerate deterministically, and no private scheduler/DSP state may be introduced. Preserve the Phase-9 String performance mapping outside the explicit Attractor edit context, then bind the editor to the FM-1 target only after host + sanitizer contracts are green.
+Run the final exact-head CI matrix on the Phase-10 documentation head. If every required core/staged/P6/P7/P8/P9/P10 host, target and active workflow is green on that exact SHA, squash-merge PR #20 into `main`. Then branch Phase 11 from the merged `main` and begin with measurement/budget inventory before changing code.
