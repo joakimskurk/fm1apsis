@@ -2,6 +2,38 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
+## 2026-11-01 - Phase 9 physical interaction parity complete, merge pending
+
+Technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e` passed the complete technical matrix: core #503, staged #492, P6-final #95, P7-storage #82, P7-target #75, P8-visuals #85, P8-target #60, P9-controls #82, P9-H4b #6 and P9-target #40.
+
+Completed:
+- pinned FM-1 interaction vocabulary: 14 buttons, 7 relative/detent encoders, 27 keys; MASTER remains platform output gain and no encoder-push is assumed
+- direct surface navigation for MOTHER, STRING, DRIFT/TUNING, CLOCK, SPIRAL, BLOOM, GRAVITY, CHAIN, KEEP and SEL+FX -> shared SPACE/CATHEDRAL
+- deterministic CLOCK, GRAVITY, STRING, SPIRAL, BLOOM, KEEP/CHAIN, MOTHER, SPACE and DRIFT/TUNING control contracts
+- MOTHER-aware structural apply/queue/commit bridge and Gravity requests through the existing shared runtime
+- relative encoder edits without hidden absolute pickup state
+- project-dirty coalescing through the existing Phase-7 deferred/journaled persistence path
+- P9-only manual STRING audio over the existing finite String transient pool, using Study-126 keyboard level 0.080 and a one-byte main->audio mailbox
+- P9-only manual BLOOM petal/core/grow audio over the existing M4g binding/DSP engine
+- direct Bloom petal/grow source gain distinction, display/pending-Gravity behavior and finite late-bound core petals
+- shared M3c RNG for manual Bloom core; no private UI RNG or musical scheduler
+- real JieLi target build and exact frozen P8 idle PCM/runtime emulator regression
+
+Frozen technical candidate:
+- source `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`
+- image 132,264 / 581,564 B
+- RAM 89,492 / 98,304 B
+- POOL 309,532 / 344,064 B
+- package `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
+- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+A Phase-9 regression was caught rather than normalized: the first manual-String helper landed inside the historical M4b String Rhythm source and moved the M4f bypass image from 95,804 to 95,820 B. The baseline was not relaxed. The old M4b blobs were restored exactly, manual String was isolated into a P9-only module and the generator now hash-guards those historical sources. Staged Gate 5b is again exact at 95,804 B.
+
+Physical FM-1 ergonomics, real ISR headroom under active manual performance, physical LEDs/display, DAC listening and real power-cut persistence remain unverified.
+
+Next after guarded PR #19 merge: Phase 10 String Motion and advanced interactive parity.
+
 ## 2026-10-31 - Phase 8 native visuals merged
 
 PR #18 merged to `main` as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` after final documentation/CI head `856c4e35ae1f041da8ccdc555f4c82b54f43a04a` passed core #460, staged #449, P6-final #54, P7-storage #41, P7-target #34, P8-visuals #44 and P8-target #19.
@@ -28,48 +60,21 @@ Frozen technical candidate:
 - audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-A first native redraw changed only early audio despite exact runtime telemetry. Frame-level comparison showed differences limited to frames 1795..4351. The baseline was not relaxed: native takeover is now deferred until runtime sample 8192, restoring the complete frozen PCM hash.
-
-The Phase-8 visual contract is deterministic and source-derived; screenshot/pixel-identical browser parity and real FM-1 panel appearance are not claimed.
-
-Next: Phase 9 physical interaction parity.
+A first native redraw changed only early audio despite exact runtime telemetry. Frame-level comparison showed differences limited to frames 1795..4351. The baseline was not relaxed: native takeover is deferred until runtime sample 8192, restoring the complete frozen PCM hash.
 
 ## 2026-10-30 - Phase 7 persistent KEEP/CHAIN storage merged
 
 PR #17 merged to `main` as `e9000b2b2f74d4fafe96df87f030cc55916a8285` after final documentation/CI head `2fd054d90a49ff8e52544c092937dadc8e4097d9` passed core #436, staged #425, P6-final #32, P7-storage #19 and P7-target #12.
 
-Completed:
-- explicit little-endian v1 project format for 8 KEEP slots, 32 CHAIN cells and behavioural CHAIN settings
-- 24-byte CRC header + 816-byte payload; native struct padding is never persisted
-- dedicated 4 KiB project sectors at `0x000F4000` and `0x000F5000`, outside Dinghy settings
-- alternating generation journal with payload-first/header-last commit semantics
-- torn-write/corruption/wraparound desktop tests
-- fake FM-1 NOR save/reboot/failure/recovery tests and ASAN/UBSAN gates
-- narrow pinned-Dinghy flash allow-list extension only for the two APSIS sectors
-- boot NOR prefetch moved before audio/DMA startup; later project apply is RAM-only
-- deferred main-loop save with stopped transport and quiesced audio; no flash write from `app_audio()`
-- real JieLi target build within budgets
-- exact P6 audible PCM and exact Phase-5 dry PCM preserved
+Completed versioned little-endian CRC project records, two-sector alternating journal, fake-NOR recovery/corruption tests, pre-audio boot prefetch, deferred stopped-transport main-loop saves and exact P6/Phase-5 audio regressions.
 
-Frozen technical candidate:
-- firmware source `e290813f5e67affc7404dcb9fc7af63d2c671a8c`
-- image 110,848 / 581,564 B
-- RAM 88,628 / 98,304 B
-- POOL 309,532 / 344,064 B
-- package `9c51d1ab833b1f4aa1d95ebbd0e31246fab0b19a456de3f28aa5761b7734f7cc`
-- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- dry-only PCM `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
-- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
-
-A boot-time NOR read initially perturbed 202 frames of the first active audio block by at most two Q15 steps. The baseline was not relaxed: prefetch was moved before `fm1_audio_init()`, restoring full bit-exact PCM.
+Frozen technical candidate: `e290813f5e67affc7404dcb9fc7af63d2c671a8c`, image 110,848 B, RAM 88,628 B, POOL 309,532 B.
 
 ## 2026-10-30 - Phase 6 shared Space/Cathedral merged
 
-PR #16 merged to `main` as `cd321e9f7999d0568d280d89e7e3574c3da66054` after the final guarded head `cfdfff673204d4fa36208508e343c6297a37ff37` passed core #424, staged #413 and P6-final #22.
+PR #16 merged to `main` as `cd321e9f7999d0568d280d89e7e3574c3da66054`. Completed one shared room, compact modulated 8-line FDN, dedicated pre-`.pool` NOLOAD storage, quarter-rate 11.025-kHz target Cathedral, exact Phase-5 dry regression and audible-room emulator gate.
 
-Completed one shared room, compact modulated 8-line FDN, dedicated pre-`.pool` NOLOAD storage, target source/send integration, quarter-rate 11.025 kHz Cathedral adaptation, exact Phase-5 dry regression and audible-room emulator gate.
-
-Frozen Phase-6 target: image 107,352 B; RAM 87,780 B; POOL 309,532 B; audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`; dry-only PCM exact Phase 5 `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`.
+Frozen Phase-6 target: image 107,352 B; RAM 87,780 B; POOL 309,532 B.
 
 ## 2026-10-30 - Phase 5 sounding integration merged
 
