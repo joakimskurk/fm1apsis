@@ -1,9 +1,10 @@
 name: APSIS Phase 11A baseline inventory
 
+# Historical measurement gate. The authoritative green baseline is run
+# 41307570193 on commit 5e9eb2348ec3bd075eecfff2cad63fcca90a32a8.
+# It intentionally asserts the pre-optimisation Phase-10 resource sizes and is
+# therefore manual-only after P11A closes. P11C+ workflows own current heads.
 on:
-  push:
-    branches: [p11-optimization]
-  pull_request:
   workflow_dispatch:
 
 jobs:
