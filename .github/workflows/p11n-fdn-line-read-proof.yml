@@ -1,8 +1,6 @@
 name: APSIS Phase 11N FDN line-read invariant proof
 
 on:
-  push:
-    branches: [p11n-fdn-line-read-proof-staging]
   workflow_dispatch:
 
 jobs:
@@ -12,10 +10,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: a13bce4ce821b68d8daab66ec1432ba3b5bf9a99
 
       - name: Gate P11N.1 - helper and complete-FDN equivalence
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'a13bce4ce821b68d8daab66ec1432ba3b5bf9a99'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             tests/test_p11n_fdn_line_read_equivalence.c \
             -o /tmp/test_p11n_fdn_line_read_equivalence
