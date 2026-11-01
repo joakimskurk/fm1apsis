@@ -1,0 +1,33 @@
+name: APSIS Phase 11I apply authorized production patch
+
+on:
+  push:
+    branches: [p11i-space-stereo-read-staging]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Apply exact-anchor production patch
+        run: python3 ci/p11i_apply_stereo_pair.py
+      - name: Commit only when source changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- apsis/apsis_space_room.c; then
+            echo 'PASS: production patch already present; no commit required'
+            exit 0
+          fi
+          git diff --check
+          git diff -- apsis/apsis_space_room.c
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apsis/apsis_space_room.c
+          git commit -m 'phase11i: apply stereo-pair Cathedral delay reader'
+          git push origin HEAD:p11i-space-stereo-read-staging
