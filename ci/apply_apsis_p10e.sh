@@ -44,7 +44,8 @@ state_anchor = 'static uint8_t apsis_string_motion_playback_valid;'
 if state_anchor not in s:
     raise SystemExit('FAIL: P10E P10D2 state anchor missing')
 s = s.replace(state_anchor, state_anchor +
-              '\nstatic ApsisStringAttractorEditorSession apsis_string_attractor_editor;', 1)
+              '\nstatic ApsisStringAttractorEditorSession apsis_string_attractor_editor;'
+              '\nstatic uint8_t apsis_string_attractor_visual_dirty;', 1)
 
 # P9H4a/H4b consume the dispatch result after the H3 dispatcher call. When an
 # ATTRACTOR frame deliberately bypasses ordinary P9 STRING dispatch, result must
@@ -79,9 +80,12 @@ if take not in s:
     raise SystemExit('FAIL: P10E P10D2 input-take anchor missing')
 s = s.replace(take, take + '''    (void)apsis_controls_string_attractor_context(
         &apsis_string_attractor_editor, current, &input, 0);
-    if (current == SURF_STRING && apsis_string_attractor_editor.active)
+    if (current == SURF_STRING && apsis_string_attractor_editor.active) {
         attractor_editor_frame = apsis_controls_string_attractor_edit(
             &apsis.string, 1u, &input, &attractor_control);
+        if (attractor_control.state_changed)
+            apsis_string_attractor_visual_dirty = 1u;
+    }
 ''', 1)
 
 motion = '''    if (current == SURF_STRING) {
@@ -109,18 +113,25 @@ s = s.replace(dispatch, '''    if (!attractor_editor_frame)
 
 # Leaving STRING must clear the UI-only editor bit immediately, not merely on a
 # later input frame. Entry from another surface is retained because ENV resolves
-# to STRING before this post-router check.
+# to STRING before this post-router check. A changed editor frame invalidates
+# only the existing P8 native STRING draw; it adds no framebuffer or renderer.
 nav = '        next = surface_from_buttons(pressed, surface);'
 if s.count(nav) != 1:
     raise SystemExit(f'FAIL: P10E expected one main navigation site, got {s.count(nav)}')
 s = s.replace(nav, nav + '''
-        if (next != SURF_STRING)
+        if (next != SURF_STRING) {
             apsis_controls_string_attractor_editor_reset(
-                &apsis_string_attractor_editor);''', 1)
+                &apsis_string_attractor_editor);
+            apsis_string_attractor_visual_dirty = 0u;
+        } else if (apsis_string_attractor_visual_dirty) {
+            drawn = 0xFFu;
+            apsis_native_draw_active = 0u;
+            apsis_native_draw_ui_surface = 0xFFu;
+            apsis_string_attractor_visual_dirty = 0u;
+        }''', 1)
 
-init = '    apsis_string_motion_playback_valid = 0u;'
-# P10D2 contains an audio-side assignment with the same text. Anchor the unique
-# boot sequence around mailbox reset so we do not repeat the D3 probe mistake.
+# Boot initialization: anchor the unique Motion mailbox sequence so we do not
+# repeat the P10D3 generic-assignment mistake.
 boot = '''    apsis_string_motion_mailbox_reset(&apsis_string_motion_mailbox);
     apsis_string_motion_active = 0u;
     apsis_string_motion_playback_valid = 0u;'''
@@ -128,7 +139,8 @@ if s.count(boot) != 1:
     raise SystemExit(f'FAIL: P10E unique Motion boot anchor count {s.count(boot)} != 1')
 s = s.replace(boot, boot + '''
     apsis_controls_string_attractor_editor_reset(
-        &apsis_string_attractor_editor);''', 1)
+        &apsis_string_attractor_editor);
+    apsis_string_attractor_visual_dirty = 0u;''', 1)
 
 p.write_text(s)
 PY
@@ -136,10 +148,12 @@ PY
 # Generated-target guardrails.
 grep -q '#include "apsis_controls_string_attractor.c"' work/apsis/firmware/src/dinghy.c
 grep -q 'static ApsisStringAttractorEditorSession apsis_string_attractor_editor;' work/apsis/firmware/src/dinghy.c
+grep -q 'static uint8_t apsis_string_attractor_visual_dirty;' work/apsis/firmware/src/dinghy.c
 grep -q 'ApsisControlsDispatchResult result = {0};' work/apsis/firmware/src/dinghy.c
 grep -q 'current == SURF_STRING && !attractor_editor_frame' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_controls_string_attractor_edit(' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_controls_string_attractor_editor_reset(' work/apsis/firmware/src/dinghy.c
+grep -q 'apsis_string_attractor_visual_dirty = 1u;' work/apsis/firmware/src/dinghy.c
 grep -q 'filter_attractor_gates >> i' work/apsis/firmware/src/dinghy.c
 
 python3 - <<'PY'
@@ -151,9 +165,10 @@ audio = s[a:b]
 main = s[s.index('static uint8_t apsis_p9h3_dispatch('):b]
 
 for forbidden in ('apsis_controls_string_attractor_context(',
-                  'apsis_controls_string_attractor_edit('):
+                  'apsis_controls_string_attractor_edit(',
+                  'apsis_string_attractor_visual_dirty'):
     if forbidden in audio:
-        raise SystemExit(f'FAIL: P10E editor leaked into app_audio: {forbidden}')
+        raise SystemExit(f'FAIL: P10E editor/UI work leaked into app_audio: {forbidden}')
 for required in ('apsis_controls_string_attractor_context(',
                  'apsis_controls_string_attractor_edit(',
                  'if (!attractor_editor_frame)',
@@ -162,6 +177,13 @@ for required in ('apsis_controls_string_attractor_context(',
         raise SystemExit(f'FAIL: P10E target binding missing: {required}')
 if s.count('apsis_controls_string_attractor_editor_reset(') != 2:
     raise SystemExit('FAIL: P10E expected boot + leave-surface editor resets only')
+if s.count('apsis_string_attractor_visual_dirty = 1u;') != 1:
+    raise SystemExit('FAIL: P10E expected exactly one editor visual-dirty producer')
+for required in ('drawn = 0xFFu;',
+                 'apsis_native_draw_active = 0u;',
+                 'apsis_native_draw_ui_surface = 0xFFu;'):
+    if required not in s:
+        raise SystemExit(f'FAIL: P10E missing existing-P8 redraw invalidation: {required}')
 for required in ('apsis_string_motion_mailbox_publish(',
                  'apsis_controls_performance_queue_string(',
                  'apsis_controls_performance_queue_bloom('):
@@ -173,7 +195,7 @@ for required in ('project_store.save_pending && !apsis_runtime.transport.running
         raise SystemExit(f'FAIL: P10E disturbed P7 deferred save path: {required}')
 if 'static ApsisRuntime apsis_runtime;' not in s:
     raise SystemExit('FAIL: P10E disturbed shared runtime declaration')
-print('PASS: P10E editor consumes STRING frames before P9/Motion without touching audio/runtime ownership')
+print('PASS: P10E editor consumes STRING frames before P9/Motion and invalidates only the existing P8 visual path')
 PY
 
 echo "PASS: P10E String Attractor editor target layered above green P10D2"
