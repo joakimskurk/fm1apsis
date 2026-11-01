@@ -55,6 +55,7 @@ jobs:
       - name: Gate P11K.2 - exact P11I baseline target
         run: |
           set -euo pipefail
+          bash ci/p11f_prepare.sh
           bash ci/apply_apsis_p10g.sh
           bash ci/build_apsis_target.sh
           cp build/target_report.json "$P11K_EVIDENCE/baseline-target.json"
