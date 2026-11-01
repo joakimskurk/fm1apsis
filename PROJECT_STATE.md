@@ -4,18 +4,19 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 10 — String Motion and advanced interactive parity is feature-complete on technical head `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`. PR #20 is at the final exact-head documentation/CI merge gate. Phase 11 — FM-1 optimisation is the next development phase after that gate.**
+**Phase 11 — FM-1 optimisation is active on `p11-optimization`. Phase 10 is complete and merged. P11A baseline inventory, P11B Motion-storage proof, and P11C compact lossless Motion storage are complete at the strongest level currently possible without physical FM-1 hardware. P11D target RAM/linker ownership inventory is next.**
 
-Phase-9 freeze remains authoritative:
-- technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`
-- final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675`
-- merge commit `bbfab322557b6760425503268b550b789f796c23`
-- target image 132,264 B; RAM 89,492 B; POOL 309,532 B
-- package `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
+Phase 10 merge authority:
+- feature-complete technical head `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`
+- exact-head documentation/CI gate `ce5857a52c6326011e5af7cd7f73819b420550fc`
+- 22/22 required workflows PASS on that exact head
+- PR #20 squash merge `378d2023df2afe59475be53c09cc001788586514`
 
-Phase 8 remains merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18.
-Phase 7 remains merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.
-Phase 6 remains merged as `cd321e9f7999d0568d280d89e7e3574c3da66054` via PR #16.
+Phase 11 branch:
+- `p11-optimization`
+- P11A green run `41307570193` on `5e9eb2348ec3bd075eecfff2cad63fcca90a32a8`
+- P11B green run `41308160497` on `0b9c197fc922eb76b37a5de3ac6f64a3ab3e511c`
+- first complete P11C green run `41308798678` on `8c31d63d04d48efeed9bcb3c28c0ec8286e00e0c`
 
 Physical FM-1 hardware remains unavailable. Nothing is promoted to physical-hardware verification.
 
@@ -50,10 +51,10 @@ Historical M4/M5 pinned emulator baseline:
 - queue 28/512
 - overflow 0
 - late flags 0
-- cursor **123,648**
+- cursor 123,648
 - late trace `811c9dc5`
 
-Integrated frozen idle boot-to-stop scenario used by P6/P7/P8/P9 and Phase-10 inactive-editor regression:
+Integrated frozen idle boot-to-stop baseline used by P6/P7/P8/P9/P10 and P11 inactive regression:
 - queue 28/512
 - overflow 0
 - late flags 0
@@ -65,9 +66,9 @@ Integrated frozen idle boot-to-stop scenario used by P6/P7/P8/P9 and Phase-10 in
 Frozen Phase-5 dry PCM:
 - `6c3b8fff90f381da36ade0e610efb85769b04a020d17333308866e95055caa2b`
 
-Source DSP and final output remain 44.1 kHz. The generated FM-1 Space/Cathedral renderer remains the frozen quarter-rate 11.025 kHz target adaptation with one shared room and five source sends. Long room storage remains in dedicated pre-`.pool` NOLOAD memory.
+Source DSP and final output remain 44.1 kHz. Target Space/Cathedral remains the proven quarter-rate 11.025 kHz adaptation with one shared room and five source sends. Long room storage remains in dedicated pre-`.pool` NOLOAD memory.
 
-## Phase 7 frozen project contract
+## Frozen project persistence
 
 Persisted:
 - all 8 KEEP snapshots + selected KEEP slot
@@ -90,15 +91,15 @@ Journal:
 - boot selects newest fully valid generation; corrupt/torn newest falls back to older valid generation
 
 Audio safety:
-- boot NOR prefetch runs before `fm1_audio_init()` / ALNK0 DMA startup
+- boot NOR prefetch runs before audio DMA startup
 - later decode is RAM-only
-- save request is a flag/dirty intent only
-- erase/program is serviced from main loop with transport stopped/audio quiesced
+- save request is only dirty intent
+- erase/program is main-loop, transport-stopped/audio-quiesced work
 - no flash write/erase path is reachable from `app_audio()`
 
-## Phase 8 frozen visual contract
+## Frozen native visual contract
 
-Ten native 240×240 surfaces remain deterministic:
+Ten deterministic 240×240 surfaces:
 - MOTHER `27373657`
 - GRAVITY `55aff30b`
 - STRING `00532f1d`
@@ -111,19 +112,19 @@ Ten native 240×240 surfaces remain deterministic:
 - SPACE/CATHEDRAL `9605ed04`
 
 Target adapter:
-- reuses Dinghy `cv_px`; no second framebuffer and no POOL growth
-- 8-row native strips gated by HAL `fm1_lcd_done()`
+- reuses Dinghy `cv_px`; no second framebuffer
+- 8-row native strips gated by `fm1_lcd_done()`
 - display work remains outside `app_audio()`
-- frozen Phase-7 legacy boot draw remains until runtime cursor sample **8192**, then native rendering takes over
+- native takeover remains after runtime sample 8192
 - all ten surfaces remain target-addressable
 
-## Phase 9 frozen interaction contract
+## Frozen physical-control contract
 
 Pinned panel vocabulary:
 - 14 buttons
 - 7 relative/detent encoders
 - 27 note keys
-- MASTER stays platform volume
+- MASTER remains platform volume
 - no encoder-push exists
 
 Surface navigation:
@@ -138,221 +139,232 @@ Surface navigation:
 - SAVE -> KEEP
 - SEL+FX -> SPACE/CATHEDRAL
 
-HOME is absolute. PLAY alone uses the existing shared runtime transport; SEL+PLAY is CHAIN transport.
+HOME is absolute. PLAY alone uses shared runtime transport; SEL+PLAY is CHAIN transport.
 
-Controls act on existing shared state/runtime structures only. Relative encoder deltas edit from the current parameter value, so no absolute pickup/soft-takeover shadow state is needed.
+Important frozen gestures:
+- CLOCK edits existing main/inner/snap/group structures
+- GRAVITY degree requests use `apsis_runtime_request_gravity()`
+- STRING uses three overlapping 9-key Study-126 source-keyboard banks across 27 keys
+- SPIRAL route editing preserves ordered raw point ids `0..35`; duplicates remain legal
+- BLOOM preserves petal/core/grow gestures
+- KEEP/CHAIN use existing 8-slot/32-cell structures
+- MOTHER structural edits retain `->1` pending/commit semantics
+- SPACE edits the one shared room
 
-Key interaction freezes:
-- CLOCK edits existing main/inner/snap/group structures.
-- GRAVITY degree requests use `apsis_runtime_request_gravity()`.
-- STRING uses three overlapping 9-key Study-126 source-keyboard banks across the 27 keys.
-- SPIRAL edits ordered raw point ids `0..35` by route index; duplicates remain legal.
-- BLOOM preserves distinct petal/core/grow gestures.
-- KEEP/CHAIN use the existing 8-slot/32-cell structures.
-- MOTHER structural edits retain `->1` pending/commit semantics.
-- SPACE edits the one shared room.
-
-## Phase 9 direct performance/audio ownership
-
-Manual performance does not fabricate transport events or create a private scheduler.
-
-STRING:
-- P9-only `apsis_string_manual_audio.*`
-- source keyboard pluck level 0.080
-- Classic reuses BODY+WIRE finite topology; Dual reuses selected side
-- 30-ms / 1323-sample retrigger debounce
-- main -> audio one-byte mailbox; audio callback owns finite transient mutation
-- historical M4b/M4f files remain byte-for-byte frozen and are hash-guarded by the P9 generator
-
-BLOOM:
-- P9-only finite manual adapter over existing M4g binding/DSP engine
-- direct petal scale 1.04
-- grow scale `0.78 + 0.055*i`
-- source grow thresholds retained
-- direct petal hears display/pending Gravity immediately
-- core freezes/advances one voice-leading plan and late-binds future petals at existing native lead timing
-- four concurrent manual core snapshots / twenty pending petals
-- core uses the one shared M3c RNG; no private UI RNG
-- packed 16-bit main -> audio mailbox; short IRQ guard only around producer read/modify/write
-
-P7 project writes remain deferred/coalesced and outside active audio.
+Manual performance uses finite main→audio adapters/mailboxes only. It does not fabricate transport events or create a private scheduler/RNG.
 
 ## Phase 9 frozen target evidence
 
 Technical head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
-- product `FM-1_972`
-- image **132,264 / 581,564 B**
-- RAM **89,492 / 98,304 B**
-- RAM headroom **8,812 B**
-- POOL **309,532 / 344,064 B**
-- POOL headroom **34,532 B**
-- package bytes 610,110
+- image 132,264 / 581,564 B
+- RAM 89,492 / 98,304 B
+- POOL 309,532 / 344,064 B
 - package SHA-256 `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
 
-Historical M4f bypass remains exactly **95,804 B**; its historical cursor/PCM gate is not relaxed.
+Historical M4f bypass remains exactly 95,804 B; its historical cursor/PCM gate is not relaxed.
 
-## Phase 10 completed scope
+## Phase 10 frozen advanced-interaction contract
 
-Phase 10 layers advanced interaction deliberately deferred from Phase 9 without reopening frozen Phase-9 mappings:
+Phase 10 added deliberately deferred interaction without reopening Phase-9 mappings:
 1. Clock-quantized String Motion capture;
 2. Classic/Dual ownership, overdub and frozen pitch context;
 3. manual override/resume on the shared Clock timeline;
 4. String Attractor editor over existing M4c authority;
 5. Spiral Attractor editor over existing M4f state/runtime;
-6. selected Gravity-point editor over the existing 24-point grid;
-7. host/sanitizer contracts before target integration;
-8. real JieLi builds, exact frozen idle regression and active pinned-emulator lifecycles.
+6. selected Gravity-point editor over the existing 24-point grid.
 
-No Phase-10 editor introduces a private scheduler, private musical RNG or duplicate musical state.
+No private scheduler, musical RNG or duplicate musical state was introduced.
 
-## P10D3 — String Motion complete
+### String Motion frozen behavior
 
-Technical checkpoint head: `e750655141bb87e83949bb262426ab2ee42d734b`.
-
-Contract:
-- REC arms/cancels at the next Clock step 1; SEL+REC toggles playback when a loop exists
+- REC arms/cancels at next Clock step 1; SEL+REC toggles playback when a loop exists
 - 1/2/4/8-cycle capture remains source-bounded
-- Classic owns the single/right lane; linked Dual owns BOTH; free Dual can own BODY/WIRE/BOTH
-- overdub preserves the unowned side in free Dual
-- captured pitch context is frozen against later Gravity changes
-- held String performance temporarily overrides playback and releases back into the loop at current phase
-- capture/playback observes shared M3c Clock only; no private scheduler
-- compact main→audio mailbox; audio callback owns Motion runtime/store mutation
-- two Motion lanes live in dedicated `.apsis_motion_pool` NOLOAD memory, exactly **19,208 B** total
+- Classic owns single/right lane; linked Dual owns BOTH; free Dual can own BODY/WIRE/BOTH
+- free-Dual overdub preserves unowned lane
+- captured pitch context remains frozen against later Gravity/Tuning edits
+- held String performance temporarily overrides playback and releases back at current phase
+- shared M3c Clock remains sole timeline
+- 1200 points/lane and 32-Hz capture bound are source-locked
 
-Production P10D2 target:
-- image **136,984 / 581,564 B**
-- RAM **89,668 / 98,304 B**; headroom **8,636 B**
-- POOL **328,740 / 344,064 B**; headroom **15,324 B**
-- package SHA-256 `25f87a83b39b48e9c1f11826741d9bc4da45b3fe1783e5c4041020ffcd4bf55b`
-
-Active P10D3 lifecycle:
-- seen flags `ff`; final flags `14`
-- Dual+LINK capture 149 points left / 149 right
+Frozen P10 active lifecycle:
+- seen `ff`; final `14`
+- 149 points left / 149 right
 - record start 220,672; finish 441,088; cycle 220,416 samples
 - manual override 450,560; resume 466,176
 - cursor 481,024; queue high-water 30/512; overflow 0; late flags 0
 - active WAV peak 1,171; RMS 173
 
-## P10E — String Attractor editor complete
+### String/Spiral/Gravity editors
 
-Editor semantics:
-- ordinary Phase-9 MOTHER `SEL+ENV` mute gesture remains frozen
-- enter STRING with ENV, then `SEL+ENV` enters/exits String Attractor edit context
-- direct key gate toggles edit existing active attractor cells only
-- REC reroll changes the existing bounded seed and regenerates through existing M4c authority
-- existing renderer/state are reused; no new DSP/runtime authority
+- String Attractor edits existing M4c gates/seed/regeneration authority only
+- Spiral Attractor edits existing M4f attractor state/reset/runtime only; route state remains isolated
+- Gravity Selected Point edits existing 24-point grid only; `SEL+degree` selects without audition, plain degree still follows normal request path
 
-Production target:
-- image **137,304 B**
-- RAM **89,668 B**
-- POOL **328,740 B**
-- inactive editor preserves exact frozen PCM and cursor 123,392
+## Frozen Phase-10 production target
 
-Active emulator:
-- seen flags `3f`
-- gate `9535 -> 9534`
-- seed `317 -> 8236`
-- zero violations, zero Motion leakage, zero overflow, zero late flags
-
-## P10F — Spiral Attractor editor complete
-
-Editor semantics:
-- ALGORITHM selects the existing Spiral ATTRACTOR page without replacing frozen P9 ROUTE behavior outside that page
-- gate/length/rate/note-length/energy edits act on existing Spiral attractor state
-- REC reroll calls existing `apsis_spiral_reset_attractor(..., 1)` authority
-- route_count/hash remain isolated from attractor editing
-- existing P8 Spiral attractor visual/runtime position are reused
-
-Deterministic reset note:
-- with default length 16 and seed reroll 911 -> 4825, source reset vector is **`0x002DA5FD`**
-- final gate masks are not treated as static after transport runs because M3c legitimately evolves Spiral attractor gates when lock < 1.0
-
-Production target:
-- image **138,840 B**
-- RAM **89,684 B**
-- POOL **328,740 B**
-- package SHA-256 begins `593ae412`
-- inactive editor preserves exact frozen PCM and cursor 123,392
-
-Active emulator:
-- seen flags `3f`
-- seed `911 -> 4825`
-- route count `0 -> 0`, route hash unchanged
-- queue high-water 28; overflow 0; late flags 0
-
-## P10G — Gravity selected-point editor complete
-
-Feature-complete technical head: `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`.
-
-Editor semantics:
-- ALGORITHM cycles Harmony / Timing / Selected Point
-- on Selected Point, `SEL+degree` chooses one of 24 existing points without sending a normal Gravity audition/request
-- K1 offset; K2 octave; K3 level; K4 brightness; SELECT attack; PRESET release; REC enabled
-- only the `SEL+degree` note bits are filtered before the frozen P9 Gravity dispatcher
-- plain degree keys still use normal `apsis_runtime_request_gravity()` behavior
-- edits are live existing project state; no per-knob flash write or new persistence mechanism
-
-Final stacked Phase-10 production target on P10G:
+Final P10G production baseline:
 - product `FM-1_972`
 - image **140,152 / 581,564 B**
-- RAM **89,684 / 98,304 B**; headroom **8,620 B**
-- POOL **328,740 / 344,064 B**; headroom **15,324 B**
+- RAM **89,684 / 98,304 B**; headroom 8,620 B
+- POOL **328,740 / 344,064 B**; headroom 15,324 B
 - package bytes 610,110
 - package SHA-256 `5a82ea63c9fac432d3a4ca98119defcfc1c51e04ad59317e8633e072e868b9ce`
-- exact frozen idle PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- exact idle PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - idle cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-P10G active telemetry target:
-- image **140,712 B**
+Phase 10 is JieLi-target/pinned-emulator verified and merged, **not physical-FM-1 verified**.
+
+## Phase 11 method
+
+Phase 11 is optimisation, not redesign.
+
+Acceptance rule for every optimisation:
+1. measured baseline;
+2. explicit resource/timing target;
+3. minimal patch;
+4. before/after evidence on the same measurement path;
+5. all relevant frozen musical/audio/control regressions green;
+6. no baseline relaxation simply to make a patch pass.
+
+Static/emulator proxies must be labelled as proxies. Do not infer physical ISR margin, stack high-water, LCD contention or NOR timing from emulator wall time.
+
+## P11A — baseline inventory complete
+
+Green run `41307570193` on `5e9eb2348ec3bd075eecfff2cad63fcca90a32a8` proved:
+- final Phase-10 production sizes exactly regenerate
+- `sizeof(ApsisRuntime) = 21,928 B`
+- original `sizeof(ApsisStringMotionStore) = 19,208 B`
+- Phase-9 → Phase-10 POOL delta is exactly 19,208 B
+- Attractor/Gravity editors add no POOL allocation
+- frozen idle PCM/runtime baseline remains exact
+
+P11A explicitly did **not** claim:
+- physical stack high-water
+- physical `app_audio()` cycle/deadline margin
+- hardware LCD DMA contention
+- hardware NOR erase/program timing
+- DAC/listening quality
+
+## P11B — Motion storage proof complete
+
+Green run `41308160497` on `0b9c197fc922eb76b37a5de3ac6f64a3ab3e511c` proved before implementation:
+- each captured point pitch is exactly derivable from one frozen context per lane + stored split
+- free-Dual overdub can preserve independent contexts per lane
+- signed-16-bit pitch compression is not lossless across the bounded String range
+- source-locked 1200-point/lane ceiling and 32-Hz capture bound need not change
+
+Projected store was 19,208 → 9,644 B, saving 9,564 B. P11C then measured that projection exactly on the real target.
+
+## P11C — compact lossless Motion store complete
+
+First complete green run: `41308798678` on `8c31d63d04d48efeed9bcb3c28c0ec8286e00e0c`.
+
+Storage model:
+- Motion point: 8 B -> 4 B (`phase_q16`, `split_q15`)
+- frozen `ApsisStringMotionPitchContext`: 20 B once per lane
+- Motion lane: 4,822 B
+- Motion store: **9,644 B**
+- Motion runtime: 88 B including bounded playback endpoint caches
+- point capacity remains 1200/lane
+- capture bound remains 32 Hz
+- pitch remains 32-bit millisemintone at playback output
+
+Playback implementation:
+- one lane segment lookup now supplies both split and pitch interpolation position
+- two derived endpoint pitches are cached per lane
+- expensive quantization/tuning derivation happens when the sampled segment changes, not on every callback
+- a new recording invalidates only the owned lane cache
+- free-Dual overdub preserves the untouched lane/context bit-for-bit
+
+Host gates:
+- old Motion contract remains green
+- compact playback matches a reference model across hold + continuous modes
+- free-Dual overwrite/cache invalidation is covered
+- ASAN/UBSAN green
+- existing Motion DSP override green
+
+### P11C measured production target
+
+- product `FM-1_972`
+- image **140,408 / 581,564 B**
+- image headroom 441,156 B
+- RAM **89,716 / 98,304 B**
+- RAM headroom **8,588 B**
+- POOL **319,176 / 344,064 B**
+- POOL headroom **24,888 B**
+- package bytes 610,110
+- package SHA-256 `e10c01525a808a4dea18d6b3f8777307bf4acf180c2cf958bebc4e1546b0d0be`
+
+Delta vs frozen Phase 10:
+- POOL **−9,564 B**
+- POOL headroom **+9,564 B**
+- image **+256 B**
+- RAM **+32 B**
+
+The complete measured POOL saving equals the P11B structural prediction byte-for-byte.
+
+### P11C frozen idle regression
+
+Still exactly:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392
+- queue high-water 28/512
+- overflow 0
+- late flags 0
+- late trace `811c9dc5`
+- peak 856; RMS 144/144; stereo delta 126
+
+### P11C active telemetry target
+
+- image **137,672 B**
 - RAM **89,764 B**
-- POOL **328,740 B**
-- package SHA-256 `21df63ad9bd785e8415ef91a9389e10888db67c983f98c11da51f4e266bc9ed9`
+- POOL **319,176 B**
+- package SHA-256 `d6e2d264d13d82c9cf93bce96f1d3b6666c6429cd5894fcf92db884b412bcb0e`
 
-P10G active emulator:
-- seen flags `7f`; violations 0
-- selected ANCHOR degree 4 without audition
-- offset 0 -> 1; octave 0 -> 1
-- level q15 24903 -> 25559; brightness q15 7864 -> 7536
-- attack 58 -> 66 ms; release 990 -> 1040 ms; enabled 1 -> 0
-- other 23 points remain stable (`other_points_hash=23b8dbda`)
-- later plain degree 6 produces the normal Gravity request
-- cursor 176,384; queue high-water 29; overflow 0; late flags 0
+Active lifecycle remains exactly the Phase-10 reference:
+- seen `ff`; final `14`
+- left/right points 149/149
+- record start 220,672
+- record finish 441,088
+- cycle 220,416 samples
+- manual start 450,560
+- manual resume 466,176
+- cursor 481,024
+- queue high-water 30/512
+- overflow 0
+- late flags 0
+- active WAV peak 1,171; RMS 173
 
-## Phase 10 verification boundary
+P11C therefore improves POOL headroom without changing the tested musical/runtime behavior.
 
-All four advanced-interaction layers are now verified at the strongest level currently possible without physical hardware:
-- deterministic host contracts
-- ASAN/UBSAN
-- generated target ownership/guard checks
-- real JieLi AC79 target builds
-- exact inactive-editor regression against the same frozen Phase-9 PCM/runtime baseline
-- active pinned-emulator control lifecycles
+## P11C evidence-retention correction
 
-Phase 10 is **not physical-FM-1 verified**.
+The first complete P11C run proved all gates, but the second `prepare_dinghy.sh` pass intentionally resets `work/` and `build/`; as a result the uploaded artifact retained active evidence but not the earlier production/idle JSON files. The workflow is being tightened to:
+- store P11C evidence under `/tmp/p11c-evidence` across both target passes;
+- assert exact production image/RAM/POOL/package hash;
+- assert exact active image/RAM/POOL/package hash;
+- upload production + idle + active evidence together.
 
-Still unverified and intentionally deferred to Phase 11/12:
-- real ISR margin/timing under combined DSP + UI + control load
-- physical control feel, debounce and encoder/switch behavior
-- actual LEDs/LCD transfer behavior on hardware
-- DAC/listening quality and Cathedral tuning on hardware
-- real NOR timing/power interruption
-- worst-case combined control/UI/audio stress on device
+This is CI evidence hygiene only; it does not change firmware.
 
-## Phase 11 entry rule
+## P11D — exact next optimisation step
 
-Phase 11 is optimisation, not redesign. Begin from measured evidence before changing arithmetic, memory ownership or scheduling. Preserve all Phase-10 musical/control behavior and frozen regression gates unless a change is explicitly re-approved by evidence.
+P11D is **target memory ownership inventory**, not a RAM optimisation yet.
 
-Initial optimisation targets:
-1. establish real/target-side ISR and callback cost measurements that can be obtained without physical hardware, while clearly separating emulator/toolchain proxies from hardware timing;
-2. inventory RAM, POOL, stack and image headroom with the final Phase-10 stacked target;
-3. identify proven-safe memory/arithmetic reductions, especially around Motion storage and UI redraw work;
-4. stress shared queue/voice limits and redraw load without creating private schedulers or relaxing audio baselines;
-5. leave physical Cathedral listening/tuning and true ISR margin claims for hardware validation.
+Goals:
+1. build the current P11C production target with the real JieLi toolchain;
+2. emit ELF/linker symbol inventory for `.data`, `.bss`, `.ram_text`, dedicated NOLOAD regions and largest static owners;
+3. locate any statically configured stack reservation/bounds if the linker/SDK exposes them;
+4. explicitly distinguish configured stack reservation from measured stack high-water;
+5. use the inventory to choose the next RAM candidate only after ownership is clear.
+
+Do not shrink a buffer, scheduler, voice pool or stack reservation merely because it is large. Any later change requires usage evidence and the normal Phase-11 acceptance rule.
 
 ## Exact next action
 
-Run the **final exact-head CI matrix on this Phase-10 documentation head**. Merge PR #20 with squash only if every required core/staged/P6/P7/P8/P9/P10 host, target and active workflow is green on that same head. After merge, create the Phase-11 optimisation branch from `main` and start with measurement/budget inventory before making optimisation changes.
+1. Run the tightened P11C workflow on the documentation/evidence-retention head and require all nine gates green on that exact SHA with a complete evidence artifact.
+2. From that green head, create P11D memory-inventory instrumentation only.
+3. Do not make a RAM optimisation until P11D identifies a concrete owner and safe target.
 
 ## Do not regress
 
@@ -364,12 +376,13 @@ Run the **final exact-head CI matrix on this Phase-10 documentation head**. Merg
 - long Space storage stays in dedicated pre-`.pool` NOLOAD memory
 - historical M4/M5 gates retain cursor 123,648
 - historical M4f bypass retains image 95,804 B
-- integrated inactive-editor scenario retains cursor 123,392 with zero late/overflow flags
-- audible idle PCM remains exact P6/P7/P8; dry-only remains exact Phase 5
-- project persistence stays versioned/journaled/CRC-protected and never blocks active audio
-- native visuals consume existing APSIS state; no UI shadow musical state
-- native boot takeover remains after sample 8192 unless revalidated against exact PCM
-- Phase-9 direct performance uses finite mailboxes/adapters; no private scheduler/RNG
-- Phase-10 Motion store remains the bounded 19,208-B dedicated POOL allocation; no heap/private scheduler
-- Phase-10 Attractor/Gravity editors keep existing DSP/runtime/state authorities; no duplicate musical state
-- physical FM-1 and real ISR/storage/display/control behaviour remain unverified
+- integrated idle scenario retains cursor 123,392 with zero late/overflow flags
+- audible idle PCM remains exact; dry-only remains exact Phase 5
+- project persistence stays journaled/CRC-protected and never blocks active audio
+- native visuals consume existing state; no UI shadow musical state
+- native boot takeover remains after sample 8192 unless exact PCM is revalidated
+- Phase-9 direct performance stays finite/mailboxed; no private scheduler/RNG
+- Motion remains source-bounded at 1200 points/lane and 32 Hz capture
+- P11C Motion store remains 9,644 B unless a later evidence-backed change is approved
+- P10 Attractor/Gravity editors retain existing DSP/runtime/state authorities
+- physical FM-1 and real ISR/storage/display/control behavior remain unverified

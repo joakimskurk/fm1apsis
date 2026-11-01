@@ -82,21 +82,31 @@ jobs:
       - name: Gate P11C.5 - final stacked Phase-10 target with compact Motion
         run: bash ci/apply_apsis_p10g.sh
 
-      - name: Gate P11C.6 - real JieLi build and resource gain
+      - name: Gate P11C.6 - real JieLi build and exact production resource gain
         run: |
           bash ci/build_apsis_target.sh
-          mkdir -p build/evidence
-          cp build/target_report.json build/evidence/p11c-production-target.json
+          rm -rf /tmp/p11c-evidence
+          mkdir -p /tmp/p11c-evidence
+          cp build/target_report.json /tmp/p11c-evidence/p11c-production-target.json
+          cp build/SHA256SUMS /tmp/p11c-evidence/p11c-production-SHA256SUMS
           python3 - <<'PY'
           import json
           r=json.load(open('build/target_report.json'))
-          assert r['product']=='FM-1_972', r
-          assert r['pool']==319176, r
-          assert r['pool_max']==344064, r
-          assert r['pool_max']-r['pool']==24888, r
-          assert r['ram'] <= 89732, r
-          assert r['ram'] <= r['ram_max'], r
-          assert r['image'] <= r['image_max'], r
+          expected = {
+              'product': 'FM-1_972',
+              'image': 140408,
+              'image_max': 581564,
+              'ram': 89716,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'package_bytes': 610110,
+              'package_sha256': 'e10c01525a808a4dea18d6b3f8777307bf4acf180c2cf958bebc4e1546b0d0be',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert r['pool_headroom'] == 24888, r
+          assert r['ram_headroom'] == 8588, r
           print('P11C production resources', r)
           PY
 
@@ -106,28 +116,49 @@ jobs:
           APSIS_EMU_DYNAMIC_HOME=1 \
           APSIS_EMU_EXPECT_CURSOR=123392 \
             bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
-            | tee build/evidence/p11c-idle.log
-          cp work/emu-smoke/report.json build/evidence/p11c-idle-report.json
+            | tee /tmp/p11c-evidence/p11c-idle.log
+          cp work/emu-smoke/report.json /tmp/p11c-evidence/p11c-idle-report.json
 
-      - name: Gate P11C.8 - regenerate active Motion telemetry target
+      - name: Gate P11C.8 - regenerate exact active Motion telemetry target
         run: |
           bash ci/prepare_dinghy.sh
           bash ci/apply_apsis_p10d3_probe.sh
           bash ci/build_apsis_target.sh
-          cp build/target_report.json build/evidence/p11c-active-target.json
+          cp build/target_report.json /tmp/p11c-evidence/p11c-active-target.json
+          cp build/SHA256SUMS /tmp/p11c-evidence/p11c-active-SHA256SUMS
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 137672,
+              'image_max': 581564,
+              'ram': 89764,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'package_bytes': 610110,
+              'package_sha256': 'd6e2d264d13d82c9cf93bce96f1d3b6666c6429cd5894fcf92db884b412bcb0e',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert r['pool_headroom'] == 24888, r
+          assert r['ram_headroom'] == 8540, r
+          print('P11C active resources', r)
+          PY
 
       - name: Gate P11C.9 - frozen active Motion lifecycle
         run: |
           set -euo pipefail
           bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
-            | tee build/evidence/p11c-active.log
-          cp work/emu-motion-active/report.json build/evidence/p11c-active-report.json
-          cp work/emu-motion-active/apsis-motion.wav build/evidence/p11c-active.wav
+            | tee /tmp/p11c-evidence/p11c-active.log
+          cp work/emu-motion-active/report.json /tmp/p11c-evidence/p11c-active-report.json
+          cp work/emu-motion-active/apsis-motion.wav /tmp/p11c-evidence/p11c-active.wav
 
-      - name: Upload P11C evidence
+      - name: Upload complete P11C evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: p11c-compact-motion-evidence
-          path: build/evidence
+          path: /tmp/p11c-evidence
           if-no-files-found: warn

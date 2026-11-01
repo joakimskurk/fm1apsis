@@ -119,7 +119,7 @@ Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 
 ## Phase 10 — String Motion and advanced interactive parity
 
-Status: **[x] feature-complete on technical head `7d8b072cbe5d17f44fd7117379af5d9284daa5d2`; final exact-head documentation/CI gate on PR #20 is the only remaining merge step.**
+Status: **[x] complete and squash-merged to `main` as `378d2023df2afe59475be53c09cc001788586514` via PR #20.**
 
 - [x] Clock-quantized String Motion capture
 - [x] Classic/Dual ownership and frozen pitch context
@@ -138,31 +138,96 @@ Status: **[x] feature-complete on technical head `7d8b072cbe5d17f44fd7117379af5d
 - [x] no new private scheduler, musical RNG or duplicate musical state
 - [x] final stacked target remains inside image/RAM/POOL budgets
 - [x] same frozen Phase-9 idle PCM/runtime baseline preserved through P10G
-- [ ] squash merge PR #20 after exact-head documentation matrix is green
+- [x] final exact-head matrix 22/22 PASS on `ce5857a52c6326011e5af7cd7f73819b420550fc`
+- [x] guarded PR #20 squash merge
 
-Phase-10 evidence summary:
-- P10D3 Motion: active flags `ff`, Dual+LINK 149/149 points, cycle 220,416 samples, queue 30, overflow/late 0
-- P10E String Attractor: image 137,304 B; RAM 89,668 B; POOL 328,740 B; active `seen=3f`, gate `9535→9534`, seed `317→8236`
-- P10F Spiral Attractor: image 138,840 B; RAM 89,684 B; POOL 328,740 B; active `seen=3f`, seed `911→4825`, route isolated
-- P10G Gravity selected-point: final production image **140,152 / 581,564 B**, RAM **89,684 / 98,304 B**, POOL **328,740 / 344,064 B**
-- P10G production package SHA-256 `5a82ea63c9fac432d3a4ca98119defcfc1c51e04ad59317e8633e072e868b9ce`
-- P10G active `seen=7f`, degree 4 selected without audition, six numeric fields + enabled edited, other 23 points stable, later plain degree 6 request preserved
-- final inactive PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- final inactive cursor 123,392; queue 28/512; overflow 0; late flags 0
+Frozen Phase-10 production baseline:
+- image **140,152 / 581,564 B**
+- RAM **89,684 / 98,304 B**
+- POOL **328,740 / 344,064 B**
+- package SHA-256 `5a82ea63c9fac432d3a4ca98119defcfc1c51e04ad59317e8633e072e868b9ce`
+- inactive PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- inactive cursor 123,392; queue 28/512; overflow 0; late flags 0
 
 Phase 10 is emulator/JieLi-target verified, **not physical-FM-1 verified**.
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[ ] next after Phase-10 merge. Measurement first; no redesign.**
+Status: **[~] active on `p11-optimization`. Measurement first; no redesign.**
 
-- [ ] establish target/emulator timing proxies and explicitly separate them from real hardware ISR claims
-- [ ] final Phase-10 image/RAM/POOL/stack budget inventory
-- [ ] proven-safe arithmetic/memory optimization
-- [ ] Motion POOL/storage efficiency review without changing musical semantics
+### P11A — baseline inventory
+- [x] measured final Phase-10 image/RAM/POOL usage and headroom
+- [x] proved `sizeof(ApsisRuntime) = 21,928 B`
+- [x] proved Phase-10 POOL growth equals the original 19,208-B MotionStore exactly
+- [x] separated measured target/emulator facts from unmeasured physical ISR/stack/display/storage claims
+- [x] green run `41307570193` on `5e9eb2348ec3bd075eecfff2cad63fcca90a32a8`
+
+### P11B — Motion storage falsification proof
+- [x] proved every captured point pitch is exactly derivable from one frozen pitch context per lane + `split_q15`
+- [x] proved free-Dual overdub can retain independent left/right frozen contexts
+- [x] rejected signed-16-bit pitch compression as non-lossless
+- [x] projected store 19,208 → 9,644 B without changing 1200-point/lane ceiling or 32-Hz capture bound
+- [x] ASAN/UBSAN green run `41308160497` on `0b9c197fc922eb76b37a5de3ac6f64a3ab3e511c`
+
+### P11C — compact lossless Motion store
+- [x] point representation reduced from 8 B to 4 B: phase + split only
+- [x] one 20-B frozen pitch context retained per lane
+- [x] 1200 points/lane and 32-Hz capture bound unchanged
+- [x] millisemintone pitch precision unchanged
+- [x] free-Dual overdub ownership unchanged
+- [x] playback combines split/pitch segment search and caches derived endpoint pitches per lane
+- [x] host playback-reference equivalence + ASAN/UBSAN green
+- [x] existing Motion DSP override unchanged
+- [x] pinned historical regressions green
+- [x] real JieLi production target exact
+- [x] frozen inactive PCM/runtime exact
+- [x] active Motion lifecycle exact
+- [x] first complete run `41308798678` green on `8c31d63d04d48efeed9bcb3c28c0ec8286e00e0c`
+
+Measured P11C production target:
+- image **140,408 / 581,564 B**
+- RAM **89,716 / 98,304 B**; headroom **8,588 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes 610,110
+- package SHA-256 `e10c01525a808a4dea18d6b3f8777307bf4acf180c2cf958bebc4e1546b0d0be`
+
+Compared with frozen Phase 10:
+- POOL **−9,564 B**
+- POOL headroom **+9,564 B**
+- image **+256 B**
+- RAM **+32 B**
+- musical behavior unchanged by host/reference, frozen idle and active-lifecycle gates
+
+P11C inactive emulator remains exactly:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392
+- queue 28/512
+- overflow 0
+- late flags 0
+- late trace `811c9dc5`
+
+P11C active telemetry target:
+- image **137,672 B**
+- RAM **89,764 B**
+- POOL **319,176 B**
+- package SHA-256 `d6e2d264d13d82c9cf93bce96f1d3b6666c6429cd5894fcf92db884b412bcb0e`
+
+P11C active lifecycle remains exactly:
+- seen `ff`; final `14`
+- left/right points 149/149
+- record start 220,672; finish 441,088; cycle 220,416 samples
+- manual override 450,560; resume 466,176
+- cursor 481,024
+- queue high-water 30/512; overflow 0; late flags 0
+- active WAV peak 1,171; RMS 173
+
+### Remaining Phase-11 work
+- [ ] P11D target RAM ownership / linker-symbol inventory and configured-stack boundary analysis
+- [ ] establish target/emulator timing proxies and explicitly separate them from physical ISR claims
 - [ ] queue/voice stress and worst-case shared-runtime pressure
 - [ ] UI redraw/DMA workload reduction without changing visual authority
 - [ ] combined control/UI/audio stress gates
+- [ ] additional proven-safe arithmetic/memory optimisation only when evidence identifies a real target
 - [ ] Cathedral listening/tuning on hardware when physical FM-1 becomes available
 
 Phase-11 invariant: optimise only from measured evidence; preserve Phase-10 behavior and all frozen regression gates unless a change is explicitly re-approved.
@@ -181,4 +246,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Run the final exact-head CI matrix on the Phase-10 documentation head. If every required core/staged/P6/P7/P8/P9/P10 host, target and active workflow is green on that exact SHA, squash-merge PR #20 into `main`. Then branch Phase 11 from the merged `main` and begin with measurement/budget inventory before changing code.
+Re-run P11C on the documentation/evidence-retention head and require all nine P11C gates green with complete production + idle + active artifacts. Then begin **P11D target memory ownership inventory** from that exact green head: parse real JieLi ELF/linker symbols to identify the largest `.data/.bss` owners and any configured stack reservation/bounds that are statically knowable. Do not claim stack high-water or ISR margin without physical/runtime instrumentation.
