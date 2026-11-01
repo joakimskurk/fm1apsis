@@ -115,7 +115,7 @@ static void test_right_overdub_preserves_left(void)
     assert(memcmp(&before, &store.left, sizeof(before)) == 0);
     s.string.right_split_q15 = APSIS_Q15_MILLI(680);
     t += 500u;
-    assert(apsis_string_motion_capture(&store, &rt, &s, t, 0u));
+    assert(apsis_string_motion_capture(&store, &rt, &s, t, 1u));
     assert(memcmp(&before, &store.left, sizeof(before)) == 0);
     t += 500u;
     apsis_string_motion_pulse(&store, &rt, &s, 1u, t, 1000u);
