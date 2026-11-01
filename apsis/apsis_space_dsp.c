@@ -167,6 +167,8 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
     if (!fdn) return;
     fdn->post_left_q15 = 0;
     fdn->post_right_q15 = 0;
+    fdn->feedback_decay_ms = 0u;
+    fdn->feedback_cache_valid = 0u;
     for (i = 0u; i < APSIS_SPACE_FDN_LINES; ++i) {
         ApsisSpaceFdnLine *line = &fdn->line[i];
         line->offset = offset;
@@ -189,14 +191,17 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
                             uint16_t decay_ms,
                             uint16_t damping_hz)
 {
-    uint16_t feedback_q15[APSIS_SPACE_FDN_LINES];
     uint16_t alpha;
     uint32_t frame;
     uint8_t k;
     if (!fdn || !fdn->storage_bound || !out_stereo) return;
     alpha = space_damping_alpha(damping_hz);
-    for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k)
-        feedback_q15[k] = space_feedback_gain(fdn->line[k].base_delay, decay_ms);
+    if (!fdn->feedback_cache_valid || fdn->feedback_decay_ms != decay_ms) {
+        for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k)
+            fdn->feedback_q15[k] = space_feedback_gain(fdn->line[k].base_delay, decay_ms);
+        fdn->feedback_decay_ms = decay_ms;
+        fdn->feedback_cache_valid = 1u;
+    }
 
     for (frame = 0u; frame < frames; ++frame) {
         int32_t mixed[APSIS_SPACE_FDN_LINES];
@@ -235,7 +240,7 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
             int32_t feedback = space_mul_q15(mixed[k], SPACE_HAD_NORM_Q15);
             int32_t excitation = space_mul_q15(input, (k & 1u) ? -SPACE_INPUT_Q15 : SPACE_INPUT_Q15);
             int32_t write_value;
-            feedback = space_mul_q15(feedback, feedback_q15[k]);
+            feedback = space_mul_q15(feedback, fdn->feedback_q15[k]);
             write_value = space_clamp_q15((int64_t)excitation + feedback);
             base[line->write_pos] = (int16_t)write_value;
             line->write_pos++;
