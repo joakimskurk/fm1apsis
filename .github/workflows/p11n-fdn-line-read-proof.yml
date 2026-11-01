@@ -21,8 +21,7 @@ jobs:
             -o /tmp/test_p11n_fdn_line_read_equivalence
           /tmp/test_p11n_fdn_line_read_equivalence | tee /tmp/p11n-proof.log
           grep -q 'PASS: P11N invariant-simplified line read is bit-identical' /tmp/p11n-proof.log
-          grep -Eq 'helper_cases=[89][0-9]{5,}' /tmp/p11n-proof.log
-          grep -Eq 'full_render_frames=1[4-9][0-9]{4,}' /tmp/p11n-proof.log
+          grep -q 'P11N helper_cases=905504 full_render_blocks=3328 full_render_frames=210677' /tmp/p11n-proof.log
 
       - name: Gate P11N.2 - equivalence under ASAN and UBSAN
         run: |
@@ -35,6 +34,7 @@ jobs:
           UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_p11n_fdn_line_read_equivalence_san | tee /tmp/p11n-proof-san.log
           grep -q 'PASS: P11N invariant-simplified line read is bit-identical' /tmp/p11n-proof-san.log
+          grep -q 'P11N helper_cases=905504 full_render_blocks=3328 full_render_frames=210677' /tmp/p11n-proof-san.log
 
       - name: Gate P11N.3 - production Space sources remain exact P11L authority
         run: |
