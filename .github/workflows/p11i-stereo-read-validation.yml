@@ -1,0 +1,187 @@
+name: APSIS Phase 11I stereo-pair production validation
+
+on:
+  push:
+    branches: [p11i-space-stereo-read-staging]
+  workflow_dispatch:
+
+jobs:
+  p11i-production:
+    runs-on: ubuntu-24.04
+    env:
+      P11I_EVIDENCE: /tmp/p11i-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11I_EVIDENCE"
+          mkdir -p "$P11I_EVIDENCE"
+
+      - name: Gate P11I.1 - production pair reader equals frozen single-read authority
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_space_dsp.c tests/test_p11i_stereo_read_equivalence.c \
+            -o /tmp/test_p11i_stereo_read_equivalence
+          /tmp/test_p11i_stereo_read_equivalence | tee "$P11I_EVIDENCE/equivalence.log"
+          grep -q 'PASS: P11I production stereo-pair reader is bit-identical' \
+            "$P11I_EVIDENCE/equivalence.log"
+
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_space_dsp.c tests/test_p11i_stereo_read_equivalence.c \
+            -o /tmp/test_p11i_stereo_read_equivalence_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11i_stereo_read_equivalence_san \
+            | tee "$P11I_EVIDENCE/equivalence-san.log"
+
+      - name: Gate P11I.2 - room engine and complete historical host behavior
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_space_dsp.c apsis/apsis_space_room.c tests/test_space_room.c \
+            -o /tmp/test_space_room_p11i
+          /tmp/test_space_room_p11i | tee "$P11I_EVIDENCE/space-room.log"
+          grep -q 'PASS: APSIS P6 shared room front-end/topology host engine' \
+            "$P11I_EVIDENCE/space-room.log"
+          bash ci/p11f_prepare.sh
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11I.3 - real target resource safety and code-shape improvement
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11I_EVIDENCE/production-target.json"
+          cp build/SHA256SUMS "$P11I_EVIDENCE/production-SHA256SUMS"
+
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN not set}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11I_EVIDENCE/symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11I_EVIDENCE/disassembly.txt"
+          cp work/apsis/firmware/src/dinghy.c "$P11I_EVIDENCE/generated_dinghy.c"
+          cp work/apsis/firmware/src/apsis_visual.h "$P11I_EVIDENCE/apsis_visual.h"
+
+          python3 ci/p11_workload_inventory.py \
+            --dinghy "$P11I_EVIDENCE/generated_dinghy.c" \
+            --visual-header "$P11I_EVIDENCE/apsis_visual.h" \
+            --symbols "$P11I_EVIDENCE/symbols.txt" \
+            --disassembly "$P11I_EVIDENCE/disassembly.txt" \
+            --target "$P11I_EVIDENCE/production-target.json" \
+            --out-json "$P11I_EVIDENCE/workload_inventory.json" \
+            --out-md "$P11I_EVIDENCE/workload_inventory.md"
+
+          python3 - <<'PY' | tee "$P11I_EVIDENCE/code-shape.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+
+          r=json.load(open('build/target_report.json'))
+          assert r['product'] == 'FM-1_972', r
+          assert r['image'] <= 140408, r
+          assert r['ram'] == 87476, r
+          assert r['pool'] == 319176, r
+          assert r['package_bytes'] == 610110, r
+
+          symbols=inv.parse_symbols(Path('/tmp/p11i-evidence/symbols.txt').read_text(errors='replace'))
+          insns=inv.parse_disassembly(Path('/tmp/p11i-evidence/disassembly.txt').read_text(errors='replace'))
+          pair_names=sorted(n for n in set(symbols)|set(insns)
+                            if 'space_room_stereo_read_pair' in n)
+          names=['apsis_space_room_render'] + pair_names
+          text_bytes=sum(symbols.get(n,0) for n in names)
+          instruction_lines=sum(insns.get(n,0) for n in names)
+          old_bytes=2270  # 2164 render + 106 old single-read helper
+          old_insns=718   # 675 render + 43 old single-read helper
+          assert 'space_room_stereo_read' not in symbols, symbols.get('space_room_stereo_read')
+          assert text_bytes < old_bytes, (names, text_bytes, old_bytes)
+          assert instruction_lines < old_insns, (names, instruction_lines, old_insns)
+          report={
+              'baseline': {'text_bytes': old_bytes, 'static_instruction_lines': old_insns},
+              'current_names': names,
+              'current': {'text_bytes': text_bytes, 'static_instruction_lines': instruction_lines},
+              'delta': {'text_bytes': text_bytes-old_bytes,
+                        'static_instruction_lines': instruction_lines-old_insns},
+              'physical_timing_proven': False,
+          }
+          Path('/tmp/p11i-evidence/room_code_shape.json').write_text(json.dumps(report, indent=2)+'\n')
+          print('PASS: P11I target room code-shape proxy improved', report)
+          print('P11I measured production target', r)
+          PY
+
+      - name: Gate P11I.4 - exact frozen idle emulator behavior
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11I_EVIDENCE/idle.log"
+          cp work/emu-smoke/report.json "$P11I_EVIDENCE/idle-report.json"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('work/emu-smoke/report.json'))
+          assert r['wav_raw_sha256'] == 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93', r
+          assert r['runtime_cursor_low32'] == 123392, r
+          assert r['runtime_queue_high_water'] == 28, r
+          assert r['runtime_queue_overflowed'] == 0, r
+          assert r['runtime_late_flags'] == 0, r
+          assert r['runtime_late_trace_hash'] == '811c9dc5', r
+          print('PASS: P11I exact frozen idle PCM/runtime')
+          PY
+
+      - name: Gate P11I.5 - exact frozen active Motion lifecycle
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11I_EVIDENCE/active-target.json"
+          cp build/SHA256SUMS "$P11I_EVIDENCE/active-SHA256SUMS"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          assert r['product'] == 'FM-1_972', r
+          assert r['image'] <= 137672, r
+          assert r['ram'] == 87524, r
+          assert r['pool'] == 319176, r
+          assert r['package_bytes'] == 610110, r
+          print('PASS: P11I active target resources do not regress', r)
+          PY
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11I_EVIDENCE/active-motion.log"
+          cp work/emu-motion-active/report.json "$P11I_EVIDENCE/active-motion-report.json"
+          cp work/emu-motion-active/apsis-motion.wav "$P11I_EVIDENCE/active-motion.wav"
+
+      - name: Upload P11I evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11i-stereo-pair-evidence
+          path: /tmp/p11i-evidence
+          if-no-files-found: error
