@@ -1,12 +1,12 @@
 # Phase 11M — FDN inner-loop branch census
 
-Status: measurement only. No production DSP/state/target changes are authorized by this phase.
+Status: **complete measurement phase. Production Space sources remain exact P11L authority.**
 
-## Why this is next
+## Why this phase
 
-P11H measured **131,072 FDN line reads**, **131,072 line writes** and **655,360 FDN Q15 multiplies** over the 16,384-room-frame census. P11J–P11L removed repeated block-rate feedback-coefficient work, so the next measurement returns to the per-line/per-frame path.
+P11H measured **131,072 FDN line reads**, **131,072 line writes** and **655,360 FDN Q15 multiplies** over the 16,384-room-frame census. P11J–P11L removed repeated block-rate feedback-coefficient work, so P11M returned to the per-line/per-frame path.
 
-Inspection of `space_line_read()` shows several checks executed on every line read:
+Inspection of `space_line_read()` showed several checks executed on every line read:
 - defensive null/storage-bound guard;
 - minimum-delay clamp;
 - startup fill/readiness calculation;
@@ -15,39 +15,122 @@ Inspection of `space_line_read()` shows several checks executed on every line re
 - integer-vs-fractional interpolation branch;
 - `i1` ring-end wrap.
 
-P11M measures their actual frequency and separately documents topology invariants that may prove some branches impossible rather than merely unobserved.
+P11M measures their frequency and keeps measured evidence separate from topology invariants that can prove branches impossible rather than merely unobserved.
 
-## Measurement scenarios
+## Authority
 
-1. **cold 16,384-frame census** — exact P11H room-frame count starting from reset;
-2. **warm 65,536-frame census** — prefill all FDN lines first, reset counters only, then measure steady full-line behavior over a longer deterministic run.
+- branch `p11m-fdn-innerloop-census-staging`
+- technical head `04b807617ffec084e3721fa2a166ac6ad9e76d59`
+- authoritative run `41355338593`
+- optimized census PASS
+- ASAN/UBSAN census PASS
+- production `apsis_space_dsp.c` remains P11L blob `0c472f3844210f0dfb3d31bf6dacf007272ac078`
+- production `apsis_space_dsp.h` remains P11L blob `71afae3c4c52bbd735121597dfa7ad6cea4f32f5`
+- production `apsis_space_room.c` remains P11I/P11L blob `ee00267cbbaef04bb1eed963b7b5cb1c2cc46346`
 
-Record:
-- sine/LFO calls and phase-fraction distribution;
-- line-read calls;
-- modulation Q8 min/max and exact multiples of 256;
-- minimum-delay-clamp opportunities;
-- not-ready startup returns;
-- full-line reads (`fill_count == capacity`);
-- negative-wrap and upper-wrap conditions;
-- integer reads (`frac == 0`) vs interpolated reads;
-- `i1` ring-end wraps.
+Instrumentation is generated into `/tmp`; no P11M probe enters production firmware.
 
-## Structural invariants to verify
+## Cold census — reset to 16,384 FDN frames
 
-With frozen topology:
-- minimum base delay is 1,871 samples;
-- modulation depth is bounded to approximately ±9 samples (`SPACE_MOD_DEPTH_Q8 = 2304`);
-- each line capacity is `base_delay + 16` samples.
+This matches the P11H FDN-room-frame count.
 
-Therefore the minimum-delay clamp appears unreachable under the production caller, and a single negative-wrap correction appears sufficient: the raw read position cannot reach `>= span` after either the positive or negative path. P11M must keep measured evidence separate from this algebraic claim.
+- sine/LFO calls: **131,072**
+- line-read calls: **131,072**
+- sine phase low-byte zero: **535**
+- modulation range: **−2,304 .. +2,303 Q8**
+- modulation exact multiple of 256: **1,670** calls
+- derived delay range before clamp: **478,976 .. 755,150 Q8**
+- minimum-delay-clamp opportunities: **0**
+- startup not-ready returns: **19,047 / 131,072 = 14.53%**
+- calls already at full line capacity: **111,902 / 131,072 = 85.37%**
+- ready reads: **112,025**
+- negative-wrap condition among ready reads: **111,261 / 112,025 = 99.32%**
+- upper-wrap condition: **0**
+- raw read-position range: **−755,065 .. +6,140 Q8**
+- exact integer reads: **348 / 112,025 = 0.31%**
+- interpolated reads: **111,677 / 112,025 = 99.69%**
+- `i1` ring-end wraps: **44 / 112,025 = 0.039%**
 
-Once a line is fully filled, `needed <= base_delay + 9 < base_delay + 16 == capacity`, so the not-ready condition is impossible for that line. The current implementation still computes `needed` on every read; P11M measures how much of representative operation is already in this full-line state.
+The cold result shows that startup readiness semantics are real and cannot simply be removed: 19,047 reads correctly return zero before enough history exists. However, most of the same cold census is already in the permanently-full state.
 
-## Acceptance boundary
+## Warm census — 65,536 measured frames after full prefill
 
-P11M may select a later proof candidate only if the census/invariants identify meaningful repeated work that can be removed without changing interpolation, modulation, delay lengths or startup semantics.
+All eight FDN lines are filled to capacity before counters are reset.
 
-Any later candidate requires bit-identical equivalence against the current P11L production authority before production modification.
+- sine/LFO calls: **524,288**
+- line-read calls: **524,288**
+- sine phase low-byte zero: **2,058**
+- modulation range: **−2,304 .. +2,303 Q8**
+- modulation exact multiple of 256: **4,438** calls
+- derived delay range before clamp: **479,071 .. 757,919 Q8**
+- minimum-delay-clamp opportunities: **0**
+- startup not-ready returns: **0**
+- calls at full line capacity: **524,288 / 524,288 = 100%**
+- ready reads: **524,288**
+- negative-wrap condition: **521,026 / 524,288 = 99.38%**
+- upper-wrap condition: **0**
+- raw read-position range: **−757,875 .. +6,144 Q8**
+- exact integer reads: **4,438 / 524,288 = 0.85%**
+- interpolated reads: **519,850 / 524,288 = 99.15%**
+- `i1` ring-end wraps: **224 / 524,288 = 0.043%**
 
-No physical FM-1 CPU/ISR claim is made by P11M.
+This rejects interpolation removal as a useful candidate: almost every steady-state read is genuinely fractional. The `i1` wrap is rare but real, so it must also remain unless replaced by an exactly equivalent formulation.
+
+## Structural invariants
+
+Frozen topology gives:
+- minimum base delay **1,871 samples**;
+- production modulation bounded to **−2,304 .. +2,303 Q8**, i.e. approximately ±9 samples;
+- line capacity exactly `base_delay + 16` samples;
+- `write_pos` always in `0 .. capacity-1`.
+
+### Minimum-delay clamp is unreachable from the production caller
+
+The smallest possible delay is:
+
+`1871*256 - 2304 = 476,672 Q8`, far above the clamp threshold `256 Q8`.
+
+The measured minima are even higher because the shortest-delay line did not coincide with the exact most-negative modulation at the sampled instants. Therefore the existing `if (delay_q8 < 256)` branch is structurally unreachable under the frozen production caller.
+
+### Upper ring-wrap branch is structurally unreachable
+
+For any line, the largest raw positive read position occurs at maximum `write_pos` and minimum delay:
+
+`(base+15)*256 - (base*256 - 2304) = 6,144 Q8`.
+
+The smallest ring span is `(1871+16)*256 = 483,072 Q8`, so a non-negative raw read is always far below `span_q8`.
+
+For a negative raw read, the most-negative value is greater than `-span_q8` because maximum delay adds at most 2,303 Q8 while the 16-sample reserve contributes 4,096 Q8. One `+ span_q8` correction therefore always lands in `[0, span_q8)`. The second `if (read_q8 >= span_q8)` correction is structurally unreachable.
+
+### Full-line readiness can use a fast path without changing startup semantics
+
+The maximum required history is:
+
+`ceil(base_delay + 2303/256) = base_delay + 9`,
+
+while capacity is `base_delay + 16`. Therefore once `fill_count == capacity`, readiness failure is impossible and remains impossible because fill count saturates at capacity.
+
+Current code nevertheless computes `needed = (delay_q8 + 255) >> 8` and compares `fill_count < needed` on every read. A candidate may preserve the exact startup calculation only while a line is not full, while bypassing it for full lines.
+
+## Decision
+
+P11M **authorizes a P11N proof candidate**, not a production patch.
+
+The candidate should be limited to `space_line_read()` production-caller invariants:
+1. retain startup readiness exactly for partial lines, but fast-path full lines without calculating `needed`;
+2. remove the structurally unreachable minimum-delay clamp;
+3. remove the structurally unreachable upper ring-wrap correction;
+4. optionally remove the defensive helper guard only if the proof separately establishes that this static helper has no call path outside the already-validated `apsis_space_fdn_render()` loop.
+
+Do **not** change:
+- LFO phase or sine interpolation;
+- modulation depth;
+- delay lengths or capacities;
+- negative-wrap behavior;
+- fractional interpolation;
+- `i1` ring-end behavior;
+- startup output semantics.
+
+P11N must prove candidate and current P11L line-read authority bit-identical across boundary classes and deterministic randomized valid states before any production source is modified. Full FDN render equivalence should then confirm the helper-level proof at system level.
+
+No physical FM-1 CPU/ISR improvement is claimed by P11M.
