@@ -109,13 +109,16 @@ static void apsis_p10_motion_probe_update(void)
 '''
 s = s.replace(app_audio_anchor, probe_helper + app_audio_anchor, 1)
 
-# Insert after the generated six-word runtime telemetry has been written, so
-# the D3 probe can copy final queue/overflow/late state without touching M3c.
-matches = list(re.finditer(r'(?m)^(\s*apsis_runtime_probe\[5\]\s*=\s*[^;]+;\s*)$', s))
-if len(matches) != 1:
-    raise SystemExit(f'FAIL: P10D3 expected one runtime probe[5] assignment, got {len(matches)}')
-m = matches[0]
-s = s[:m.end()] + '\n        apsis_p10_motion_probe_update();' + s[m.end():]
+# D2 retains two established callback telemetry paths. Instrument both after
+# probe[5] is written so the D3 helper observes whichever path actually ran,
+# rather than inventing a third callback path or disturbing M3c.
+pattern = r'(?m)^([ \t]*apsis_runtime_probe\[5\][ \t]*=[^;\n]+;)$'
+matches = list(re.finditer(pattern, s))
+if len(matches) != 2:
+    raise SystemExit(f'FAIL: P10D3 expected two runtime probe[5] assignments, got {len(matches)}')
+for m in reversed(matches):
+    indent = re.match(r'[ \t]*', m.group(1)).group(0)
+    s = s[:m.end()] + '\n' + indent + 'apsis_p10_motion_probe_update();' + s[m.end():]
 
 # Explicitly initialize the CI probe only; no Motion store memset is added.
 init_anchor = '    apsis_string_motion_playback_valid = 0u;'
@@ -136,6 +139,6 @@ PY
 
 grep -q 'static volatile uint32_t apsis_motion_probe\[10\]' work/apsis/firmware/src/dinghy.c
 grep -q 'APSIS_MOTION_SEEN_FINISHED_PLAY' work/apsis/firmware/src/dinghy.c
-grep -q 'apsis_p10_motion_probe_update();' work/apsis/firmware/src/dinghy.c
+[[ $(grep -c 'apsis_p10_motion_probe_update();' work/apsis/firmware/src/dinghy.c) -eq 2 ]]
 
 echo "PASS: P10D3 active Motion lifecycle telemetry layered test-only above green D2"
