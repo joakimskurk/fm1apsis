@@ -1,0 +1,163 @@
+name: APSIS Phase 11L production FDN feedback-cache validation
+
+on:
+  push:
+    branches: [p11l-fdn-feedback-cache-production-staging]
+  workflow_dispatch:
+
+jobs:
+  p11l-production:
+    runs-on: ubuntu-24.04
+    env:
+      P11L_EVIDENCE: /tmp/p11l-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11L_EVIDENCE"
+          mkdir -p "$P11L_EVIDENCE"
+
+      - name: Gate P11L.1 - actual production cache equals frozen always-recomputed authority
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11l_fdn_feedback_cache_production_equivalence.c \
+            -o /tmp/test_p11l_fdn_feedback_cache
+          /tmp/test_p11l_fdn_feedback_cache | tee "$P11L_EVIDENCE/production-equivalence.log"
+          grep -q 'PASS: P11L production FDN cache is bit-identical' "$P11L_EVIDENCE/production-equivalence.log"
+          grep -q 'steady blocks=256 frames=16384' "$P11L_EVIDENCE/production-equivalence.log"
+          grep -q 'sweep changes=192 blocks=256' "$P11L_EVIDENCE/production-equivalence.log"
+          grep -q 'adversarial blocks=256' "$P11L_EVIDENCE/production-equivalence.log"
+          grep -q 'all_keys blocks=16002' "$P11L_EVIDENCE/production-equivalence.log"
+
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            tests/test_p11l_fdn_feedback_cache_production_equivalence.c \
+            -o /tmp/test_p11l_fdn_feedback_cache_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11l_fdn_feedback_cache_san | tee "$P11L_EVIDENCE/production-equivalence-san.log"
+          grep -q 'PASS: P11L production FDN cache is bit-identical' "$P11L_EVIDENCE/production-equivalence-san.log"
+
+      - name: Gate P11L.2 - complete frozen historical host and sanitizer behavior
+        run: bash ci/p11f_prepare.sh
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11L.3 - exact real target matches proved projection
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11L_EVIDENCE/production-target.json"
+          cp build/SHA256SUMS "$P11L_EVIDENCE/production-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11L_EVIDENCE/production-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11L_EVIDENCE/production-disassembly.txt"
+          python3 - <<'PY' | tee "$P11L_EVIDENCE/production-target-check.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972',
+              'image':140440,
+              'ram':87492,
+              'pool':319176,
+              'ram_headroom':10812,
+              'pool_headroom':24888,
+              'package_bytes':610110,
+              'package_sha256':'131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          symbols=inv.parse_symbols(Path('/tmp/p11l-evidence/production-symbols.txt').read_text(errors='replace'))
+          insns=inv.parse_disassembly(Path('/tmp/p11l-evidence/production-disassembly.txt').read_text(errors='replace'))
+          assert symbols.get('apsis_space_fdn_render') == 1118, symbols.get('apsis_space_fdn_render')
+          assert insns.get('apsis_space_fdn_render') == 379, insns.get('apsis_space_fdn_render')
+          print('PASS: P11L actual target exactly matches P11K proved projection', r)
+          PY
+
+      - name: Gate P11L.4 - exact frozen idle emulator behavior
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11L_EVIDENCE/idle.log"
+          cp work/emu-smoke/report.json "$P11L_EVIDENCE/idle-report.json"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('work/emu-smoke/report.json'))
+          assert r['wav_raw_sha256'] == 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93', r
+          assert r['runtime_cursor_low32'] == 123392, r
+          assert r['runtime_queue_high_water'] == 28, r
+          assert r['runtime_queue_overflowed'] == 0, r
+          assert r['runtime_late_flags'] == 0, r
+          assert r['runtime_late_trace_hash'] == '811c9dc5', r
+          print('PASS: P11L exact frozen idle PCM/runtime')
+          PY
+
+      - name: Gate P11L.5 - exact frozen active Motion lifecycle
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11L_EVIDENCE/active-target.json"
+          cp build/SHA256SUMS "$P11L_EVIDENCE/active-SHA256SUMS"
+          python3 - <<'PY' | tee "$P11L_EVIDENCE/active-target-check.log"
+          import json
+          r=json.load(open('build/target_report.json'))
+          assert r['product'] == 'FM-1_972', r
+          assert r['image'] == 137704, r
+          assert r['ram'] == 87540, r
+          assert r['pool'] == 319176, r
+          assert r['package_bytes'] == 610110, r
+          print('PASS: P11L active target resource delta matches production cache projection', r)
+          PY
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11L_EVIDENCE/active-motion.log"
+          cp work/emu-motion-active/report.json "$P11L_EVIDENCE/active-motion-report.json"
+          cp work/emu-motion-active/apsis-motion.wav "$P11L_EVIDENCE/active-motion.wav"
+
+      - name: Gate P11L.6 - production diff stays narrow
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          grep -q 'uint16_t feedback_q15\[APSIS_SPACE_FDN_LINES\];' apsis/apsis_space_dsp.h
+          grep -q 'fdn->feedback_cache_valid' apsis/apsis_space_dsp.c
+          echo 'PASS: P11L changes only proved FDN feedback-cache state/render/reset; room remains exact P11I'
+
+      - name: Upload P11L evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11l-fdn-feedback-cache-evidence
+          path: /tmp/p11l-evidence
+          if-no-files-found: error
