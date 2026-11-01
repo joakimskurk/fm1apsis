@@ -43,10 +43,12 @@ jobs:
       - name: Gate P11I.4 - prove production room source is still untouched
         run: |
           set -euo pipefail
-          git diff --exit-code 317a007aa4f01e6402d90b69d88f0bce39c148b6 -- apsis/apsis_space_room.c
+          EXPECTED_BLOB=2d7c34e32b48b904623d740a70cf657fee0801a7
+          ACTUAL_BLOB="$(git hash-object apsis/apsis_space_room.c)"
+          test "$ACTUAL_BLOB" = "$EXPECTED_BLOB"
           grep -q 'static int32_t space_room_stereo_read' apsis/apsis_space_room.c
           if grep -q 'space_room_stereo_read_pair' apsis/apsis_space_room.c; then
             echo 'FAIL: candidate entered production before equivalence phase finished' >&2
             exit 1
           fi
-          echo 'PASS: P11I proof phase has not modified production Cathedral room code'
+          echo "PASS: production Cathedral room source remains frozen at blob $ACTUAL_BLOB"
