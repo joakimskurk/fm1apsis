@@ -1,95 +1,212 @@
 # Phase 9 Interaction Contract — FM-1 Physical Parity
 
-Date: 2026-10-31
-Status: P9A global panel/navigation, P9B CLOCK/GRAVITY, P9C STRING and P9D SPIRAL host contracts frozen; later surfaces follow, with generated target/LED integration in P9H.
-Base: Phase-8 merged main `de60b5afea868c0f663a2c0d70b27787b302c86a`.
+Date: 2026-11-01
+Status: frozen through P9H4b target integration.
+Base: merged Phase-8 main `de60b5afea868c0f663a2c0d70b27787b302c86a`.
+Technical Phase-9 head: `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`.
 
 ## Purpose
 
-Phase 9 makes the existing APSIS instrument playable through the FM-1 panel without creating a second musical model or changing APSIS timing/state semantics. `docs/UI_MAPPING.md` remains design rationale; this file is the implementation contract.
+Phase 9 makes the existing APSIS instrument playable through the pinned FM-1 panel without creating a second musical model, private module clocks or UI-owned DSP state. `docs/UI_MAPPING.md` is design rationale; this file is the implementation contract.
 
-## P9A — global panel
+## Global panel / navigation
 
-HOME=MOTHER, ENV=STRING, LFO=DRIFT, SEQ=CLOCK, ARP=SPIRAL, FX=BLOOM, GLO=GRAVITY, EDIT=CHAIN, SAVE=KEEP, SEL-held+FX-edge=SPACE. HOME is absolute. PLAY without SEL toggles the existing shared runtime transport; SEL+PLAY is reserved for CHAIN. P9A target code is edge-gated so the frozen P8 idle path remains exact.
+Pinned FM-1 vocabulary:
+- 14 buttons
+- 7 detent/relative encoders
+- 27 note keys
+- MASTER remains platform output gain
+- no encoder-push input exists
 
-## P9B — CLOCK / GRAVITY
+Canonical navigation:
+- HOME = MOTHER
+- ENV = STRING
+- LFO = DRIFT/TUNING
+- SEQ = CLOCK
+- ARP = SPIRAL
+- FX = BLOOM
+- GLO = GRAVITY
+- EDIT = CHAIN
+- SAVE = KEEP
+- SEL-held + FX-edge = SPACE/CATHEDRAL
 
-CLOCK uses first `n` keys and MAIN/BETWEEN/SNAP/GROUP layers. GROUP holds at most three sorted unique boundaries and never silently replaces a fourth. GRAVITY uses the first eight keys for degree candidates and OCT-/OCT+ for Anchor/Colour/Air. Degree candidates must go through `apsis_runtime_request_gravity()`; committed degree is never written directly by UI code.
+HOME is absolute. PLAY without SEL toggles the existing shared runtime transport. SEL+PLAY is reserved for CHAIN and cannot accidentally toggle global transport. SEL is a momentary modifier, never a hidden latch.
 
-## P9C — STRING source keyboard on 27 keys
+The target input path is activity/edge gated. Idle operation preserves the frozen P8 main-loop/audio behavior and exact PCM/runtime regression.
 
-The browser source has a 9-key String keyboard (`A..L`) plus octave banks 0..3. Its keyboard is not a MIDI-note bypass: it chooses a musical String magnitude, converts that magnitude back into String split, then the normal String target/quantize/tuning path remains authoritative.
+Relative encoder deltas are applied to the current parameter value. Because the hardware exposes detents rather than absolute pot positions, there is no absolute pickup crossing and no hidden soft-takeover state is required.
 
-FM-1 exposes **three 9-key source banks simultaneously**:
-- physical keys 0..8 = source keyboard in octave bank `base+0`;
-- keys 9..17 = source keyboard in bank `base+1`;
-- keys 18..26 = source keyboard in bank `base+2`;
-- `base=0` exposes banks 0/1/2;
-- OCT+ changes base to 1, exposing banks 1/2/3; OCT- returns to 0.
+## CLOCK / GRAVITY
 
-This deliberately preserves the source bank overlap rather than pretending the 27 keys are a conventional chromatic keyboard.
+CLOCK uses the first `n` keys and MAIN/BETWEEN/SNAP/GROUP edit layers. GROUP holds at most three sorted unique boundaries and never silently replaces a fourth.
 
-Source target law per 9-key group is retained:
-- QUANTIZE off: `octave*12 + 16*(i/8)` semitones;
-- CHROMATIC grid: `octave*12 + 12*(i/8)` before normal chromatic quantization;
-- SCALE grid: walk the selected seven-note scale note-by-note using source octave indexing;
-- CHORD grid: walk the current Gravity ring chord intervals using source octave indexing.
+GRAVITY uses the first eight keys for degree candidates. OCT-/OCT+ cycles Anchor/Colour/Air ring focus. Degree candidates always go through `apsis_runtime_request_gravity()`; UI code never writes committed degree directly. Existing immediate/quantized and MOTHER-pending semantics therefore remain authoritative.
 
-The target magnitude is inverted through the **existing native `apsis_string_magnitude_milli()` law**, including current `span`, instead of copying a second pitch formula. The result is only a split coordinate; P9H applies it with `apsis_string_set_side_split(..., mirror=1)`.
+## STRING — source keyboard on 27 keys
 
-Classic always addresses RIGHT because Classic DSP reads RIGHT as its single String coordinate. Dual defaults to RIGHT/WIRE; holding SEL addresses LEFT/BODY using the same magnitude mirrored around the 1:1 centre. If several note edges arrive in one input frame, the lowest physical key wins deterministically.
+The browser source owns a 9-key String keyboard (`A..L`) plus octave banks 0..3. It is not a MIDI-note bypass: it chooses a musical String magnitude, inverts that magnitude back into the String split coordinate, and then the normal String target/quantize/tuning path remains authoritative.
 
-SELECT fine-slide uses the browser keyboard nudge quantum `0.0045` split per detent. Positive detents move farther from 1:1 on either side. ALGORITHM toggles Classic/Dual. Manual key pluck must use existing finite String transient primitives directly in P9H, never fabricate a `STRING_RHYTHM` scheduler event.
+FM-1 exposes three source banks simultaneously:
+- keys 0..8 = source bank `base+0`
+- keys 9..17 = source bank `base+1`
+- keys 18..26 = source bank `base+2`
+- `base=0` exposes 0/1/2
+- OCT+ selects `base=1`, exposing 1/2/3
+- OCT- returns to `base=0`
 
-## P9C — source-bounded live parameters
+The overlap is deliberate. The target magnitude is inverted through the existing `apsis_string_magnitude_milli()` law, including current `span`; the control layer does not own a second pitch formula.
 
-The locked browser parameter surface is authoritative:
-- K1 RESONANCE: `0.30..0.88`, step `0.01`;
-- K2 BRIGHTNESS: `0.20..0.82`, step `0.01`;
-- K3 GLIDE: `0.018..0.380 s`, step `0.004 s`;
-- K4 SPAN: discrete `0.72 / 1.00 / 1.28 / 1.56`.
+Source target law per 9-key group:
+- QUANTIZE off: `octave*12 + 16*(i/8)` semitones
+- CHROMATIC: `octave*12 + 12*(i/8)` before normal quantization
+- SCALE: selected scale note-by-note using source octave indexing
+- CHORD: current Gravity-ring chord intervals using source octave indexing
 
-The control core emits parameter intents in native state units; it does **not** mutate state. This is required because browser `motherShouldHold()` holds every non-MOTHER structural parameter while `->1` is armed. P9H must therefore route each String edit through the existing native MOTHER hold/pending/apply mechanism or apply it live only when hold is inactive.
+Classic always addresses RIGHT because Classic DSP reads RIGHT as its one String coordinate. Dual defaults to RIGHT/WIRE; SEL addresses LEFT/BODY using the same magnitude mirrored around 1:1. Lowest physical note edge wins deterministically if several arrive in one frame.
 
-## P9D — SPIRAL route geometry and ordered editing
+SELECT fine-slide uses the source keyboard nudge quantum `0.0045` split per detent. ALGORITHM toggles Classic/Dual.
 
-Study 126 stores SPIRAL melody geometry as an **ordered list of raw point ids `0..35`**, max 30. `spiralAllowed(i)` is unconditional, so route entry must not pre-filter points through Gravity/scale. `derivedSequence()` owns the later musical interpretation; the drawn/stored route remains fixed when FOLLOW GRAVITY changes sounding pitch.
+K1..K4 source bounds:
+- K1 RESONANCE `0.30..0.88`, step `0.01`
+- K2 BRIGHTNESS `0.20..0.82`, step `0.01`
+- K3 GLIDE `0.018..0.380 s`, step `0.004 s`
+- K4 SPAN discrete `0.72 / 1.00 / 1.28 / 1.56`
 
-FM-1 uses the two-bank design from `UI_MAPPING.md`:
-- bank 0: physical keys 0..26 -> Spiral points 0..26;
-- bank 1: keys 0..23 -> points 12..35;
-- keys 24..26 are intentionally inactive in bank 1;
-- OCT+ selects bank 1, OCT- selects bank 0;
-- simultaneous key edges resolve to the lowest valid physical key.
+These edits route through the existing MOTHER-aware apply bridge when `->1` is armed.
 
-The overlap `12..26` is deliberate and preserves hand continuity when changing bank.
+### Direct STRING audio
 
-Route order and duplicate points are identity-bearing. The physical edit gestures therefore operate on **route indices**, not point membership:
-- plain key edge: append the addressed point and select the appended route index;
-- source max-30 append behaviour is retained: when already full, the oldest route item is dropped and the new point becomes index 29;
-- SELECT encoder: move the route cursor cyclically across existing route indices;
-- SEL + key edge: insert the addressed point **before** the current cursor; on an empty route this becomes index 0;
-- insert at 30 items is rejected rather than silently evicting/reordering a different node;
-- K1: move only the selected route node along raw Spiral point ids, clamped `0..35`, without changing route order;
-- REC: delete exactly the selected route index and keep the cursor on the successor where possible, otherwise the new final item.
+P9C maps keys to Study-126 `keyboardStringPress()`, so the P9-only manual acoustic adapter freezes keyboard pluck level **0.080**.
 
-EDIT is **not** used as the delete modifier because its edge is already the global CHAIN navigation control. P9D does not include the SPIRAL attractor editor; that remains Phase 10. The browser pointer route editor mutates `state.spiral.selected` directly rather than going through `motherQueueParam()`, so P9D preserves that live route-edit identity. Parameter/toggle changes that already use `applyParam()`/`toggleParam()` remain subject to MOTHER `->1` in P9H.
+It reuses the existing finite String transient pool instead of fabricating `STRING_RHYTHM` events:
+- Classic = source BODY + WIRE composite at one perceived pitch, including 4-ms WIRE offset
+- Dual = selected BODY/LEFT or WIRE/RIGHT side
+- 30-ms / 1323-sample retrigger debounce
+- main loop publishes only a one-byte side request
+- audio callback is sole transient-pool owner
 
-## Reserved / later controls
+Historical M4b/M4f source files remain frozen; Phase 9 manual audio lives in `apsis_string_manual_audio.*`.
 
-REC remains contextual. String Motion recording/capture, selected Gravity-point editing and String/Spiral attractor editors remain Phase 10. SEL is a momentary modifier, never a hidden latch. MASTER remains platform output gain.
+## SPIRAL — raw ordered route editing
 
-## Remaining Phase 9
+Study 126 stores an ordered list of raw point ids `0..35`, max 30. `spiralAllowed(i)` is unconditional; route entry does not pre-filter through Gravity/scale. `derivedSequence()` owns later musical interpretation.
 
-- **P9E** — BLOOM petal/core/grow gesture and live parameters.
-- **P9F** — KEEP capture/recall + CHAIN editing/control.
-- **P9G** — MOTHER mixing/structural sync + SPACE editing + secondary pages.
-- **P9H** — generated FM-1 integration, MOTHER-aware edit application, manual String transient binding, LEDs and exact target/emulator regression.
+Banks:
+- bank 0: keys 0..26 -> points 0..26
+- bank 1: keys 0..23 -> points 12..35
+- keys 24..26 are inactive in bank 1
+- OCT+ selects bank 1; OCT- selects bank 0
 
-## Gates
+Route order and duplicate points are identity-bearing:
+- plain key = append and select appended route index
+- full source-style append drops the oldest item and places the new point at index 29
+- SELECT moves route cursor cyclically
+- SEL+key inserts before current cursor; full-route insert is rejected
+- K1 moves only the selected raw point id, clamped 0..35
+- REC deletes exactly selected route index and preserves successor/final cursor behavior
 
-Host tests cover P9A/P9B plus the source 3x9 String bank mapping, octave-window rules, scale/chord/chromatic/unquantized magnitude inversion, BODY/WIRE mirroring, source nudge quantum, Classic/Dual mode, exact K1..K4 source bounds, SPIRAL two-bank point mapping, route-cursor wrapping, duplicate-preserving append/insert/move/delete semantics, full-route append eviction and full-route insert refusal. The same suite runs under ASAN/UBSAN.
+EDIT is not the delete modifier because it remains global CHAIN navigation. Spiral Attractor editing remains Phase 10.
+
+## BLOOM — petal / core / grow
+
+Performance semantics stay live under MOTHER `->1`.
+
+Physical contract:
+- low keys address active petals
+- center key 13 is CORE
+- REC-held + SELECT detents is the grow gesture
+- REC-held note edges are suppressed during grow
+
+Source grow thresholds are frozen exactly:
+- one voice: `0.22`
+- otherwise `0.14 + i/(n-1)*0.72`
+
+K1..K4 parameter intents:
+- K1 UNFURL `0..3600 ms`, 10-ms detent
+- K2 HARMONIC SPREAD `0..1`, 0.01 detent
+- K3 LENGTH `650..6000 ms`, 10-ms detent
+- K4 BRIGHTNESS source-bounded Q15 edit
+
+### Direct BLOOM audio
+
+Manual Bloom is P9-only and reuses the existing M4g binding/DSP engine.
+
+Source distinctions:
+- direct petal scale `1.04`
+- grow petal scale `0.78 + 0.055*i`
+- direct petal snapshots display/pending Gravity immediately, matching `bloomDisplayHarmony()` semantics
+- core chooses/advances one voice-leading plan from display harmony
+- later core petals keep source UNFURL targets and late-bind Gravity/tuning near their normal native bind lead
+
+A finite manual queue supports four concurrent core snapshots / twenty pending petals. It is not a musical scheduler. Core random draws come from the one shared M3c RNG; no private UI RNG exists.
+
+Main loop publishes one packed 16-bit Bloom request under a short IRQ guard. Audio callback owns the manual queue and `ApsisBloomDsp` mutation.
+
+## KEEP / CHAIN
+
+KEEP uses the existing eight snapshot slots:
+- key selects/recalls a filled slot; empty slot selection remains selection
+- SAVE captures using source selected/first-empty/final-slot behavior
+- contextual REC erases the selected slot and removes CHAIN references through existing native structures
+
+CHAIN uses the existing up-to-32 cells:
+- KEEP-slot keys append valid memory slots
+- SELECT chooses cell
+- PRESETS changes selected cell memory
+- K1 cycles, K2 fine pulses, K3 chance, K4 transpose
+- ALGORITHM cycles morph values
+- REC duplicates selected cell
+- EDIT+REC deletes selected cell
+- SEL+PLAY starts/stops CHAIN through existing runtime transport
+
+Active-cell deletion preserves the source rule that the new cell occupying the active position is applied immediately through the existing runtime cell-apply path.
+
+All project mutations mark the existing P7 journal dirty; flash save remains coalesced, transport-deferred and main-loop only.
+
+## MOTHER / SPACE / DRIFT-TUNING
+
+MOTHER remains the source mixer/state horizon rather than a second scene system. Live mixer controls remain live; structural edits use the existing one-shot `->1` pending/commit mechanism.
+
+SPACE is the one shared Cathedral, reached by SEL+FX. It edits the existing shared `ApsisSpaceState`; there are never per-source reverbs.
+
+DRIFT/TUNING edits the existing shared Drift and Temper state. Structural Tuning edits pass through the same MOTHER-aware apply bridge.
+
+## Target ownership / safety
+
+- physical decoding occurs in main loop
+- existing state/runtime APIs own structural mutations
+- no control code runs a private scheduler
+- direct String/Bloom DSP mutation occurs only from the audio callback after narrow mailboxes
+- project flash erase/program remains unreachable from `app_audio()`
+- visuals still read the same shared state and retain the P8 post-8192-sample takeover
+- MASTER remains platform output gain
+
+## Phase-9 verification
+
+Host tests and ASAN/UBSAN cover global routing, CLOCK/GRAVITY, 3x9 STRING mapping, source parameter bounds, SPIRAL ordered editing, BLOOM performance/parameter contracts, KEEP/CHAIN, MOTHER, SPACE, DRIFT/TUNING, MOTHER-aware apply, unified dispatch, project-dirty coalescing, direct String audio and direct Bloom audio.
+
+Generated target gates additionally verify pinned BTN/ENC ids, activity-gated input consumption, persistence separation, main/audio ownership and exact idle audio/runtime regression.
+
+Technical target head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e` preserves:
+- audible PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392
+- queue 28/512
+- overflow 0
+- late flags 0
+- trace `811c9dc5`
+- POOL 309,532 B
+
+See `docs/reference/P9_FINAL_CHECKPOINT.md` for final resource and matrix evidence.
+
+## Deferred to Phase 10
+
+- Clock-quantized String Motion capture
+- Classic/Dual Motion ownership and frozen pitch context
+- overdub/manual override
+- String Attractor editor
+- Spiral Attractor editor
+- selected Gravity-point editor
 
 ## Do not regress
 
-One shared APSIS state graph; one M3c scheduler/runtime; HOME->MOTHER; one shared SPACE/CATHEDRAL; frozen P6/P7/P8/P9A audible PCM and cursor/queue/late telemetry; journaled persistence outside active audio; MOTHER pending semantics; no physical-hardware claims until a real FM-1 exists.
+One shared APSIS state graph; one M3c scheduler/runtime; HOME->MOTHER; one shared SPACE/CATHEDRAL; exact frozen idle PCM/runtime; historical M4f 95,804-B bypass; journaled persistence outside active audio; MOTHER pending semantics; no physical-hardware claims until a real FM-1 exists.

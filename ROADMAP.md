@@ -45,7 +45,7 @@ Frozen runtime: 21,928 B, 512-event shared heap, no module-private clocks.
 Status: **[x] complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`.**
 
 - [x] freeze shared-room topology / source sends / parameter roles
-- [x] select compact 8-line modulated FDN after topology comparison
+- [x] compact 8-line modulated FDN
 - [x] dedicated pre-`.pool` NOLOAD room storage
 - [x] fixed-point host/reference room + target source/send integration
 - [x] target quarter-rate 11.025 kHz Cathedral while sources/output remain 44.1 kHz
@@ -73,51 +73,61 @@ Frozen technical P7 candidate `e290813f5e67affc7404dcb9fc7af63d2c671a8c`: image 
 
 Status: **[x] complete and merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18.**
 
-- [x] freeze source-derived 240×240 layout/visual contract
-- [x] inventory pinned FM-1 graphics/update path and redraw hazards
-- [x] allocation-free bounded integer graphics primitives with clipping
-- [x] native MOTHER / GRAVITY / STRING / CLOCK / SPIRAL / BLOOM / DRIFT-TUNING / CHAIN / KEEP / SPACE
-- [x] String central veil + SPLIT anchors
-- [x] Clock orbit/timeline treatment
-- [x] Spiral route on spiral geometry
-- [x] Bloom probability/cluster treatment
-- [x] Gravity/Mother state-driven mappings
-- [x] Chain/Keep non-generic treatment reading real persistent/runtime structures
-- [x] one shared Space/Cathedral visual with five source sends
-- [x] source-reference review against the frozen APSIS visual/state contract; no claim of screenshot/pixel-identical browser parity
-- [x] deterministic per-surface hashes, full-frame/strip equivalence and ASAN/UBSAN
+- [x] source-derived 240×240 layout/visual contract
+- [x] allocation-free bounded integer renderer
+- [x] ten native APSIS surfaces including one shared SPACE/CATHEDRAL
+- [x] deterministic visual hashes + full-frame/strip equivalence + ASAN/UBSAN
 - [x] target integration reusing Dinghy canvas with no POOL growth
 - [x] HAL-gated 8-row incremental LCD DMA updates outside `app_audio()`
-- [x] preserve exact P7/P6 audible PCM by deferring native takeover until runtime sample 8192
-- [x] expose all 10 surfaces to target adapter while leaving final SPACE physical mapping to Phase 9
+- [x] exact audio preserved by native takeover after runtime sample 8192
 - [x] real JieLi target + pinned emulator P8 gate
-- [x] final exact-head matrix on `856c4e35ae1f041da8ccdc555f4c82b54f43a04a`
-- [x] guarded PR #18 squash merge
+- [x] guarded PR #18 merge
 
-Frozen technical P8 head `87575aa829f3fab6af43092b440d585745eecc25`:
-- image 118,040 / 581,564 B
-- RAM 88,644 / 98,304 B
-- POOL 309,532 / 344,064 B
-- package `2f79a9dada63b950bbe77f9c3f6987f1c72c78cc39f8262e7590f06dcce3d743`
-- audible PCM exact P6/P7 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
-- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+Frozen technical P8 head `87575aa829f3fab6af43092b440d585745eecc25`: image 118,040 B; RAM 88,644 B; POOL 309,532 B; audible PCM exact P6/P7; cursor 123,392.
 
 ## Phase 9 — physical interaction parity
 
-Status: **[~] current.**
+Status: **[x] technical implementation complete on `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`; PR #19 merge pending final docs-head CI.**
 
-- [ ] freeze FM-1 control/gesture mapping contract
-- [ ] direct mappings for Clock, Gravity, String, Spiral, Bloom, KEEP, CHAIN, MOTHER and SPACE
-- [ ] encoder/pot pickup semantics that do not jump untouched parameters
-- [ ] input routing and LED feedback from existing shared APSIS state
-- [ ] deterministic routing tests before target integration
-- [ ] target/emulator regression proving control polling does not alter frozen audio/runtime
+- [x] freeze pinned FM-1 panel/control/gesture contract
+- [x] HOME/STRING/DRIFT/CLOCK/SPIRAL/BLOOM/GRAVITY/CHAIN/KEEP/SPACE navigation
+- [x] direct CLOCK and GRAVITY editing over existing shared state/runtime
+- [x] source-locked 3×9 STRING keyboard mapping and bounded parameters
+- [x] ordered raw-point SPIRAL route editing
+- [x] BLOOM petal/core/grow performance + parameter contract
+- [x] KEEP capture/recall/erase and CHAIN edit/transport contract
+- [x] MOTHER live mix / `->1` structural sync and shared SPACE editing
+- [x] DRIFT/TUNING control contract
+- [x] relative encoder semantics with no hidden absolute pickup state; MASTER remains platform volume
+- [x] deterministic routing/apply/dirty/performance tests + ASAN/UBSAN
+- [x] generated target binding with activity-gated input consumption and existing LED/state feedback
+- [x] project-dirty coalescing through existing P7 deferred persistence
+- [x] direct STRING performance via P9-only audio adapter and finite main→audio mailbox
+- [x] direct BLOOM performance via P9-only finite manual queue, shared M3c RNG and existing M4g binding/DSP
+- [x] historical M4f 95,804-B bypass preserved; no baseline relaxation
+- [x] real JieLi target + exact P8 idle PCM/runtime emulator regression
+- [x] technical-head 10-workflow matrix PASS
+
+Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
+- image 132,264 / 581,564 B
+- RAM 89,492 / 98,304 B
+- POOL 309,532 / 344,064 B
+- package `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
+- audible PCM exact P6/P7/P8 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
 ## Phase 10 — String Motion and advanced interactive parity
-- [ ] Clock-quantized capture
+
+Status: **[ ] next after Phase 9 merge.**
+
+- [ ] Clock-quantized String Motion capture
 - [ ] Classic/Dual ownership and frozen pitch context
 - [ ] overdub/manual override
-- [ ] String/Spiral attractor and Gravity point editors
+- [ ] String Attractor editor
+- [ ] Spiral Attractor editor
+- [ ] selected Gravity-point editor
+- [ ] deterministic host/sanitizer contracts before target integration
+- [ ] target/emulator regression preserving frozen Phase-9 idle audio/runtime
 
 ## Phase 11 — FM-1 optimisation
 - [ ] real ISR timing under DSP load
@@ -139,4 +149,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Begin Phase 9 by freezing the physical FM-1 interaction contract before changing any button/encoder/pot mappings. Keep control routing read/write access anchored to the existing shared APSIS state and add deterministic routing tests before target integration.
+Run the complete CI matrix on the Phase-9 documentation-only head. If green, update PR #19 with exact-head evidence, mark it ready and merge with expected-head locking. Then hand `main` off to Phase 10 without changing the frozen Phase-9 firmware candidate.
