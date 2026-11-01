@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11F are complete; measurement remains the prerequisite for every further change.**
+Status: **[~] active on `p11-optimization`. P11A–P11H are complete; P11I is the next evidence-backed optimization candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -186,7 +186,6 @@ Status: **[x] complete, exact-head validated, frozen and promoted to `p11-optimi
 - [x] POOL remains **319,176 B**; no POOL capacity changed
 - [x] authoritative final run `41324331937` on technical head `eb651e768a049a1b4a1e88397a9021fccc69fd30`
 - [x] historical P11F workflow is manual-only and pinned to that proven technical head
-- [x] promoted/frozen Phase-11 working head `c68919a1002b9e200b2f026d46077a07207581ef`
 
 Frozen P11F production target:
 - image **140,408 / 581,564 B**
@@ -194,20 +193,58 @@ Frozen P11F production target:
 - POOL **319,176 / 344,064 B**; headroom **24,888 B**
 - package SHA-256 `e0d0b826f0c2d5b8f1af781a9259b5d78dce9062939661ac7acad17bfefb78e5`
 
-### P11G — timing/workload proxy inventory
+### P11G — target/source workload proxy inventory
 
-Status: **[ ] next. Measurement only; no resource or behavior change.**
+Status: **[x] complete, frozen and promoted. Measurement only; no production firmware change.**
 
-- [ ] establish reproducible emulator/target-build workload proxies for the audio callback without claiming physical ISR timing
-- [ ] inventory display redraw/DMA work and its existing HAL gating without moving display work into audio
-- [ ] combine control/UI/audio stress scenarios and record queue/late/overflow invariants
-- [ ] inspect target code/static call paths for expensive operations in hot audio paths
-- [ ] keep physical stack high-water, real ISR margin, LCD-bus contention and listening quality explicitly unproven until hardware exists
-- [ ] authorize a later optimisation only if the proxy identifies a concrete hotspot and the change can be falsified against frozen behavior
+- [x] exact P11F production target regenerated
+- [x] generated `app_audio()` inventory: 219 source lines, 51 lexical call-sites, 34 unique call names
+- [x] no native visual/LCD/input polling work inside `app_audio()`
+- [x] native display quantified as 30 DMA-gated 8-row strips / 115,200 B RGB565 payload per full redraw
+- [x] real JieLi ELF static code-shape inventory captured
+- [x] Cathedral and transport call-frequency hypotheses separated from static code size
+- [x] green technical run `41333497987` on `dbe0b540e602ea5ce8d93f4b119951736f5549bc`
+- [x] evidence artifact SHA-256 `4365212ac4ad5668840d150f44be12933c9dcbef2faa575fbfdc261f750c6b5e`
+- [x] frozen/promoted head `70470ddda31450b6aa168da643c8244184e72c16`
+
+P11G is a static/source workload proxy, **not** a physical CPU/ISR timing measurement.
+
+### P11H — Cathedral dynamic workload census
+
+Status: **[x] complete, exact-head validated, frozen and promoted. Measurement only; production target remains byte-identical to P11F.**
+
+- [x] test-only ephemeral counters; no instrumentation enters production firmware
+- [x] 256 callbacks × 256 output frames = 65,536 output frames / 16,384 quarter-rate room frames
+- [x] measured **196,608** single-channel stereo-delay reads
+- [x] measured **131,072** room biquad evaluations
+- [x] measured **294,912** room Q15 multiplies
+- [x] measured **131,072** FDN line reads + **131,072** FDN line writes
+- [x] measured **655,360** FDN Q15 multiplies
+- [x] fastest legal transport over the same span: **18 scheduler calls / 218 events**
+- [x] room-frame/scheduler-call frequency ratio = **910:1** over the comparison scenario
+- [x] exact P11F target/package hash retained; exact idle and active Motion regressions retained
+- [x] authoritative run `41341918347` on technical head `ca20dd8608ae685349d483f68d72ce4022b90402`
+- [x] evidence artifact SHA-256 `27c9fabb358331d5b34444ea6233e4df25c58572cc9bd0f42e16159ff3d57fb7`
+- [x] frozen/promoted head `4b69145e5bf6d27a394725fdd923876795680a5a`
+
+P11H identifies the room delay-read path as a narrow, repeated optimization candidate. It still does **not** measure physical FM-1 cycles or ISR margin.
+
+### P11I — stereo-pair Cathedral delay-read optimization
+
+Status: **[ ] next. Equivalence proof first; production patch only after the proof passes.**
+
+- [ ] build current-single-read vs candidate stereo-pair-read equivalence harness
+- [ ] cover invalid/empty/partial/full fill, ring wrap, integer/fractional delays, both channels and deterministic randomized storage
+- [ ] run normal + ASAN/UBSAN equivalence
+- [ ] if and only if equivalent, replace six stereo tap locations per room frame from 12 duplicated single-channel address calculations to 6 shared pair calculations
+- [ ] run existing `test_space_room`, Space DSP and full historical regressions
+- [ ] compare real JieLi target disassembly/code shape against P11G/P11H baseline
+- [ ] require exact idle PCM/runtime and exact active Motion lifecycle
+- [ ] freeze new target image/RAM/POOL/package values before promotion
 
 ### Later Phase-11 work
-- [ ] evidence-backed CPU/workload optimisation if P11G identifies one
-- [ ] UI redraw/DMA workload optimisation only from measured evidence
+- [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
+- [ ] UI redraw/DMA optimization only if later measurement justifies it
 - [ ] combined control/UI/audio stress gates as permanent regression coverage where useful
 - [ ] Cathedral listening/tuning on physical hardware when available
 
@@ -227,4 +264,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Create a P11G staging branch from the frozen P11F head. P11G is a **read-only timing/workload proxy inventory**: measure existing audio/UI/control workload and static hot paths without changing capacity, scheduling, musical behavior or visual authority. Do not infer physical ISR or stack margin from emulator timing.
+Create **one** P11I staging branch from the frozen P11H head. First prove the stereo-pair delay reader bit-identical to the existing single-channel reader over exhaustive boundary classes and deterministic randomized cases. Do not modify production `apsis_space_room.c` until that equivalence gate is green.
