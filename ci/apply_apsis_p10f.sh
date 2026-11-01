@@ -143,6 +143,10 @@ grep -q 'apsis_controls_spiral_attractor_edit(' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_spiral_attractor_visual_dirty = 1u;' work/apsis/firmware/src/dinghy.c
 grep -q 'spiral->attractor_gates' work/apsis/firmware/src/apsis_visual_p8b.c
 grep -q 'context->runtime->spiral_attractor_pos' work/apsis/firmware/src/apsis_visual_p8b.c
+grep -q 'apsis_controls_spiral_append(' work/apsis/firmware/src/apsis_controls_dispatch.c
+grep -q 'apsis_controls_spiral_insert(' work/apsis/firmware/src/apsis_controls_dispatch.c
+grep -q 'apsis_controls_spiral_move_selected(' work/apsis/firmware/src/apsis_controls_dispatch.c
+grep -q 'apsis_controls_spiral_delete_selected(' work/apsis/firmware/src/apsis_controls_dispatch.c
 
 python3 - <<'PY'
 from pathlib import Path
@@ -172,12 +176,14 @@ for required in ('spiral->attractor_gates',
                  'context->runtime->spiral_attractor_pos'):
     if required not in renderer:
         raise SystemExit(f'FAIL: P10F existing P8 Spiral renderer lost attractor authority: {required}')
-# The frozen P9 route operations must still exist for ROUTE context.
+# P9 ROUTE lives in the copied dispatch source, not textually inside dinghy.c.
+# Keep that source as the authority guard so the check survives include order.
+route_dispatch = Path('work/apsis/firmware/src/apsis_controls_dispatch.c').read_text()
 for required in ('apsis_controls_spiral_append(',
                  'apsis_controls_spiral_insert(',
                  'apsis_controls_spiral_move_selected(',
                  'apsis_controls_spiral_delete_selected('):
-    if required not in s:
+    if required not in route_dispatch:
         raise SystemExit(f'FAIL: P10F disturbed P9 ROUTE authority: {required}')
 for required in ('apsis_string_motion_mailbox_publish(',
                  'apsis_controls_performance_queue_string(',
