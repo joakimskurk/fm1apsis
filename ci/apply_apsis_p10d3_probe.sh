@@ -120,10 +120,14 @@ for m in reversed(matches):
     indent = re.match(r'[ \t]*', m.group(1)).group(0)
     s = s[:m.end()] + '\n' + indent + 'apsis_p10_motion_probe_update();' + s[m.end():]
 
-# Explicitly initialize the CI probe only; no Motion store memset is added.
-init_anchor = '    apsis_string_motion_playback_valid = 0u;'
-if init_anchor not in s:
-    raise SystemExit('FAIL: P10D3 P10D2 init anchor missing')
+# Explicitly initialize the CI probe only at the unique P10D2 boot sequence.
+# Do not match the identical playback-valid assignment in recompute_active():
+# inserting multi-statement init there would run the reset on every callback.
+init_anchor = '''    apsis_string_motion_mailbox_reset(&apsis_string_motion_mailbox);
+    apsis_string_motion_active = 0u;
+    apsis_string_motion_playback_valid = 0u;'''
+if s.count(init_anchor) != 1:
+    raise SystemExit(f'FAIL: P10D3 unique boot init anchor count {s.count(init_anchor)} != 1')
 s = s.replace(init_anchor, init_anchor + r'''
     apsis_motion_probe[0] = 0x4d4f544eu;
     apsis_motion_probe_seen = 0u;
@@ -134,11 +138,22 @@ s = s.replace(init_anchor, init_anchor + r'''
     apsis_motion_probe_manual_start = 0u;
     apsis_motion_probe_manual_resume = 0u;''', 1)
 
+# Guard the regression that caused D3 to report only the final-state bits:
+# lifecycle history may be initialized only from app_main(), never from the
+# audio-side recompute helper.
+main_pos = s.index('static void app_main(')
+reset_pos = s.index('    apsis_motion_probe_seen = 0u;')
+if reset_pos < main_pos:
+    raise SystemExit('FAIL: P10D3 lifecycle probe reset leaked outside boot/app_main')
+if s.count('    apsis_motion_probe_seen = 0u;') != 1:
+    raise SystemExit('FAIL: P10D3 lifecycle probe has more than one reset site')
+
 p.write_text(s)
 PY
 
 grep -q 'static volatile uint32_t apsis_motion_probe\[10\]' work/apsis/firmware/src/dinghy.c
 grep -q 'APSIS_MOTION_SEEN_FINISHED_PLAY' work/apsis/firmware/src/dinghy.c
 [[ $(grep -c 'apsis_p10_motion_probe_update();' work/apsis/firmware/src/dinghy.c) -eq 2 ]]
+[[ $(grep -c 'apsis_motion_probe_seen = 0u;' work/apsis/firmware/src/dinghy.c) -eq 1 ]]
 
 echo "PASS: P10D3 active Motion lifecycle telemetry layered test-only above green D2"
