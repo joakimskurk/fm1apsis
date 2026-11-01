@@ -1,0 +1,154 @@
+name: APSIS Phase 11K ephemeral target cache projection
+
+on:
+  push:
+    branches: [p11k-fdn-feedback-cache-proof-staging]
+  workflow_dispatch:
+
+jobs:
+  p11k-target-projection:
+    runs-on: ubuntu-24.04
+    env:
+      P11K_EVIDENCE: /tmp/p11k-target-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11K_EVIDENCE"
+          mkdir -p "$P11K_EVIDENCE"
+
+      - name: Gate P11K.1 - repeat host equivalence proof
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11k_fdn_feedback_cache_equivalence.c \
+            -o /tmp/test_p11k_fdn_feedback_cache_equivalence
+          /tmp/test_p11k_fdn_feedback_cache_equivalence | tee "$P11K_EVIDENCE/host-proof.log"
+          grep -q 'PASS: P11K cached FDN feedback gains are bit-identical' "$P11K_EVIDENCE/host-proof.log"
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11K.2 - exact P11I baseline target
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11K_EVIDENCE/baseline-target.json"
+          cp build/SHA256SUMS "$P11K_EVIDENCE/baseline-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11K_EVIDENCE/baseline-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11K_EVIDENCE/baseline-disassembly.txt"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972',
+              'image':140392,
+              'ram':87476,
+              'pool':319176,
+              'package_bytes':610110,
+              'package_sha256':'868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          print('PASS: exact frozen P11I target regenerated')
+          PY
+
+      - name: Gate P11K.3 - apply candidate only to generated target and rebuild
+        run: |
+          set -euo pipefail
+          python3 ci/p11k_apply_ephemeral_feedback_cache.py
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11K_EVIDENCE/candidate-target.json"
+          cp build/SHA256SUMS "$P11K_EVIDENCE/candidate-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11K_EVIDENCE/candidate-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11K_EVIDENCE/candidate-disassembly.txt"
+
+      - name: Gate P11K.4 - quantify exact target resource and code-shape deltas
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee "$P11K_EVIDENCE/projection.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+
+          base=json.load(open('/tmp/p11k-target-evidence/baseline-target.json'))
+          cand=json.load(open('/tmp/p11k-target-evidence/candidate-target.json'))
+          assert cand['product'] == 'FM-1_972', cand
+          assert cand['image'] <= cand['image_max'], cand
+          assert cand['ram'] <= cand['ram_max'], cand
+          assert cand['pool'] == base['pool'], (base,cand)
+          assert cand['package_bytes'] == base['package_bytes'], (base,cand)
+
+          def shape(prefix):
+              symbols=inv.parse_symbols(Path(f'/tmp/p11k-target-evidence/{prefix}-symbols.txt').read_text(errors='replace'))
+              insns=inv.parse_disassembly(Path(f'/tmp/p11k-target-evidence/{prefix}-disassembly.txt').read_text(errors='replace'))
+              return {
+                  'fdn_render_text_bytes': symbols.get('apsis_space_fdn_render', 0),
+                  'fdn_render_instruction_lines': insns.get('apsis_space_fdn_render', 0),
+                  'feedback_gain_text_bytes': symbols.get('space_feedback_gain', 0),
+                  'feedback_gain_instruction_lines': insns.get('space_feedback_gain', 0),
+              }
+          bshape=shape('baseline')
+          cshape=shape('candidate')
+          report={
+              'baseline_target': base,
+              'candidate_target': cand,
+              'delta': {
+                  'image': cand['image']-base['image'],
+                  'ram': cand['ram']-base['ram'],
+                  'pool': cand['pool']-base['pool'],
+                  'ram_headroom': cand['ram_headroom']-base['ram_headroom'],
+              },
+              'baseline_code_shape': bshape,
+              'candidate_code_shape': cshape,
+              'code_shape_delta': {k:cshape[k]-bshape[k] for k in bshape},
+              'host_cache_bytes': 20,
+              'physical_timing_proven': False,
+          }
+          Path('/tmp/p11k-target-evidence/projection.json').write_text(json.dumps(report, indent=2)+'\n')
+          print(json.dumps(report, indent=2))
+          print('PASS: P11K ephemeral target cache fits and exact resource delta is recorded')
+          PY
+
+      - name: Gate P11K.5 - repo production sources remain untouched
+        run: |
+          set -euo pipefail
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '72210e122b68bff77c56805618b2703d363a25ef'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ae843d3289a8ff839cfe061861311a5620ab839a'
+          echo 'PASS: target projection changed generated worktree only, not repository production FDN source/layout'
+
+      - name: Upload P11K target projection evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11k-target-projection-evidence
+          path: /tmp/p11k-target-evidence
+          if-no-files-found: error
