@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """P11G read-only workload proxy inventory.
 
-The report intentionally distinguishes deterministic static proxies from physical
-FM-1 timing. It never converts instruction counts or emulator wall time into ISR
-headroom or CPU percentages.
+Deterministic source/target-code proxies only. Nothing here converts code size,
+static instruction lines or emulator wall time into physical FM-1 ISR headroom.
 """
 
 from __future__ import annotations
@@ -14,9 +13,7 @@ import math
 import re
 from pathlib import Path
 
-KEYWORDS = {
-    "if", "for", "while", "switch", "return", "sizeof", "do", "case",
-}
+KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "do", "case"}
 
 AUDIO_REQUIRED = {
     "apsis_string_dsp_render",
@@ -28,10 +25,21 @@ AUDIO_REQUIRED = {
     "apsis_space_target_render",
 }
 
+# Performance mailbox consumers deliberately live on the audio side, so an
+# apsis_controls_* prefix is not categorically forbidden. What must remain out
+# of app_audio() is visual/canvas/LCD/input polling and the main-loop dispatcher.
 AUDIO_FORBIDDEN_PREFIXES = (
-    "apsis_visual_", "apsis_controls_", "draw_", "cv_", "lcd_", "fm1_lcd_",
-    "fm1_input", "platform_poll",
+    "apsis_visual_", "draw_", "cv_", "lcd_", "fm1_lcd_", "fm1_input", "platform_poll",
 )
+AUDIO_FORBIDDEN_NAMES = {
+    "apsis_controls_dispatch",
+    "apsis_controls_gravity_point_context",
+    "apsis_controls_gravity_point_edit",
+    "apsis_controls_spiral_attractor_context",
+    "apsis_controls_spiral_attractor_edit",
+    "apsis_controls_string_attractor_context",
+    "apsis_controls_string_attractor_edit",
+}
 
 STATIC_FOCUS = [
     "apsis_string_dsp_render",
@@ -54,12 +62,10 @@ def strip_c_noise(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
     text = re.sub(r"//[^\n]*", " ", text)
     text = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
-    text = re.sub(r"'(?:\\.|[^'\\])*'", "''", text)
-    return text
+    return re.sub(r"'(?:\\.|[^'\\])*'", "''", text)
 
 
 def extract_function(text: str, name: str) -> str:
-    # Function definitions only; prototypes terminate with ';' before a body.
     m = re.search(r"\b" + re.escape(name) + r"\s*\([^;{}]*\)\s*\{", text, re.S)
     if not m:
         raise SystemExit(f"FAIL: generated target source has no {name}() body")
@@ -75,26 +81,29 @@ def extract_function(text: str, name: str) -> str:
     raise SystemExit(f"FAIL: unterminated {name}() body")
 
 
-def lexical_calls(body: str) -> dict[str, int]:
-    clean = strip_c_noise(body)
+def lexical_calls(definition: str, definition_name: str) -> dict[str, int]:
+    clean = strip_c_noise(definition)
     counts: dict[str, int] = {}
     for name in re.findall(r"\b([A-Za-z_]\w*)\s*\(", clean):
         if name in KEYWORDS:
             continue
         counts[name] = counts.get(name, 0) + 1
+    # The extracted definition includes its own signature; that is not a call.
+    if counts.get(definition_name):
+        counts[definition_name] -= 1
+        if not counts[definition_name]:
+            del counts[definition_name]
     return dict(sorted(counts.items()))
 
 
 def parse_symbols(text: str) -> dict[str, int]:
-    out: dict[str, int] = {}
-    # Typical JieLi objdump -t:
+    # JieLi objdump -t example:
     # 02004154 g     F .text  00000382 apsis_string_dsp_render
     rx = re.compile(
         r"^\s*[0-9a-fA-F]+\s+\S+\s+F\s+\.text\s+([0-9a-fA-F]+)\s+(\S+)\s*$",
         re.M,
     )
-    for size_hex, name in rx.findall(text):
-        out[name] = int(size_hex, 16)
+    out = {name: int(size_hex, 16) for size_hex, name in rx.findall(text)}
     if not out:
         raise SystemExit("FAIL: could not parse any .text function symbols")
     return out
@@ -103,10 +112,13 @@ def parse_symbols(text: str) -> dict[str, int]:
 def parse_disassembly(text: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     current: str | None = None
-    header = re.compile(r"^\s*[0-9a-fA-F]+\s+<([^>]+)>:\s*$")
+    # GNU-style objdump commonly emits `ADDR <name>:`. JieLi pi32v2 objdump
+    # instead emits a bare `name:` line, followed by ` ADDRESS: bytes insn`.
+    gnu_header = re.compile(r"^\s*[0-9a-fA-F]+\s+<([^>]+)>:\s*$")
+    jieli_header = re.compile(r"^([A-Za-z_.$][A-Za-z0-9_.$@-]*):\s*$")
     insn = re.compile(r"^\s*[0-9a-fA-F]+:\s+")
     for line in text.splitlines():
-        m = header.match(line)
+        m = gnu_header.match(line) or jieli_header.match(line)
         if m:
             current = m.group(1)
             counts.setdefault(current, 0)
@@ -143,24 +155,25 @@ def main() -> None:
     target = json.loads(a.target.read_text())
 
     audio = extract_function(dinghy, "app_audio")
-    audio_calls = lexical_calls(audio)
+    audio_calls = lexical_calls(audio, "app_audio")
     missing = sorted(AUDIO_REQUIRED - set(audio_calls))
     if missing:
         raise SystemExit(f"FAIL: generated app_audio lost expected final render calls: {missing}")
     forbidden = sorted(
         name for name in audio_calls
-        if any(name.startswith(prefix) for prefix in AUDIO_FORBIDDEN_PREFIXES)
+        if name in AUDIO_FORBIDDEN_NAMES
+        or any(name.startswith(prefix) for prefix in AUDIO_FORBIDDEN_PREFIXES)
     )
     if forbidden:
         raise SystemExit(f"FAIL: UI/control/display call leaked into app_audio: {forbidden}")
 
     draw_step = extract_function(dinghy, "draw_native_visual_step")
-    draw_calls = lexical_calls(draw_step)
+    draw_calls = lexical_calls(draw_step, "draw_native_visual_step")
     for required in ("apsis_visual_render_p8c", "cv_begin", "cv_blit", "apsis_lcd_dma_ready"):
         if required not in draw_calls:
             raise SystemExit(f"FAIL: native draw step lost {required}()")
     lcd_ready = extract_function(dinghy, "apsis_lcd_dma_ready")
-    if "fm1_lcd_done" not in lexical_calls(lcd_ready):
+    if "fm1_lcd_done" not in lexical_calls(lcd_ready, "apsis_lcd_dma_ready"):
         raise SystemExit("FAIL: native visual path is no longer HAL-gated by fm1_lcd_done()")
 
     strip_rows = define_u32(dinghy, "APSIS_NATIVE_STRIP_ROWS")
@@ -193,19 +206,14 @@ def main() -> None:
     }
     absent_focus = sorted(name for name in required_focus if name not in focus)
     if absent_focus:
-        raise SystemExit(
-            f"FAIL: target static census lost expected audio/runtime functions: {absent_focus}"
-        )
+        raise SystemExit(f"FAIL: target static census lost expected functions: {absent_focus}")
 
     ranked = sorted(
-        (
-            {
-                "name": name,
-                "static_instruction_lines": count,
-                "text_bytes": symbols.get(name),
-            }
-            for name, count in apsis_insns.items()
-        ),
+        ({
+            "name": name,
+            "static_instruction_lines": count,
+            "text_bytes": symbols.get(name),
+        } for name, count in apsis_insns.items()),
         key=lambda x: (x["static_instruction_lines"], x["text_bytes"] or 0, x["name"]),
         reverse=True,
     )[:25]
@@ -257,23 +265,22 @@ def main() -> None:
     rows = []
     for name in STATIC_FOCUS:
         item = focus.get(name)
-        if not item:
-            continue
-        rows.append(
-            f"| `{name}` | {item['text_bytes'] if item['text_bytes'] is not None else 'n/a'} | "
-            f"{item['static_instruction_lines'] if item['static_instruction_lines'] is not None else 'n/a'} |"
-        )
+        if item:
+            rows.append(
+                f"| `{name}` | {item['text_bytes'] if item['text_bytes'] is not None else 'n/a'} | "
+                f"{item['static_instruction_lines'] if item['static_instruction_lines'] is not None else 'n/a'} |"
+            )
 
     md = [
         "# APSIS Phase 11G workload proxy inventory",
         "",
-        "P11G changes no production firmware behavior or capacity. This report is a deterministic source/target-code inventory, **not a physical timing measurement**.",
+        "P11G changes no production firmware behavior or capacity. This is a deterministic source/target-code inventory, **not a physical timing measurement**.",
         "",
         "## Audio callback boundary",
         "",
         f"Generated `app_audio()` contains {len(audio.splitlines())} source lines and {sum(audio_calls.values())} lexical call sites ({len(audio_calls)} unique call names).",
         "",
-        "No visual, control-dispatch, LCD, input-poll or canvas call is present in `app_audio()`.",
+        "No visual renderer, main-loop control dispatcher, LCD/canvas operation or input poll is present in `app_audio()`. Audio-side performance-mailbox consumers remain intentionally present.",
         "",
         "## Native display workload boundary",
         "",
@@ -283,9 +290,9 @@ def main() -> None:
         f"- maximum pixel payload per strip: **{max_strip_payload_bytes:,} B**;",
         f"- pixel payload per complete redraw: **{full_payload_bytes:,} B** (SPI/protocol overhead excluded);",
         f"- native takeover remains sample **{start_sample}**;",
-        "- every native strip is gated through `apsis_lcd_dma_ready()` / `fm1_lcd_done()` and performs one `cv_blit()` call.",
+        "- each native strip is gated through `apsis_lcd_dma_ready()` / `fm1_lcd_done()` and performs one `cv_blit()` call.",
         "",
-        "The pixel payload is a deterministic work-volume proxy. It is not a measured LCD bus duration.",
+        "The payload is a deterministic work-volume proxy, not a measured LCD-bus duration.",
         "",
         "## JieLi target static audio/runtime proxy",
         "",
@@ -293,15 +300,15 @@ def main() -> None:
         "|---|---:|---:|",
         *rows,
         "",
-        "Largest APSIS functions by static instruction-line count are preserved in `workload_inventory.json` together with the complete lexical `app_audio()` call census.",
+        "The top 25 APSIS functions by static instruction-line count are stored in `workload_inventory.json` together with the complete lexical `app_audio()` call census.",
         "",
-        "These counts describe compiler-emitted code shape only. Loop trip counts, active voice counts, cache behavior, memory waits and hardware ISR scheduling are not encoded by the static count.",
+        "Static counts describe compiler-emitted code shape only; loop trips, active voices, cache behavior, memory waits and hardware scheduling are not represented.",
         "",
         "## Decision boundary",
         "",
-        "P11G may use this inventory to select a later falsifiable optimisation target, but it does **not** authorize an optimisation by itself. A candidate must first be tied to a dynamic workload scenario or an independently bounded repeated operation.",
+        "P11G may select a later falsifiable optimisation target only after this static proxy is tied to a dynamic workload scenario or an independently bounded repeated operation.",
         "",
-        "Still unproven without physical hardware: ISR headroom, runtime stack high-water, LCD/audio bus contention, memory wait-state effects and DAC/listening quality.",
+        "Still unproven without hardware: ISR headroom, runtime stack high-water, LCD/audio bus contention, memory wait-state effects and DAC/listening quality.",
         "",
     ]
     a.out_md.write_text("\n".join(md))
