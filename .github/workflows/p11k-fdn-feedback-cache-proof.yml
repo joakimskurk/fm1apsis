@@ -1,8 +1,6 @@
 name: APSIS Phase 11K FDN feedback-cache equivalence proof
 
 on:
-  push:
-    branches: [p11k-fdn-feedback-cache-proof-staging]
   workflow_dispatch:
 
 jobs:
@@ -12,9 +10,11 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: ffb436dd87247af23c37e7e533cfd87fc2d161d0
       - name: Gate P11K.1 - cached render equals always-recomputed authority
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ffb436dd87247af23c37e7e533cfd87fc2d161d0'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             tests/test_p11k_fdn_feedback_cache_equivalence.c \
             -o /tmp/test_p11k_fdn_feedback_cache_equivalence
