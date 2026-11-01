@@ -1,0 +1,99 @@
+name: APSIS Phase 10 String Motion
+
+on:
+  push:
+    branches: [p10-string-motion]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  motion-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P10A String Motion source contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_string_motion.c -o /tmp/test_string_motion
+          /tmp/test_string_motion
+      - name: P10A String Motion ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_string_motion.c -o /tmp/test_string_motion_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_san
+      - name: P10B String Motion persistent DSP pitch override
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_drift.c \
+            apsis/apsis_string_motion.c apsis/apsis_string_motion_dsp.c \
+            tests/test_string_motion_dsp.c -o /tmp/test_string_motion_dsp
+          /tmp/test_string_motion_dsp
+      - name: P10B String Motion DSP ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_drift.c \
+            apsis/apsis_string_motion.c apsis/apsis_string_motion_dsp.c \
+            tests/test_string_motion_dsp.c -o /tmp/test_string_motion_dsp_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_dsp_san
+      - name: P10C1 String Motion physical-control contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_controls_string_motion.c \
+            tests/test_controls_string_motion.c -o /tmp/test_controls_string_motion
+          /tmp/test_controls_string_motion
+      - name: P10C1 control ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_controls_string_motion.c \
+            tests/test_controls_string_motion.c -o /tmp/test_controls_string_motion_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_string_motion_san
+      - name: P10C2 shared-Clock passive Motion observer
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_spiral.c apsis/apsis_keep.c \
+            apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_bloom.c \
+            apsis/apsis_transport.c apsis/apsis_late_binding.c \
+            apsis/apsis_runtime_m3c.c apsis/apsis_string_motion_clock.c \
+            tests/test_string_motion_clock.c -o /tmp/test_string_motion_clock
+          /tmp/test_string_motion_clock
+      - name: P10C2 Clock observer ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_spiral.c apsis/apsis_keep.c \
+            apsis/apsis_chain.c apsis/apsis_mother.c apsis/apsis_bloom.c \
+            apsis/apsis_transport.c apsis/apsis_late_binding.c \
+            apsis/apsis_runtime_m3c.c apsis/apsis_string_motion_clock.c \
+            tests/test_string_motion_clock.c -o /tmp/test_string_motion_clock_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_clock_san
+      - name: P10D1 main/audio Motion mailbox
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_string_motion_mailbox.c tests/test_string_motion_mailbox.c \
+            -o /tmp/test_string_motion_mailbox
+          /tmp/test_string_motion_mailbox
+      - name: P10D1 mailbox ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_string_motion_mailbox.c tests/test_string_motion_mailbox.c \
+            -o /tmp/test_string_motion_mailbox_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_mailbox_san

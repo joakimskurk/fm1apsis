@@ -1,0 +1,67 @@
+name: APSIS Phase 10 active String Motion
+
+on:
+  push:
+    branches: [p10-string-motion]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  active-motion:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P10D3.1 - pinned upstream
+        run: bash ci/prepare_dinghy.sh
+
+      - name: Gate P10D3.2 - D2 target plus test-only lifecycle telemetry
+        run: bash ci/apply_apsis_p10d3_probe.sh
+
+      - name: Gate P10D3.3 - real JieLi telemetry target
+        run: bash ci/build_apsis_target.sh
+
+      - name: Gate P10D3.4 - active Motion lifecycle in pinned emulator
+        run: |
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc
+          mkdir -p build/evidence
+          cp work/emu-motion-active/report.json build/evidence/p10-motion-active-report.json
+          cp work/emu-motion-active/run.log build/evidence/p10-motion-active-run.log
+          cp work/emu-motion-active/apsis-motion.wav build/evidence/p10-motion-active.wav
+          cp build/target_report.json build/evidence/p10-motion-active-target-report.json
+
+      - name: Upload active Motion evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p10-motion-active-evidence
+          path: build/evidence
+          if-no-files-found: warn
