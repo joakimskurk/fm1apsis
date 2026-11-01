@@ -91,7 +91,7 @@ jobs:
           test -d ~/fw-AC79_AIoT_SDK
           echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
 
-      - name: Gate P11F.3 - real JieLi production target and measured RAM gain
+      - name: Gate P11F.3 - exact real JieLi production target
         run: |
           set -euo pipefail
           bash ci/apply_apsis_p10g.sh
@@ -101,13 +101,23 @@ jobs:
           python3 - <<'PY'
           import json
           r=json.load(open('build/target_report.json'))
-          assert r['product'] == 'FM-1_972', r
-          assert r['pool'] == 319176, r
-          assert r['ram'] < 89716, r
-          assert r['image'] <= 140408, r
-          assert r['package_bytes'] == 610110, r
-          print('P11F_PRODUCTION', r)
-          print('P11F_RAM_SAVED', 89716-r['ram'])
+          expected = {
+              'product': 'FM-1_972',
+              'image': 140408,
+              'image_max': 581564,
+              'ram': 87476,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'ram_headroom': 10828,
+              'pool_headroom': 24888,
+              'package_bytes': 610110,
+              'package_sha256': 'e0d0b826f0c2d5b8f1af781a9259b5d78dce9062939661ac7acad17bfefb78e5',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert 89716-r['ram'] == 2240, r
+          print('PASS: P11F exact production target, RAM saving 2240 B', r)
           PY
 
       - name: Gate P11F.4 - exact frozen inactive emulator behavior
@@ -129,7 +139,7 @@ jobs:
           print('PASS: P11F exact frozen idle PCM/runtime')
           PY
 
-      - name: Gate P11F.5 - reduced-capacity active Motion target
+      - name: Gate P11F.5 - exact reduced-capacity active Motion target
         run: |
           set -euo pipefail
           bash ci/p11f_prepare.sh
@@ -140,12 +150,23 @@ jobs:
           python3 - <<'PY'
           import json
           r=json.load(open('build/target_report.json'))
-          assert r['product'] == 'FM-1_972', r
-          assert r['pool'] == 319176, r
-          assert r['ram'] < 89764, r
-          assert r['image'] <= 137672, r
-          assert r['package_bytes'] == 610110, r
-          print('P11F_ACTIVE_TARGET', r)
+          expected = {
+              'product': 'FM-1_972',
+              'image': 137672,
+              'image_max': 581564,
+              'ram': 87524,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'ram_headroom': 10780,
+              'pool_headroom': 24888,
+              'package_bytes': 610110,
+              'package_sha256': '6dc05756b22dfbf7a825b1877207209a2cd667f8f0223fa56f5603a933ffe86c',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert 89764-r['ram'] == 2240, r
+          print('PASS: P11F exact active target, RAM saving 2240 B', r)
           PY
 
       - name: Gate P11F.6 - exact frozen active Motion lifecycle
