@@ -63,11 +63,13 @@ jobs:
           pool = t.get('pool', 0)
           if pool > t.get('pool_max', 0):
               raise SystemExit(f"FAIL: P10 POOL {pool}/{t.get('pool_max')}")
-          # P9 froze at 309,532 B and host P10A reports 25,280 B Motion runtime.
-          # Allow only a tiny linker-alignment envelope until the first real
-          # P10B build freezes the exact new value.
-          if not (334812 <= pool <= 334832):
-              raise SystemExit(f"FAIL: P10 unexpected Motion POOL {pool}, expected 334812..334832")
+          # First real JieLi P10B build froze this exact linker result. Host
+          # sizeof(ApsisStringMotionRuntime)=25,280 B while the measured POOL
+          # delta is 25,276 B because the prior section boundary had 4 B of
+          # linker alignment padding available. Freeze the target value, not a
+          # guessed sizeof delta.
+          if pool != 334808:
+              raise SystemExit(f"FAIL: P10 changed frozen Motion POOL {pool} != 334808")
           if t.get('pool_max', 0) - pool < 9000:
               raise SystemExit(f"FAIL: P10 POOL headroom below 9000 B: {t.get('pool_max', 0)-pool}")
           print(f"PASS: P10B target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={pool}/{t.get('pool_max')}")
