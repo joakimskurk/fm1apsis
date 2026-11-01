@@ -1,8 +1,6 @@
 name: APSIS Phase 11J FDN coefficient recomputation census
 
 on:
-  push:
-    branches: [p11j-fdn-coeff-census-staging]
   workflow_dispatch:
 
 jobs:
@@ -12,11 +10,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: 17030232e5f21f95a81b834e831d9021683d81bf
       - name: Generate test-only instrumented FDN source
         run: python3 ci/p11j_instrument_sources.py --out /tmp/p11j-src
       - name: Gate P11J.1 - deterministic coefficient census
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = '17030232e5f21f95a81b834e831d9021683d81bf'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
             -Iapsis -Itests \
             /tmp/p11j-src/apsis_space_dsp.c \
