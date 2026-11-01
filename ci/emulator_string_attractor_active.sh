@@ -20,12 +20,12 @@ PROBE_ADDR=$(awk '$NF == "apsis_attractor_probe" { found="0x" $1 } END { if (fou
   work/emu-string-attractor-active/target_symbols.txt)
 [[ -n "$PROBE_ADDR" ]] || { echo "FAIL: apsis_attractor_probe symbol not found" >&2; exit 3; }
 
-# APSIS names physical button id 3 SEL; the pinned emulator names the same
-# FM-1 panel button SCL. Hold it while pressing ENV to enter ATTRACTOR context.
-# Then toggle gate 0, reroll with REC, and leave STRING with HOME.
-"$EMU" --fwsc "$PKG" --ms 3000 \
-  --keys "300-650:SCL,400:ENV,1000:n0,1500:REC,2200:HOME" \
-  --snap 850 --snap 1250 --snap 1900 --snap 2600 \
+# Preserve the frozen MOTHER SEL+source gesture: first enter ordinary STRING
+# with ENV, then hold physical SEL (emulator name SCL) and press ENV again to
+# enter the secondary ATTRACTOR editor. Toggle gate0, reroll, then HOME.
+"$EMU" --fwsc "$PKG" --ms 3400 \
+  --keys "300:ENV,600-950:SCL,700:ENV,1200:n0,1700:REC,2500:HOME" \
+  --snap 1050 --snap 1450 --snap 2150 --snap 2900 \
   --dump "$PROBE_ADDR" 12 \
   > work/emu-string-attractor-active/run.log 2>&1
 
@@ -99,7 +99,7 @@ if queue_overflow:
     raise SystemExit('FAIL: P10E active runtime queue overflowed')
 if late_flags:
     raise SystemExit(f'FAIL: P10E active late-binding flags {late_flags:#x}')
-if cursor < 90000:
+if cursor < 100000:
     raise SystemExit(f'FAIL: P10E active runtime cursor unexpectedly low: {cursor}')
 
 shots = sorted(root.glob('lcd_*.bmp'), key=lambda p: int(re.search(r'(\d+)(?=\.bmp$)', p.name).group(1)))
@@ -107,9 +107,8 @@ if len(shots) != 4:
     print(log)
     raise SystemExit(f'FAIL: P10E expected four LCD snapshots, got {len(shots)}')
 hashes = [hashlib.sha256(p.read_bytes()).hexdigest() for p in shots]
-# 850 ms is STRING after editor entry; 1250 ms is the same surface after gate0
-# changed. They must differ, proving the P10E visual-dirty path actually caused
-# the existing incremental P8 renderer to present the edited gate state.
+# 1050 ms is STRING after editor entry; 1450 ms is the same surface after
+# gate0 changed. They must differ, proving the existing P8 redraw path ran.
 if hashes[0] == hashes[1]:
     raise SystemExit('FAIL: P10E gate edit changed state but did not redraw STRING LCD')
 # HOME must visibly leave STRING after the editor session has been cleared.
@@ -135,5 +134,5 @@ report = {
 }
 (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, sort_keys=True))
-print('PASS: P10E physical SEL+ENV -> gate toggle -> REC reroll -> HOME, with redraw and zero P9/Motion leakage')
+print('PASS: P10E ENV -> STRING -> SEL+ENV ATTRACTOR -> gate -> reroll -> HOME, with redraw and zero P9/Motion leakage')
 PY

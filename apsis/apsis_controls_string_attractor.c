@@ -63,10 +63,13 @@ uint8_t apsis_controls_string_attractor_context(
     env = p10e_button_bit(APSIS_FM1_BTN_ENV);
     sel = p10e_button_bit(APSIS_FM1_BTN_SEL);
 
-    if (input && (input->buttons_pressed & env))
-        next = (input->buttons_held & sel) ? 1u : 0u;
-    else if (current_surface != APSIS_SURFACE_STRING)
+    /* Preserve the frozen MOTHER SEL+source mute contract. The secondary
+     * Attractor page can only be entered once STRING is already the active
+     * surface; plain ENV on STRING returns to normal STRING performance. */
+    if (current_surface != APSIS_SURFACE_STRING)
         next = 0u;
+    else if (input && (input->buttons_pressed & env))
+        next = (input->buttons_held & sel) ? 1u : 0u;
 
     session->active = next;
     if (out) {

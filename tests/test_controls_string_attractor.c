@@ -18,10 +18,17 @@ static void test_context(void)
     apsis_controls_string_attractor_editor_reset(&session);
     assert(session.active == 0u);
 
+    /* MOTHER SEL+ENV is a frozen source-mute gesture, never editor entry. */
     input.buttons_pressed = button_bit(APSIS_FM1_BTN_ENV);
     input.buttons_held = button_bit(APSIS_FM1_BTN_SEL);
-    assert(apsis_controls_string_attractor_context(
+    assert(!apsis_controls_string_attractor_context(
         &session, APSIS_SURFACE_MOTHER, &input, &out));
+    assert(session.active == 0u && out.active == 0u);
+
+    /* Once normal ENV navigation has already reached STRING, SEL+ENV opens
+     * the secondary Attractor page. */
+    assert(apsis_controls_string_attractor_context(
+        &session, APSIS_SURFACE_STRING, &input, &out));
     assert(session.active == 1u && out.active == 1u);
     assert(out.entered == 1u && out.exited == 0u);
 
@@ -30,6 +37,7 @@ static void test_context(void)
         &session, APSIS_SURFACE_STRING, &input, &out));
     assert(session.active == 1u && out.active == 1u);
 
+    /* Plain ENV on STRING returns to normal STRING performance. */
     input.buttons_pressed = button_bit(APSIS_FM1_BTN_ENV);
     assert(apsis_controls_string_attractor_context(
         &session, APSIS_SURFACE_STRING, &input, &out));

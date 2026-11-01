@@ -70,6 +70,7 @@ jobs:
 
       - name: Gate P10E.11 - physical editor lifecycle in pinned emulator
         run: |
+          set -euo pipefail
           bash ci/emulator_string_attractor_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee build/evidence/emulator_p10_string_attractor_active.txt
           cp -a work/emu-string-attractor-active build/evidence/emulator-string-attractor-active

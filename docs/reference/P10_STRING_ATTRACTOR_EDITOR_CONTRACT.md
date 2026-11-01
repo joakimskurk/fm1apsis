@@ -19,9 +19,13 @@ Existing `apsis_string_attractor_sync()` remains responsible for regenerating ce
 
 Phase-9 STRING performance remains the default and is not remapped.
 
-- `ENV` enters/returns to normal STRING performance.
-- `SEL + ENV` enters the STRING ATTRACTOR editor.
+- `ENV` enters normal STRING performance from another surface.
+- while already on STRING, `SEL + ENV` enters the STRING ATTRACTOR editor.
+- plain `ENV` while on STRING returns from ATTRACTOR to normal STRING performance.
 - leaving the STRING surface clears the editor context.
+- `SEL + ENV` on MOTHER retains the frozen Phase-9 MOTHER source-mute gesture; it never opens the editor directly from MOTHER.
+
+This two-stage entry is deliberate: P10E must not steal the existing contextual `SEL + source` MOTHER interaction just to make a secondary editor page convenient.
 
 The editor context is UI/control-session state only. It is not persisted musical state and must never be consulted by M3c scheduling or DSP.
 
@@ -36,7 +40,7 @@ The first N physical note keys map directly to attractor cells `0..N-1`, where N
 - note keys outside N are ignored musically but remain consumed by the editor so they cannot leak into normal STRING performance;
 - bits above N already present in `filter_attractor_gates` are preserved, so shortening and later re-extending the attractor does not destructively erase hidden gates.
 
-LED/display feedback is target/UI work layered later; the host contract owns only the state transition.
+The existing P8 STRING renderer already reads `filter_attractor_gates`; target integration invalidates only that existing incremental surface after an editor state change. No new framebuffer or renderer is introduced.
 
 ## Reroll
 
@@ -57,20 +61,22 @@ This preserves reproducible CI, avoids perturbing M3c random draw order, and kee
 
 P10E host tests must prove:
 
-1. editor context entry, normal-STRING exit, and automatic clear after leaving STRING;
-2. inactive editor is a strict no-op;
-3. direct gate toggling is bounded to normalized length 4..16 and preserves hidden bits;
-4. simultaneous gate presses toggle every addressed cell exactly once;
-5. editor frames suppress ordinary STRING dispatch and Motion interpretation;
-6. reroll changes only the bounded existing seed and introduces no RNG/session state;
-7. `apsis_string_attractor_sync()` regenerates cells after reroll and is idempotent when seed/length stay unchanged;
-8. gate-only edits do not regenerate cells or reset the M4c cursor;
-9. normal and ASAN/UBSAN builds pass before generated FM-1 target binding begins.
+1. editor context can only be entered from STRING, plain ENV exits it, and leaving STRING clears it;
+2. MOTHER `SEL+ENV` remains outside the editor contract;
+3. inactive editor is a strict no-op;
+4. direct gate toggling is bounded to normalized length 4..16 and preserves hidden bits;
+5. simultaneous gate presses toggle every addressed cell exactly once;
+6. editor frames suppress ordinary STRING dispatch and Motion interpretation;
+7. reroll changes only the bounded existing seed and introduces no RNG/session state;
+8. `apsis_string_attractor_sync()` regenerates cells after reroll and is idempotent when seed/length stay unchanged;
+9. gate-only edits do not regenerate cells or reset the M4c cursor;
+10. normal and ASAN/UBSAN builds pass before generated FM-1 target binding begins.
 
 ## Target integration boundary
 
 After the host checkpoint is green, target integration may add only the finite control-session bit and routing needed to select/apply this editor. It must retain:
 
+- frozen Phase-9 MOTHER `SEL+source` semantics;
 - frozen Phase-9 STRING performance outside ATTRACTOR context;
 - P10D3 Motion ownership and mailbox behavior outside ATTRACTOR context;
 - shared M3c runtime size/timeline;
