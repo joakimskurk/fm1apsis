@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11L are complete. P11L is the current exact-head validated production baseline; further production optimisation requires a new measured/equivalence-backed candidate.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11M are complete. P11L remains the production baseline; P11M measured FDN line-read branch behavior and P11N is proof-only until the invariant-simplified reader is bit-identical.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -451,9 +451,51 @@ Accepted workload tradeoff from P11J/P11K:
 
 P11L proves exact behavior and real-target resource cost. It still does not prove physical FM-1 CPU cycles or ISR margin.
 
-## Exact next phase
+## P11M — FDN inner-loop branch census complete
 
-Promote P11L to `p11-optimization`, then return to measurement. No P11M production change is authorized until a new concrete hotspot and falsifiable equivalence/regression gate are established. Physical ISR timing, stack high-water, LCD/audio contention and listening quality remain deferred to hardware validation.
+Authority:
+- technical head `04b807617ffec084e3721fa2a166ac6ad9e76d59`
+- run `41355338593`
+- optimized + ASAN/UBSAN PASS
+- production DSP source/header and Cathedral room blobs remain exact P11L authority
+- instrumentation exists only in generated `/tmp` source
+
+Cold 16,384-frame census:
+- 131,072 sine/LFO calls and line reads
+- modulation **−2,304 .. +2,303 Q8**
+- minimum-delay-clamp opportunities **0**
+- not-ready startup returns **19,047 (14.53%)**
+- full-capacity calls **111,902 (85.37%)**
+- ready reads **112,025**
+- negative-wrap **111,261 (99.32% of ready)**
+- upper-wrap **0**
+- integer reads **348 (0.31% of ready)**
+- interpolated reads **111,677 (99.69%)**
+- `i1` wraps **44 (0.039%)**
+
+Warm 65,536-frame census after full prefill:
+- 524,288 sine/LFO calls and line reads
+- all **524,288** reads at full line capacity
+- not-ready **0**
+- minimum-delay-clamp opportunities **0**
+- negative-wrap **521,026 (99.38%)**
+- upper-wrap **0**
+- integer reads **4,438 (0.85%)**
+- interpolated reads **519,850 (99.15%)**
+- `i1` wraps **224 (0.043%)**
+
+Structural P11M bounds:
+- min base delay 1,871 samples and modulation bound −2,304..+2,303 Q8 make the minimum-delay clamp unreachable;
+- capacity `base_delay+16` and ±9-sample modulation guarantee raw non-negative reads stay far below span and negative reads need at most one `+span`, so the upper-wrap correction is unreachable;
+- once `fill_count==capacity`, `needed<=base_delay+9<capacity`, so readiness failure is permanently impossible while startup semantics remain required before full capacity.
+
+Decision: P11N may prove only a narrow production-caller-specialized reader: partial lines retain the exact readiness calculation, full lines bypass it; unreachable minimum-delay and upper-wrap branches may be removed; negative-wrap, interpolation and `i1` wrap remain exact. Defensive helper-guard removal is not authorized without separate call-path proof.
+
+## Exact next phase — P11N FDN line-read invariant proof
+
+Before production modification, prove current and candidate helper outputs bit-identical across all eight line topologies, boundary modulation/readiness/wrap classes and deterministic randomized valid states, then confirm complete FDN render equivalence under cold/warm/randomized trajectories. Run optimized + ASAN/UBSAN. Only then may an ephemeral real-target projection be used to decide whether a production phase is justified.
+
+Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 
 ## Do not regress
 

@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11L are complete; further production optimisation requires a new measured, equivalence-backed candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11M are complete; P11N is proof-only for the measured FDN line-read invariant simplification candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -317,6 +317,39 @@ Frozen P11L production target:
 
 Accepted dynamic workload tradeoff from P11J–P11L: steady census eliminates 2,040 coefficient divisions + 6,120 wide multiplies; the measured 4s→12s sweep eliminates 504 divisions + 1,512 wide multiplies; adversarial every-block decay churn has zero coefficient-computation savings. Physical CPU/ISR improvement remains unverified.
 
+### P11M — FDN inner-loop branch census
+
+Status: **[x] complete, frozen measurement phase. Production Space sources remain exact P11L.**
+
+- [x] cold census: **16,384 frames / 131,072 line reads**
+- [x] warm census: **65,536 frames / 524,288 line reads** after all eight FDN lines reach full capacity
+- [x] modulation range measured **−2,304 .. +2,303 Q8**
+- [x] minimum-delay clamp opportunities: **0** cold and warm; topology proves the branch unreachable under the production caller
+- [x] upper ring-wrap condition: **0** cold and warm; topology proves one negative-wrap correction is sufficient
+- [x] cold startup not-ready returns: **19,047 / 131,072 (14.53%)** — startup semantics must remain
+- [x] cold reads already at full capacity: **111,902 / 131,072 (85.37%)**
+- [x] warm full-capacity reads: **524,288 / 524,288 (100%)**; readiness failure impossible once full
+- [x] warm negative-wrap condition: **521,026 / 524,288 (99.38%)** — negative wrap must remain
+- [x] warm integer reads: **4,438 / 524,288 (0.85%)**; interpolated reads **519,850 (99.15%)** — interpolation must remain
+- [x] warm `i1` ring-end wraps: **224 (0.043%)** — rare but real
+- [x] optimized + ASAN/UBSAN census PASS
+- [x] production P11L Space blobs unchanged
+- [x] authoritative run `41355338593` on technical head `04b807617ffec084e3721fa2a166ac6ad9e76d59`
+- [x] census workflow manual-only and pinned to the proven technical head
+
+Decision: authorize P11N **proof only** for a production-caller-specialized `space_line_read()` candidate: retain exact partial-line startup readiness, fast-path full lines without `needed`, remove only the structurally unreachable minimum-delay clamp and upper-wrap correction, and leave modulation/interpolation/negative-wrap/`i1` semantics untouched. Defensive helper-guard removal requires a separate call-path proof.
+
+### P11N — FDN line-read invariant simplification proof
+
+Status: **[ ] next. No production patch until equivalence is proved.**
+
+- [ ] prove current P11L line-read authority vs candidate across all eight line topologies, boundary modulation values, readiness thresholds, ring boundaries and deterministic randomized valid states
+- [ ] preserve exact partial-fill/startup zero-return behavior
+- [ ] preserve negative wrap, fractional interpolation and `i1` wrap exactly
+- [ ] full-FDN render equivalence across cold, warm, randomized phase/state and reset trajectories
+- [ ] optimized + ASAN/UBSAN proof
+- [ ] only after proof, measure an ephemeral real-target code-shape/resource projection before production authorization
+
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
 - [ ] UI redraw/DMA optimization only if later measurement justifies it
@@ -339,4 +372,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote the frozen P11L production state to `p11-optimization`. Then return to measurement before selecting any P11M production candidate; no further DSP change is authorized until a concrete hotspot and falsifiable equivalence/regression gate are defined.
+Promote frozen P11M measurement state to `p11-optimization`, then create one P11N proof branch. Prove the production-caller-specialized FDN line-read candidate bit-identical to current P11L behavior before any production source is modified.
