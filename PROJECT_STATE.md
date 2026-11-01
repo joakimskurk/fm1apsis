@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 9 — physical interaction parity is complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19. Phase 10 — String Motion and advanced interactive parity is current.**
+**Phase 9 — physical interaction parity is complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19. Phase 10 — String Motion and advanced interactive parity is current. String Motion checkpoint P10D3 is green; Phase 10E String Attractor editor is next.**
 
 Phase-9 freeze:
 - technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`
@@ -223,9 +223,53 @@ Phase 10 owns advanced interaction deliberately deferred from Phase 9:
 
 Do not reopen the frozen Phase-9 mappings merely to make Phase-10 editors convenient. Phase 10 must layer advanced edit state onto the existing shared APSIS model and shared M3c timeline.
 
+## Phase 10 String Motion checkpoint — P10D3 green
+
+Technical checkpoint head: `e750655141bb87e83949bb262426ab2ee42d734b`.
+
+Completed contract:
+- REC arms/cancels at the next Clock step 1; SEL+REC toggles playback when a loop exists
+- 1/2/4/8-cycle capture remains source-bounded
+- Classic owns the single/right lane; linked Dual owns BOTH; free Dual can own BODY/WIRE/BOTH
+- overdub preserves the unowned side in free Dual
+- captured pitch context is frozen against later Gravity changes
+- held String performance temporarily overrides playback and releases back into the loop at current phase
+- capture/playback uses the shared M3c Clock observation only; no private scheduler is introduced
+- main→audio control is a compact finite mailbox; audio callback owns Motion runtime/store mutation
+- two Motion lanes are stored in dedicated `.apsis_motion_pool` NOLOAD memory, exactly 19,208 B total
+
+Production P10D2 target evidence:
+- product `FM-1_972`
+- image **136,984 / 581,564 B**
+- RAM **89,668 / 98,304 B**; headroom **8,636 B**
+- POOL **328,740 / 344,064 B**; headroom **15,324 B**
+- package bytes 610,110
+- package SHA-256 `25f87a83b39b48e9c1f11826741d9bc4da45b3fe1783e5c4041020ffcd4bf55b`
+- inactive Motion keeps exact Phase-9 audible PCM/runtime baseline
+
+P10D3 test-only telemetry target:
+- image **137,240 B**
+- RAM **89,732 B**
+- POOL **328,740 B**
+- package SHA-256 `0c94bee67e5e727efa4e4f5656a597df5dc9d866b87c069fd783f77c04bd0ef9`
+
+Pinned active-emulator lifecycle evidence:
+- lifecycle seen flags **`ff`**; final flags **`14`**
+- Dual+LINK capture **149 points left / 149 right**
+- record start sample **220,672**
+- record finish sample **441,088**
+- recorded cycle **220,416 samples**
+- manual override sample **450,560**; resume **466,176**
+- runtime cursor **481,024**
+- queue high-water **30/512**
+- queue overflow **0**; late flags **0**
+- active WAV peak **1,171**; RMS **173**
+
+The earlier P10D3 `seen=0xc8` failure was a CI-instrumentation false negative. The test-only generator matched the first generic `apsis_string_motion_playback_valid = 0u` occurrence inside `apsis_p10_motion_recompute_active()` rather than the boot block. Because that line is the single body of a brace-less `if`, the subsequently injected multi-statement probe reset became unconditional and cleared lifecycle history every active callback. P10D3 now anchors initialization to the unique boot sequence and guards that exactly one lifecycle-reset site exists in `app_main()`.
+
 ## Verification boundary
 
-Phase 9 is verified through implementation, deterministic host tests, ASAN/UBSAN, real JieLi target build and pinned emulator idle regression. It is **not** physical-FM-1 verified.
+Phase 10 String Motion is verified through host implementation, deterministic tests, ASAN/UBSAN, real JieLi target build, exact idle emulator regression and active pinned-emulator lifecycle. It is **not** physical-FM-1 verified.
 
 Still unverified:
 - physical control feel/ergonomics and switch/encoder behavior
@@ -237,12 +281,15 @@ Still unverified:
 
 ## Exact next action
 
-Begin **Phase 10A — String Motion contract** from merged `main`:
-1. freeze Study-126 String Motion capture/playback/ownership semantics before target edits;
-2. define the minimum native capture state needed outside the frozen `ApsisRuntime` layout;
-3. host-test Clock-quantized capture, Classic/Dual ownership, overdub and manual override;
-4. only then bind Phase-10 controls into the generated FM-1 target;
-5. retain exact Phase-9 idle PCM `c4fa1895…`, cursor 123,392 and zero late/overflow flags as the target regression gate.
+Begin **Phase 10E — String Attractor editor** on `p10-string-motion`:
+1. keep the frozen M4c String Attractor runtime/DSP as authority;
+2. add a host-first edit contract over the existing `filter_attractor_gates`, bounded seed and length/state fields rather than new musical shadow state;
+3. map active attractor cells (max 16) to direct key gate toggles in an explicit String Attractor edit context while preserving ordinary Phase-9 String performance outside that context;
+4. make reroll deterministic/bounded at the control contract and rely on existing `apsis_string_attractor_sync()` regeneration when seed/length changes;
+5. host-test gate edits, bounds, reroll/regeneration and no unintended musical-state mutation under ASAN/UBSAN;
+6. only then bind P10E into the generated FM-1 target and re-run exact Phase-9 idle audio/runtime regression.
+
+After P10E: Spiral Attractor editor, then selected Gravity-point editor, then the final Phase-10 target/emulator matrix before Phase 11 optimization.
 
 ## Do not regress
 
@@ -260,4 +307,5 @@ Begin **Phase 10A — String Motion contract** from merged `main`:
 - native visuals consume existing APSIS state; no UI shadow musical state
 - native boot takeover remains after sample 8192 unless revalidated against exact PCM
 - Phase-9 direct performance uses finite mailboxes/adapters; no private scheduler/RNG
+- Phase-10 Motion store remains the bounded 19,208-B dedicated POOL allocation; no heap/private scheduler
 - physical FM-1 and real ISR/storage/display/control behaviour remain unverified
