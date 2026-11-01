@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11J are complete; P11K is an equivalence-proof phase for the measured FDN feedback-gain cache candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11K are complete; P11L is authorized as the separate production-validation phase for the proved FDN feedback-gain cache.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -271,13 +271,34 @@ Decision: authorize P11K **proof only** for a cache of the eight feedback gains 
 
 ### P11K — feedback-gain cache equivalence proof
 
-Status: **[ ] next. No production patch until equivalence is proved.**
+Status: **[x] complete, exact proof + ephemeral real-target projection frozen. Production FDN source/layout remain P11I.**
 
-- [ ] compare always-recomputed and cached feedback-gain paths across reset/partial-fill/steady/sweeps/adversarial decay sequences
-- [ ] preserve `space_feedback_gain()` arithmetic exactly; cache only its eight outputs + rounded decay key/validity
-- [ ] normal + ASAN/UBSAN bit-identical output/state proof
-- [ ] measure projected host/target state-size cost before production authorization
-- [ ] only after proof, decide whether a separate production-validation stage is justified
+- [x] cached vs always-recomputed complete FDN output/state/storage bit-identical
+- [x] reset/partial fill, steady, smoothed sweep, adversarial churn, all **8,001** legal decay keys and 4,096 random/reset blocks covered
+- [x] optimized + ASAN/UBSAN PASS; host external cache representation **20 B**
+- [x] steady: **8** gain evaluations vs 2,048 baseline; sweep: **1,544**; adversarial: **2,048**
+- [x] proof run `41350818792` on head `ffb436dd87247af23c37e7e533cfd87fc2d161d0`
+- [x] ephemeral target projection run `41351123630` on head `72b48c499ce7619fd3a077edac664ea2c65c4ca5`
+- [x] projected target delta: image **+48 B**, RAM **+16 B**, POOL **0 B**
+- [x] projected target RAM **87,492 B**; headroom **10,812 B**
+- [x] FDN-render code shape **1,082 → 1,118 B**, **353 → 379** static instruction lines
+- [x] evidence artifact ID `13101765292`; ZIP SHA-256 `a5cf89df0e49c8d79c5118db8f444f74a65808e6ca0f820e43bfda4d40ff0ef3`
+- [x] repo production FDN source/header blobs remained unchanged throughout P11K
+- [x] proof/projection workflows manual-only and pinned to their proven heads
+
+Decision: authorize P11L production validation. The cache intentionally spends 16 B target RAM / 48 B image to remove 2,040 divisions + 6,120 wide multiplies in steady census and 504 divisions + 1,512 wide multiplies in the measured one-way sweep. Worst-case adversarial churn has zero coefficient-computation savings.
+
+### P11L — production feedback-gain cache validation
+
+Status: **[ ] next.**
+
+- [ ] apply only the proved eight-gain cache + rounded decay key/validity to production FDN state/render/reset
+- [ ] keep `space_feedback_gain()` arithmetic exact and all other FDN math/topology unchanged
+- [ ] run P11K equivalence proof against actual production implementation
+- [ ] full historical host + ASAN/UBSAN behavior green
+- [ ] exact real JieLi target resource measurement
+- [ ] exact idle PCM/runtime and active Motion lifecycle
+- [ ] freeze final image/RAM/POOL/package hashes before promotion
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -301,4 +322,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11J measurement state to `p11-optimization`, then create one P11K proof branch. Prove an eight-value feedback-gain cache keyed by rounded `decay_ms` bit-identical to the current always-recomputed FDN before any production source is modified.
+Promote frozen P11K proof/projection state to `p11-optimization`, then create one P11L production-validation branch. Apply only the proved FDN feedback-gain cache and require complete host/sanitizer, real-target, exact idle and exact active-Motion gates before promotion.

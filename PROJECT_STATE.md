@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11J are complete. P11J measured FDN feedback-gain recomputation redundancy; P11K is proof-only until cached and always-recomputed FDN behavior are bit-identical.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11K are complete. P11K proved and target-projected the FDN feedback-gain cache without changing production source; P11L is authorized as the separate production-validation phase.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -366,17 +366,49 @@ Measured rounded-decay churn:
 
 P11J therefore selects one narrow P11K candidate: cache exactly the eight feedback gains keyed by rounded `decay_ms`, invalidated on reset and recomputed only when that key changes. No other coefficient or DSP arithmetic is authorized to change.
 
-## Exact next phase — P11K feedback-gain cache proof
+## P11K — FDN feedback-gain cache proof complete
 
-Before production modification:
-1. implement baseline and candidate paths in a proof harness or ephemeral source transformation;
-2. cover reset, partial fill, steady state, legal smoothed transitions and adversarial decay churn;
-3. require bit-identical stereo output and all pre-existing FDN musical/runtime state;
-4. run optimized + ASAN/UBSAN;
-5. measure exact projected state-size cost of the cache;
-6. only if all proof gates pass, authorize a separate production-validation patch.
+Equivalence authority:
+- proof head `ffb436dd87247af23c37e7e533cfd87fc2d161d0`
+- run `41350818792`
+- optimized + ASAN/UBSAN PASS
+- complete baseline/candidate stereo output, existing FDN state and full delay storage compared after every block
+- reset/partial-fill, steady, exact room-style sweep, adversarial churn, all 8,001 legal decay keys and 4,096 deterministic random/reset blocks covered
+- host external cache representation **20 B**
 
-P11J/P11K remain workload/equivalence work. Physical FM-1 CPU cycles and ISR margin are still unverified.
+Measured proof counts:
+- steady: 256 blocks / 16,384 frames → 1 recompute block / 8 gain evaluations
+- 4s→12s smoothed sweep: 192 decay changes → 193 recompute blocks / 1,544 gain evaluations
+- adversarial: 256 recompute blocks / 2,048 gain evaluations
+- all legal keys: 16,002 blocks / 8,001 recomputes / 64,008 gain evaluations
+- random/reset: 4,096 blocks / 92,927 frames / 3,840 recomputes / 30,720 gain evaluations
+
+Ephemeral real-target projection authority:
+- head `72b48c499ce7619fd3a077edac664ea2c65c4ca5`
+- run `41351123630`
+- artifact ID `13101765292`
+- artifact ZIP SHA-256 `a5cf89df0e49c8d79c5118db8f444f74a65808e6ca0f820e43bfda4d40ff0ef3`
+- exact P11I baseline regenerated before candidate patch
+- candidate patched only in generated target worktree; repo production blobs remained exact
+
+Projected target tradeoff:
+- image **140,392 → 140,440 B** (**+48 B**)
+- ordinary RAM **87,476 → 87,492 B** (**+16 B**); projected headroom **10,812 B**
+- POOL **319,176 B** unchanged
+- package bytes **610,110 B** unchanged
+- projection package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
+- FDN-render code shape **1,082 → 1,118 B**, **353 → 379** static instruction lines
+
+Workload payoff from P11J/P11K model:
+- steady census: 2,040 fewer 32-bit divisions + 6,120 fewer wide multiplies
+- measured one-way sweep: 504 fewer divisions + 1,512 fewer wide multiplies
+- adversarial every-block decay churn: zero coefficient-computation savings, with only the cache-key decision added
+
+P11K therefore authorizes P11L production validation. It does not claim physical FM-1 cycle or ISR improvement.
+
+## Exact next phase — P11L production feedback-gain cache validation
+
+Apply exactly the proved cache to production FDN state/reset/render. Preserve `space_feedback_gain()` arithmetic and all other FDN math. Require actual-production equivalence proof, full historical host/sanitizer behavior, exact real-target resources, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
 
 ## Do not regress
 
