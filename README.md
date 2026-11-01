@@ -30,8 +30,8 @@ The repository, not chat history, is the durable source of project state.
 - Phase 6 shared Space/Cathedral: complete and merged as `cd321e9f7999d0568d280d89e7e3574c3da66054`
 - Phase 7 persistent KEEP/CHAIN storage: complete and merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285`
 - Phase 8 native 240×240 visual surfaces: complete and merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18
-- Phase 9 physical interaction parity: **technical implementation complete; PR #19 merge pending final docs-head CI**
-- Phase 10 String Motion + advanced interactive parity: next after Phase 9 merge
+- Phase 9 physical interaction parity: complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19
+- Phase 10 String Motion + advanced interactive parity: **current**
 
 Physical FM-1 validation has not yet been performed. Real hardware ISR margin, real NOR power-interruption behaviour, DAC/listening quality and physical controls/display behaviour therefore remain unverified.
 
@@ -106,9 +106,13 @@ Frozen technical Phase-9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 - audible PCM remains bit-exact P6/P7/P8: `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
 - cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
 
-The technical-head matrix passed core #503, staged #492, P6-final #95, P7-storage #82, P7-target #75, P8-visuals #85, P8-target #60, P9-controls #82, P9-H4b #6 and P9-target #40.
+The final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675` passed the full exact-head matrix: core #504, staged #493, P6-final #96, P7-storage #83, P7-target #76, P8-visuals #86, P8-target #61, P9-controls #84, P9-H4b #8 and P9-target #41. PR #19 then squash-merged as `bbfab322557b6760425503268b550b789f796c23`.
 
 See `docs/reference/P9_FINAL_CHECKPOINT.md` and `docs/reference/P9_INTERACTION_CONTRACT.md` for the frozen technical contract.
+
+## Phase 10 — current work
+
+Phase 10 adds the advanced interaction layer that was deliberately excluded from Phase 9: Clock-quantized String Motion capture, Classic/Dual ownership and frozen pitch context, overdub/manual override, String/Spiral Attractor editors and selected Gravity-point editing. These features must remain layered over the existing shared APSIS state/runtime and preserve the frozen Phase-9 idle audio/runtime unless explicit evidence approves a change.
 
 ## Important verification boundary
 

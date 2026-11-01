@@ -2,9 +2,9 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
-## 2026-11-01 - Phase 9 physical interaction parity complete, merge pending
+## 2026-11-01 - Phase 9 physical interaction parity merged
 
-Technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e` passed the complete technical matrix: core #503, staged #492, P6-final #95, P7-storage #82, P7-target #75, P8-visuals #85, P8-target #60, P9-controls #82, P9-H4b #6 and P9-target #40.
+PR #19 squash-merged to `main` as `bbfab322557b6760425503268b550b789f796c23` after final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675` passed the complete exact-head matrix: core #504, staged #493, P6-final #96, P7-storage #83, P7-target #76, P8-visuals #86, P8-target #61, P9-controls #84, P9-H4b #8 and P9-target #41.
 
 Completed:
 - pinned FM-1 interaction vocabulary: 14 buttons, 7 relative/detent encoders, 27 keys; MASTER remains platform output gain and no encoder-push is assumed
@@ -32,7 +32,7 @@ A Phase-9 regression was caught rather than normalized: the first manual-String 
 
 Physical FM-1 ergonomics, real ISR headroom under active manual performance, physical LEDs/display, DAC listening and real power-cut persistence remain unverified.
 
-Next after guarded PR #19 merge: Phase 10 String Motion and advanced interactive parity.
+Next: Phase 10 String Motion and advanced interactive parity.
 
 ## 2026-10-31 - Phase 8 native visuals merged
 

@@ -4,13 +4,15 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 9 — physical interaction parity is technically complete on `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`. PR #19 is merge-pending final documentation-head CI. Phase 10 — String Motion and advanced interactive parity is next after merge.**
+**Phase 9 — physical interaction parity is complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19. Phase 10 — String Motion and advanced interactive parity is current.**
 
-Phase-9 technical freeze:
+Phase-9 freeze:
 - technical firmware head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`
+- final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675`
+- merge commit `bbfab322557b6760425503268b550b789f796c23`
 - target image 132,264 B; RAM 89,492 B; POOL 309,532 B
 - package `5b0ec5dc136542ae9d3a96510ba8c05a587726e1c44b877d9a4f90b56d448018`
-- exact-head technical matrix: core #503, staged #492, P6-final #95, P7-storage #82, P7-target #75, P8-visuals #85, P8-target #60, P9-controls #82, P9-H4b #6, P9-target #40 — **all PASS**
+- final exact-head matrix: core #504, staged #493, P6-final #96, P7-storage #83, P7-target #76, P8-visuals #86, P8-target #61, P9-controls #84, P9-H4b #8, P9-target #41 — **all PASS**
 
 Phase 8 remains merged as `4d71d712b34a684fb8f74f6b98ed675a9d5e1457` via PR #18.
 Phase 7 remains merged as `e9000b2b2f74d4fafe96df87f030cc55916a8285` via PR #17.
@@ -207,6 +209,20 @@ The first direct String implementation placed manual-audio helpers inside the hi
 
 The final implementation restores the M4b `.c/.h/test` blobs exactly and moves manual String into a P9-only module. The P9 generator hard-checks the frozen blob hashes before target generation. This keeps Phase-9 performance work layered above historical audio authorities.
 
+## Phase 10 current scope
+
+Phase 10 owns advanced interaction deliberately deferred from Phase 9:
+1. Clock-quantized String Motion capture contract;
+2. Classic/Dual ownership and frozen pitch context;
+3. overdub/manual override behavior;
+4. String Attractor editor;
+5. Spiral Attractor editor;
+6. selected Gravity-point editor;
+7. deterministic host/sanitizer contracts before target integration;
+8. target/emulator regression preserving frozen Phase-9 idle audio/runtime.
+
+Do not reopen the frozen Phase-9 mappings merely to make Phase-10 editors convenient. Phase 10 must layer advanced edit state onto the existing shared APSIS model and shared M3c timeline.
+
 ## Verification boundary
 
 Phase 9 is verified through implementation, deterministic host tests, ASAN/UBSAN, real JieLi target build and pinned emulator idle regression. It is **not** physical-FM-1 verified.
@@ -221,12 +237,12 @@ Still unverified:
 
 ## Exact next action
 
-1. validate the Phase-9 documentation-only head through the same exact CI matrix;
-2. update PR #19 with final exact-head evidence and mark ready;
-3. guarded merge with expected-head lock;
-4. post-merge docs-only handoff to **Phase 10 — String Motion and advanced interactive parity**.
-
-Phase 10 starts with String Motion capture/ownership/overdub and the advanced String/Spiral Attractor + Gravity point editors. Do not reopen frozen Phase-9 mappings without explicit evidence.
+Begin **Phase 10A — String Motion contract** from merged `main`:
+1. freeze Study-126 String Motion capture/playback/ownership semantics before target edits;
+2. define the minimum native capture state needed outside the frozen `ApsisRuntime` layout;
+3. host-test Clock-quantized capture, Classic/Dual ownership, overdub and manual override;
+4. only then bind Phase-10 controls into the generated FM-1 target;
+5. retain exact Phase-9 idle PCM `c4fa1895…`, cursor 123,392 and zero late/overflow flags as the target regression gate.
 
 ## Do not regress
 

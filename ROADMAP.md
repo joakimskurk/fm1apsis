@@ -87,7 +87,7 @@ Frozen technical P8 head `87575aa829f3fab6af43092b440d585745eecc25`: image 118,0
 
 ## Phase 9 — physical interaction parity
 
-Status: **[x] technical implementation complete on `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`; PR #19 merge pending final docs-head CI.**
+Status: **[x] complete and merged as `bbfab322557b6760425503268b550b789f796c23` via PR #19.**
 
 - [x] freeze pinned FM-1 panel/control/gesture contract
 - [x] HOME/STRING/DRIFT/CLOCK/SPIRAL/BLOOM/GRAVITY/CHAIN/KEEP/SPACE navigation
@@ -106,7 +106,8 @@ Status: **[x] technical implementation complete on `02a0cfe55ffd4fb6ee3e346d5a49
 - [x] direct BLOOM performance via P9-only finite manual queue, shared M3c RNG and existing M4g binding/DSP
 - [x] historical M4f 95,804-B bypass preserved; no baseline relaxation
 - [x] real JieLi target + exact P8 idle PCM/runtime emulator regression
-- [x] technical-head 10-workflow matrix PASS
+- [x] final documentation-head 10-workflow matrix PASS on `dc288b6424b957ad382997f62cd6924b4146f675`
+- [x] guarded PR #19 squash merge
 
 Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 - image 132,264 / 581,564 B
@@ -118,7 +119,7 @@ Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 
 ## Phase 10 — String Motion and advanced interactive parity
 
-Status: **[ ] next after Phase 9 merge.**
+Status: **[~] current.**
 
 - [ ] Clock-quantized String Motion capture
 - [ ] Classic/Dual ownership and frozen pitch context
@@ -149,4 +150,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Run the complete CI matrix on the Phase-9 documentation-only head. If green, update PR #19 with exact-head evidence, mark it ready and merge with expected-head locking. Then hand `main` off to Phase 10 without changing the frozen Phase-9 firmware candidate.
+Begin Phase 10A by freezing the Study-126 String Motion capture/ownership contract before changing target behavior. Host-test Clock-quantized capture, Classic/Dual ownership, frozen pitch context, overdub and manual override first. Only then integrate target controls, while retaining the frozen Phase-9 idle PCM `c4fa1895…`, cursor 123,392 and zero late/overflow flags.

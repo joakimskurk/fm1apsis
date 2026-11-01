@@ -120,7 +120,7 @@ BLOOM:
 
 The finite manual Bloom queue owns gesture target times only; it is not a musical scheduler.
 
-## Final technical Phase-9 candidate
+## Frozen Phase-9 candidate
 
 Firmware source head: `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`.
 
@@ -146,21 +146,21 @@ Pinned emulator, idle control scenario:
 - late trace `811c9dc5`
 - dynamic HOME -> MOTHER PASS
 
-## Technical-head Phase-9 matrix
+## Final Phase-9 exact-head matrix
 
-On `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
-- APSIS core #503 — PASS
-- APSIS staged validation #492 — PASS
-- APSIS Phase 6 final checkpoint #95 — PASS
-- APSIS Phase 7 storage #82 — PASS
-- APSIS Phase 7 target persistence #75 — PASS
-- APSIS Phase 8 visuals #85 — PASS
-- APSIS Phase 8 target visuals #60 — PASS
-- APSIS Phase 9 controls #82 — PASS
-- APSIS Phase 9 H4b Bloom performance #6 — PASS
-- APSIS Phase 9 target controls #40 — PASS
+Final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675`:
+- APSIS core #504 — PASS
+- APSIS staged validation #493 — PASS
+- APSIS Phase 6 final checkpoint #96 — PASS
+- APSIS Phase 7 storage #83 — PASS
+- APSIS Phase 7 target persistence #76 — PASS
+- APSIS Phase 8 visuals #86 — PASS
+- APSIS Phase 8 target visuals #61 — PASS
+- APSIS Phase 9 controls #84 — PASS
+- APSIS Phase 9 H4b Bloom performance #8 — PASS
+- APSIS Phase 9 target controls #41 — PASS
 
-The final documentation-only head is validated separately before PR #19 merge so this file does not create a self-referential CI/run-number loop.
+PR #19 then squash-merged as `bbfab322557b6760425503268b550b789f796c23` with expected-head locking.
 
 ## Regression caught during Phase 9
 
