@@ -83,3 +83,17 @@ jobs:
             tests/test_string_motion_clock.c -o /tmp/test_string_motion_clock_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_string_motion_clock_san
+      - name: P10D1 main/audio Motion mailbox
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_string_motion_mailbox.c tests/test_string_motion_mailbox.c \
+            -o /tmp/test_string_motion_mailbox
+          /tmp/test_string_motion_mailbox
+      - name: P10D1 mailbox ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_string_motion_mailbox.c tests/test_string_motion_mailbox.c \
+            -o /tmp/test_string_motion_mailbox_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_mailbox_san
