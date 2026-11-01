@@ -42,7 +42,9 @@ enum {
 };''', 1)
 
 # Keep the telemetry formatter in main/control territory. It only reads current
-# state plus established runtime health counters.
+# state plus the already-established generated-target runtime probe. Reusing
+# probe[1]/[2]/[4] keeps late/overflow semantics identical to P10D3 and avoids
+# inventing a non-existent ApsisRuntime late_flags field.
 dispatch_anchor = 'static uint8_t apsis_p9h3_dispatch('
 if dispatch_anchor not in s:
     raise SystemExit('FAIL: P10E probe dispatcher anchor missing')
@@ -55,9 +57,9 @@ helper = r'''static void apsis_p10e_attractor_probe_update(uint8_t current)
     if (apsis.string.motion_loop_play) motion |= 1u << 2;
     if (apsis_string_motion_runtime.manual_override) motion |= 1u << 3;
     if (apsis_string_motion_playback_valid) motion |= 1u << 4;
-    health = (apsis_runtime.queue_high_water & 0x3ffu) |
-             ((apsis_runtime.queue_overflowed ? 1u : 0u) << 10) |
-             ((apsis_runtime.late_flags & 0xffffu) << 16);
+    health = (apsis_runtime_probe[1] & 0x3ffu) |
+             ((apsis_runtime_probe[2] ? 1u : 0u) << 10) |
+             ((apsis_runtime_probe[4] & 0xffffu) << 16);
 
     apsis_attractor_probe[0] = 0x41545452u; /* "ATTR" */
     apsis_attractor_probe[1] = apsis_attractor_probe_seen;
@@ -187,6 +189,7 @@ PY
 grep -q 'static volatile uint32_t apsis_attractor_probe\[12\]' work/apsis/firmware/src/dinghy.c
 grep -q 'APSIS_ATTR_SEEN_REROLL' work/apsis/firmware/src/dinghy.c
 grep -q 'APSIS_ATTR_VIOL_P9_PLUCK' work/apsis/firmware/src/dinghy.c
+grep -q 'apsis_runtime_probe\[4\]' work/apsis/firmware/src/dinghy.c
 [[ $(grep -c 'apsis_attractor_probe_seen = 0u;' work/apsis/firmware/src/dinghy.c) -eq 1 ]]
 
 python3 - <<'PY'
@@ -196,11 +199,13 @@ a = s.index('static void app_audio(')
 b = s.index('static const char *surface_name', a)
 if 'apsis_p10e_attractor_probe_update(' in s[a:b]:
     raise SystemExit('FAIL: P10E active probe leaked into app_audio')
+if 'apsis_runtime.late_flags' in s:
+    raise SystemExit('FAIL: P10E active probe references non-existent runtime late_flags')
 if s.count('apsis_attractor_probe_seen = 0u;') != 1:
     raise SystemExit('FAIL: P10E active probe has multiple history-reset sites')
 if s.count('apsis_string_attractor_visual_dirty = 1u;') != 1:
     raise SystemExit('FAIL: P10E active probe disturbed visual-dirty producer count')
-print('PASS: P10E active editor telemetry is test-only and main/control-side')
+print('PASS: P10E active editor telemetry is test-only, main/control-side and reuses target health telemetry')
 PY
 
 echo "PASS: P10E active String Attractor telemetry layered test-only above production target"
