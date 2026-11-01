@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11H are complete. P11I is next: prove a stereo-pair Cathedral delay reader bit-identical to the existing single-channel reader, then and only then test it as a production optimization.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11I are complete. P11I is exact-head validated and frozen; further production optimization requires a new measured/equivalence-backed candidate.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -29,18 +29,18 @@ Phase 10 merge authority:
 - 22/22 required workflows PASS
 - squash merge `378d2023df2afe59475be53c09cc001788586514` via PR #20
 
-## Current frozen production baseline — P11F onward
+## Current frozen production baseline — P11I
 
-P11G and P11H are measurement-only, so the accepted production binary remains P11F exactly:
+P11G and P11H were measurement-only. P11I is the current accepted production target after the equivalence-backed stereo-pair delay-read optimization:
 
 - product `FM-1_972`
-- image **140,408 / 581,564 B**
+- image **140,392 / 581,564 B**
 - ordinary RAM **87,476 / 98,304 B**
 - RAM headroom **10,828 B**
 - POOL **319,176 / 344,064 B**
 - POOL headroom **24,888 B**
 - package bytes **610,110**
-- package SHA-256 `e0d0b826f0c2d5b8f1af781a9259b5d78dce9062939661ac7acad17bfefb78e5`
+- package SHA-256 `868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c`
 
 Integrated frozen idle baseline:
 - PCM SHA-256 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
@@ -311,24 +311,42 @@ Interpretation:
 - Cathedral is a stronger repeated-workload optimization target than the statically large but pulse-driven scheduler
 - exact idle and active Motion behavior remained frozen
 
-## Exact next phase — P11I stereo-pair delay read
+## P11I — stereo-pair Cathedral delay read complete
 
-Candidate:
-- current `space_room_stereo_read()` computes delay validity, ring span, wrapped read position, `i0/i1` and interpolation fraction independently for left and right channels
-- per room frame the room executes 4 early stereo taps + one predelay + one echo delay = **6 stereo locations**, currently implemented as **12 single-channel reads**
-- candidate pair helper computes the common address/fraction once per stereo location and performs unchanged per-channel interpolation
+Pre-patch authority:
+- proof run `41343196262`
+- proof head `32bb42c52f666af12065737e14a8846d3d8f01ab`
+- **150,412** bit-identical cases, optimized + ASAN/UBSAN
+- complete historical host suite green
+- production room source still frozen at pre-patch blob `2d7c34e32b48b904623d740a70cf657fee0801a7`
 
-P11I order is mandatory:
-1. equivalence harness before production patch;
-2. compare existing single-channel reader with candidate pair reader across empty/partial/full fill, wrap boundaries, integer/fractional delays, both channels and deterministic randomized storage;
-3. normal + ASAN/UBSAN equivalence green;
-4. only then minimal `apsis_space_room.c` production patch;
-5. existing `test_space_room`, FDN/Space tests and full historical regressions green;
-6. real JieLi target disassembly/code-shape comparison against P11G/P11H baseline;
-7. exact idle PCM/runtime and exact active Motion lifecycle;
-8. measure and freeze new exact target image/RAM/POOL/package identity before promotion.
+Production/validation authority:
+- production pair-read commit `4629406bb6e417b0bcb544e6a770c0860613e7cd`
+- exact technical head `ab6960ad3acf78dbc9f366d2a5e9358b42011cca`
+- authoritative run `41344186184`, all five gates PASS
+- artifact ID `13097594559`
+- artifact ZIP SHA-256 `2a9b2d6f2adc8a5fd4a4f39dbe88cbd9b7c6bd2122b80ce83178a07a5a94e716`
 
-P11I may be accepted as a target-code/workload-proxy optimization only. It must not be described as proven physical FM-1 CPU or ISR improvement.
+Measured result:
+- six stereo delay locations/roomframe share validity/wrap/index/fraction work instead of twelve duplicate single-channel address calculations
+- target room code shape **2,270 → 2,260 B** and **718 → 707** static disassembly instruction lines
+- production image **140,408 → 140,392 B**
+- ordinary RAM remains **87,476 B**
+- POOL remains **319,176 B**
+- production package SHA-256 `868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c`
+- active-Motion image **137,672 → 137,656 B** with RAM **87,524 B** and POOL **319,176 B** unchanged
+- active package SHA-256 `86c44161d61b17697bebb2af7c3222449a0de1d20b74acc3cbaf2a8635cb7a75`
+
+Behavior remains exact:
+- idle PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- idle cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+- active Motion lifecycle remains seen `ff`, final `14`, 149/149 points, cursor 481,024, queue 30/512, overflow 0, late flags 0
+
+P11I proves a reproducible target code-shape reduction, not physical FM-1 cycle/ISR improvement. The historical apply/validation workflows are frozen manual-only and pinned to the proven technical head; the apply verifier is read-only.
+
+## Exact next phase
+
+Return to measurement before P11J. A new production optimization requires a concrete measured hotspot plus a falsifiable equivalence/regression gate. Physical ISR timing, stack high-water, LCD/audio contention and listening quality remain deferred to hardware validation.
 
 ## Do not regress
 

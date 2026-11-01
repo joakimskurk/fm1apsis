@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11H are complete; P11I is the next evidence-backed optimization candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11I are complete; any further optimization requires a new measured/equivalence-backed candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -231,16 +231,27 @@ P11H identifies the room delay-read path as a narrow, repeated optimization cand
 
 ### P11I — stereo-pair Cathedral delay-read optimization
 
-Status: **[ ] next. Equivalence proof first; production patch only after the proof passes.**
+Status: **[x] complete, exact-head validated and frozen.**
 
-- [ ] build current-single-read vs candidate stereo-pair-read equivalence harness
-- [ ] cover invalid/empty/partial/full fill, ring wrap, integer/fractional delays, both channels and deterministic randomized storage
-- [ ] run normal + ASAN/UBSAN equivalence
-- [ ] if and only if equivalent, replace six stereo tap locations per room frame from 12 duplicated single-channel address calculations to 6 shared pair calculations
-- [ ] run existing `test_space_room`, Space DSP and full historical regressions
-- [ ] compare real JieLi target disassembly/code shape against P11G/P11H baseline
-- [ ] require exact idle PCM/runtime and exact active Motion lifecycle
-- [ ] freeze new target image/RAM/POOL/package values before promotion
+- [x] pre-patch equivalence proof: **150,412** cases, optimized + ASAN/UBSAN
+- [x] complete historical host/sanitizer behavior green before and after patch
+- [x] six stereo locations/roomframe now share address/fraction calculation instead of 12 duplicated single-channel calculations
+- [x] production pair helper remains bit-identical to frozen single-read authority
+- [x] target room code shape **2,270 → 2,260 B** and **718 → 707** static instruction lines
+- [x] production image **140,408 → 140,392 B**; RAM **87,476 B** unchanged; POOL **319,176 B** unchanged
+- [x] exact idle PCM/runtime retained
+- [x] exact active Motion lifecycle retained; active image **137,672 → 137,656 B**
+- [x] authoritative validation run `41344186184` on technical head `ab6960ad3acf78dbc9f366d2a5e9358b42011cca`
+- [x] evidence artifact ID `13097594559`; ZIP SHA-256 `2a9b2d6f2adc8a5fd4a4f39dbe88cbd9b7c6bd2122b80ce83178a07a5a94e716`
+- [x] historical P11I apply/validation workflows manual-only, read-only/pinned as appropriate
+
+Frozen P11I production target:
+- image **140,392 / 581,564 B**
+- RAM **87,476 / 98,304 B**; headroom **10,828 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package SHA-256 `868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c`
+
+P11I proves a smaller target code-shape proxy, **not** physical FM-1 CPU cycles or ISR margin.
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -264,4 +275,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Create **one** P11I staging branch from the frozen P11H head. First prove the stereo-pair delay reader bit-identical to the existing single-channel reader over exhaustive boundary classes and deterministic randomized cases. Do not modify production `apsis_space_room.c` until that equivalence gate is green.
+Promote the frozen P11I state to `p11-optimization`, then return to measurement before selecting P11J. Do not claim physical CPU/ISR improvement from the P11I code-shape proxy; the next production optimization requires a new concrete hotspot and a falsifiable equivalence/regression gate.
