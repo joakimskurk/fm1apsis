@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11I are complete. P11I is exact-head validated and frozen; further production optimization requires a new measured/equivalence-backed candidate.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11J are complete. P11J measured FDN feedback-gain recomputation redundancy; P11K is proof-only until cached and always-recomputed FDN behavior are bit-identical.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -347,6 +347,36 @@ P11I proves a reproducible target code-shape reduction, not physical FM-1 cycle/
 ## Exact next phase
 
 Return to measurement before P11J. A new production optimization requires a concrete measured hotspot plus a falsifiable equivalence/regression gate. Physical ISR timing, stack high-water, LCD/audio contention and listening quality remain deferred to hardware validation.
+
+## P11J — FDN coefficient recomputation census complete
+
+Authority:
+- technical head `17030232e5f21f95a81b834e831d9021683d81bf`
+- run `41350487323`
+- optimized and ASAN/UBSAN census PASS
+- production `apsis_space_dsp.c` blob `72210e122b68bff77c56805618b2703d363a25ef` unchanged
+- production `apsis_space_room.c` P11I blob `ee00267cbbaef04bb1eed963b7b5cb1c2cc46346` unchanged
+
+Current FDN behavior recomputes eight feedback gains on every FDN render. Across 256 FDN blocks this is always 2,048 `space_feedback_gain()` evaluations = 2,048 32-bit divisions + 6,144 wide fixed-point multiplies before per-frame work.
+
+Measured rounded-decay churn:
+- steady: 0 changes / 1 unique value → recompute-on-change model needs 8 calls; 2,040 redundant current calls (99.6%)
+- one legal 4s→12s smoothed transition: 192 changes / 193 unique values → 1,544 calls; 504 redundant current calls (24.6%)
+- adversarial extreme alternation: 255 changes → 2,048 calls; zero savings
+
+P11J therefore selects one narrow P11K candidate: cache exactly the eight feedback gains keyed by rounded `decay_ms`, invalidated on reset and recomputed only when that key changes. No other coefficient or DSP arithmetic is authorized to change.
+
+## Exact next phase — P11K feedback-gain cache proof
+
+Before production modification:
+1. implement baseline and candidate paths in a proof harness or ephemeral source transformation;
+2. cover reset, partial fill, steady state, legal smoothed transitions and adversarial decay churn;
+3. require bit-identical stereo output and all pre-existing FDN musical/runtime state;
+4. run optimized + ASAN/UBSAN;
+5. measure exact projected state-size cost of the cache;
+6. only if all proof gates pass, authorize a separate production-validation patch.
+
+P11J/P11K remain workload/equivalence work. Physical FM-1 CPU cycles and ISR margin are still unverified.
 
 ## Do not regress
 

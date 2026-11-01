@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11I are complete; any further optimization requires a new measured/equivalence-backed candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11J are complete; P11K is an equivalence-proof phase for the measured FDN feedback-gain cache candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -253,6 +253,32 @@ Frozen P11I production target:
 
 P11I proves a smaller target code-shape proxy, **not** physical FM-1 CPU cycles or ISR margin.
 
+### P11J — FDN coefficient recomputation census
+
+Status: **[x] complete, frozen measurement phase. Production Space sources remain exact P11I.**
+
+- [x] 256 FDN blocks × 8 feedback gains = **2,048** feedback-gain evaluations per scenario
+- [x] current cost per scenario includes **2,048 32-bit divisions + 6,144 wide fixed-point multiplies** in coefficient setup
+- [x] steady room: decay changes **0**; theoretical recompute-on-change calls **8**; **2,040/2,048 (99.6%) redundant**
+- [x] one legal 4s→12s smoothed sweep: decay changes **192**; cached calls **1,544**; **504/2,048 (24.6%) redundant**
+- [x] adversarial legal extreme churn: decay changes **255**; cached calls **2,048**; **0** redundant
+- [x] optimized + ASAN/UBSAN census PASS
+- [x] P11I production Space blobs unchanged
+- [x] authoritative run `41350487323` on technical head `17030232e5f21f95a81b834e831d9021683d81bf`
+- [x] historical census workflow manual-only and pinned to that technical head
+
+Decision: authorize P11K **proof only** for a cache of the eight feedback gains keyed solely by the rounded `decay_ms`. Worst-case churn has zero computation savings and must remain exact.
+
+### P11K — feedback-gain cache equivalence proof
+
+Status: **[ ] next. No production patch until equivalence is proved.**
+
+- [ ] compare always-recomputed and cached feedback-gain paths across reset/partial-fill/steady/sweeps/adversarial decay sequences
+- [ ] preserve `space_feedback_gain()` arithmetic exactly; cache only its eight outputs + rounded decay key/validity
+- [ ] normal + ASAN/UBSAN bit-identical output/state proof
+- [ ] measure projected host/target state-size cost before production authorization
+- [ ] only after proof, decide whether a separate production-validation stage is justified
+
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
 - [ ] UI redraw/DMA optimization only if later measurement justifies it
@@ -275,4 +301,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote the frozen P11I state to `p11-optimization`, then return to measurement before selecting P11J. Do not claim physical CPU/ISR improvement from the P11I code-shape proxy; the next production optimization requires a new concrete hotspot and a falsifiable equivalence/regression gate.
+Promote frozen P11J measurement state to `p11-optimization`, then create one P11K proof branch. Prove an eight-value feedback-gain cache keyed by rounded `decay_ms` bit-identical to the current always-recomputed FDN before any production source is modified.
