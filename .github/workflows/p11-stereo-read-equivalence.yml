@@ -1,8 +1,9 @@
 name: APSIS Phase 11I stereo-read equivalence proof
 
+# Historical pre-patch proof. Authoritative green run 41343196262 on
+# 32bb42c52f666af12065737e14a8846d3d8f01ab. Later P11I commits must not
+# reinterpret the candidate-before-production equivalence result.
 on:
-  push:
-    branches: [p11i-space-stereo-read-staging]
   workflow_dispatch:
 
 jobs:
@@ -12,6 +13,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: 32bb42c52f666af12065737e14a8846d3d8f01ab
 
       - name: Gate P11I.1 - candidate equals current single-channel authority
         run: |
