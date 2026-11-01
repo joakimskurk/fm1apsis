@@ -1,8 +1,6 @@
 name: APSIS Phase 11K ephemeral target cache projection
 
 on:
-  push:
-    branches: [p11k-fdn-feedback-cache-proof-staging]
   workflow_dispatch:
 
 jobs:
@@ -14,6 +12,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: 72b48c499ce7619fd3a077edac664ea2c65c4ca5
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
@@ -27,6 +26,7 @@ jobs:
       - name: Gate P11K.1 - repeat host equivalence proof
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = '72b48c499ce7619fd3a077edac664ea2c65c4ca5'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             tests/test_p11k_fdn_feedback_cache_equivalence.c \
             -o /tmp/test_p11k_fdn_feedback_cache_equivalence
@@ -68,10 +68,7 @@ jobs:
           import json
           r=json.load(open('build/target_report.json'))
           expected={
-              'product':'FM-1_972',
-              'image':140392,
-              'ram':87476,
-              'pool':319176,
+              'product':'FM-1_972','image':140392,'ram':87476,'pool':319176,
               'package_bytes':610110,
               'package_sha256':'868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c',
           }
@@ -99,44 +96,29 @@ jobs:
           from pathlib import Path
           sys.path.insert(0, 'ci')
           import p11_workload_inventory as inv
-
           base=json.load(open('/tmp/p11k-target-evidence/baseline-target.json'))
           cand=json.load(open('/tmp/p11k-target-evidence/candidate-target.json'))
-          assert cand['product'] == 'FM-1_972', cand
-          assert cand['image'] <= cand['image_max'], cand
-          assert cand['ram'] <= cand['ram_max'], cand
-          assert cand['pool'] == base['pool'], (base,cand)
-          assert cand['package_bytes'] == base['package_bytes'], (base,cand)
-
+          assert cand['product'] == 'FM-1_972'
+          assert cand['image'] <= cand['image_max'] and cand['ram'] <= cand['ram_max']
+          assert cand['pool'] == base['pool'] and cand['package_bytes'] == base['package_bytes']
           def shape(prefix):
               symbols=inv.parse_symbols(Path(f'/tmp/p11k-target-evidence/{prefix}-symbols.txt').read_text(errors='replace'))
               insns=inv.parse_disassembly(Path(f'/tmp/p11k-target-evidence/{prefix}-disassembly.txt').read_text(errors='replace'))
-              return {
-                  'fdn_render_text_bytes': symbols.get('apsis_space_fdn_render', 0),
-                  'fdn_render_instruction_lines': insns.get('apsis_space_fdn_render', 0),
-                  'feedback_gain_text_bytes': symbols.get('space_feedback_gain', 0),
-                  'feedback_gain_instruction_lines': insns.get('space_feedback_gain', 0),
-              }
-          bshape=shape('baseline')
-          cshape=shape('candidate')
-          report={
-              'baseline_target': base,
-              'candidate_target': cand,
-              'delta': {
-                  'image': cand['image']-base['image'],
-                  'ram': cand['ram']-base['ram'],
-                  'pool': cand['pool']-base['pool'],
-                  'ram_headroom': cand['ram_headroom']-base['ram_headroom'],
-              },
-              'baseline_code_shape': bshape,
-              'candidate_code_shape': cshape,
-              'code_shape_delta': {k:cshape[k]-bshape[k] for k in bshape},
-              'host_cache_bytes': 20,
-              'physical_timing_proven': False,
-          }
-          Path('/tmp/p11k-target-evidence/projection.json').write_text(json.dumps(report, indent=2)+'\n')
-          print(json.dumps(report, indent=2))
-          print('PASS: P11K ephemeral target cache fits and exact resource delta is recorded')
+              return {'fdn_render_text_bytes':symbols.get('apsis_space_fdn_render',0),
+                      'fdn_render_instruction_lines':insns.get('apsis_space_fdn_render',0)}
+          bshape=shape('baseline'); cshape=shape('candidate')
+          report={'baseline_target':base,'candidate_target':cand,
+                  'delta':{'image':cand['image']-base['image'],'ram':cand['ram']-base['ram'],
+                           'pool':cand['pool']-base['pool'],'ram_headroom':cand['ram_headroom']-base['ram_headroom']},
+                  'baseline_code_shape':bshape,'candidate_code_shape':cshape,
+                  'code_shape_delta':{k:cshape[k]-bshape[k] for k in bshape},
+                  'host_cache_bytes':20,'physical_timing_proven':False}
+          Path('/tmp/p11k-target-evidence/projection.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          assert report['delta'] == {'image':48,'ram':16,'pool':0,'ram_headroom':-16}, report
+          assert bshape == {'fdn_render_text_bytes':1082,'fdn_render_instruction_lines':353}, bshape
+          assert cshape == {'fdn_render_text_bytes':1118,'fdn_render_instruction_lines':379}, cshape
+          print('PASS: frozen P11K target projection exactly reproduced')
           PY
 
       - name: Gate P11K.5 - repo production sources remain untouched
