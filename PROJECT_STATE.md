@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11K are complete. P11K proved and target-projected the FDN feedback-gain cache without changing production source; P11L is authorized as the separate production-validation phase.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11L are complete. P11L is the current exact-head validated production baseline; further production optimisation requires a new measured/equivalence-backed candidate.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -29,18 +29,18 @@ Phase 10 merge authority:
 - 22/22 required workflows PASS
 - squash merge `378d2023df2afe59475be53c09cc001788586514` via PR #20
 
-## Current frozen production baseline — P11I
+## Current frozen production baseline — P11L
 
-P11G and P11H were measurement-only. P11I is the current accepted production target after the equivalence-backed stereo-pair delay-read optimization:
+P11L is the current accepted production target after the P11J/P11K measured-and-proved FDN feedback-gain cache:
 
 - product `FM-1_972`
-- image **140,392 / 581,564 B**
-- ordinary RAM **87,476 / 98,304 B**
-- RAM headroom **10,828 B**
+- image **140,440 / 581,564 B**
+- ordinary RAM **87,492 / 98,304 B**
+- RAM headroom **10,812 B**
 - POOL **319,176 / 344,064 B**
 - POOL headroom **24,888 B**
 - package bytes **610,110**
-- package SHA-256 `868e1dd01fbe0eecb4c13c09dd46854491f3795dd268c9dedb3e16c519313a2c`
+- package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
 
 Integrated frozen idle baseline:
 - PCM SHA-256 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
@@ -406,9 +406,54 @@ Workload payoff from P11J/P11K model:
 
 P11K therefore authorizes P11L production validation. It does not claim physical FM-1 cycle or ISR improvement.
 
-## Exact next phase — P11L production feedback-gain cache validation
+## P11L — production FDN feedback-gain cache complete
 
-Apply exactly the proved cache to production FDN state/reset/render. Preserve `space_feedback_gain()` arithmetic and all other FDN math. Require actual-production equivalence proof, full historical host/sanitizer behavior, exact real-target resources, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
+Production authority:
+- exact production head `4a08705815fffcbf9407193a21334764d8710d51`
+- authoritative run `41351791632`, all six gates PASS
+- artifact ID `13101743282`
+- artifact ZIP SHA-256 `819f932f701d2e46cf13b26a641d68130785f84cc026eec39347563903f24d72`
+
+Production change is narrow:
+- eight exact cached feedback gains + rounded decay key/validity in `ApsisSpaceFdn`
+- cache invalidated on reset
+- exact gains recomputed only when rounded `decay_ms` changes
+- `space_feedback_gain()` arithmetic, FDN topology and Cathedral room source unchanged
+
+Actual production equivalence:
+- optimized + ASAN/UBSAN PASS
+- reset/partial fill, 256-block steady, exact smoothed sweep, adversarial churn, all 8,001 legal decay keys and 4,096 deterministic random/reset blocks
+- bit-identical stereo output, all pre-existing FDN state and full FDN delay storage after every block
+
+Frozen production target:
+- image **140,440 / 581,564 B**
+- RAM **87,492 / 98,304 B**; headroom **10,812 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
+- FDN render **1,118 B / 379** static instruction lines
+
+Idle authority remains exact:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Active Motion authority remains exact:
+- active image **137,704 B**
+- RAM **87,540 B**; headroom **10,764 B**
+- POOL **319,176 B**
+- package SHA-256 `54616e07ad5b579d33ec07732b5ec3daa824d71950ec8844805631251245374a`
+- seen `ff`, final `14`, 149/149 points, record 220,672→441,088, manual 450,560→466,176, cursor 481,024, queue 30/512, overflow 0, late flags 0, WAV peak 1,171, RMS 173
+
+Accepted workload tradeoff from P11J/P11K:
+- steady census: 2,040 fewer coefficient divisions + 6,120 fewer wide multiplies
+- measured one-way sweep: 504 fewer divisions + 1,512 fewer wide multiplies
+- adversarial every-block decay churn: zero coefficient-computation savings
+
+P11L proves exact behavior and real-target resource cost. It still does not prove physical FM-1 CPU cycles or ISR margin.
+
+## Exact next phase
+
+Promote P11L to `p11-optimization`, then return to measurement. No P11M production change is authorized until a new concrete hotspot and falsifiable equivalence/regression gate are established. Physical ISR timing, stack high-water, LCD/audio contention and listening quality remain deferred to hardware validation.
 
 ## Do not regress
 

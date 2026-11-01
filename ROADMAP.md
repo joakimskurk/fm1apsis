@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11K are complete; P11L is authorized as the separate production-validation phase for the proved FDN feedback-gain cache.**
+Status: **[~] active on `p11-optimization`. P11A–P11L are complete; further production optimisation requires a new measured, equivalence-backed candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -290,15 +290,32 @@ Decision: authorize P11L production validation. The cache intentionally spends 1
 
 ### P11L — production feedback-gain cache validation
 
-Status: **[ ] next.**
+Status: **[x] complete, exact-head validated and frozen.**
 
-- [ ] apply only the proved eight-gain cache + rounded decay key/validity to production FDN state/render/reset
-- [ ] keep `space_feedback_gain()` arithmetic exact and all other FDN math/topology unchanged
-- [ ] run P11K equivalence proof against actual production implementation
-- [ ] full historical host + ASAN/UBSAN behavior green
-- [ ] exact real JieLi target resource measurement
-- [ ] exact idle PCM/runtime and active Motion lifecycle
-- [ ] freeze final image/RAM/POOL/package hashes before promotion
+- [x] production FDN state stores only the eight exact gains + rounded decay key/validity
+- [x] reset invalidates cache; render recomputes only when rounded decay changes
+- [x] `space_feedback_gain()` arithmetic and all other FDN math/topology remain exact
+- [x] actual production render is bit-identical to frozen always-recomputed authority across reset/partial fill, steady, smoothed sweep, adversarial churn, all **8,001** legal decay keys and 4,096 random/reset blocks
+- [x] optimized + ASAN/UBSAN production equivalence PASS
+- [x] complete historical host + sanitizer behavior PASS
+- [x] actual real-target build exactly matches P11K projection
+- [x] production image **140,440 B**, RAM **87,492 B**, POOL **319,176 B**
+- [x] production package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
+- [x] exact idle PCM/runtime retained
+- [x] exact active Motion lifecycle retained; active image **137,704 B**, RAM **87,540 B**, POOL **319,176 B**
+- [x] active package SHA-256 `54616e07ad5b579d33ec07732b5ec3daa824d71950ec8844805631251245374a`
+- [x] authoritative run `41351791632` on production head `4a08705815fffcbf9407193a21334764d8710d51`
+- [x] evidence artifact ID `13101743282`; ZIP SHA-256 `819f932f701d2e46cf13b26a641d68130785f84cc026eec39347563903f24d72`
+- [x] validation workflow manual-only and pinned to the proven production head
+
+Frozen P11L production target:
+- image **140,440 / 581,564 B**
+- RAM **87,492 / 98,304 B**; headroom **10,812 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3`
+
+Accepted dynamic workload tradeoff from P11J–P11L: steady census eliminates 2,040 coefficient divisions + 6,120 wide multiplies; the measured 4s→12s sweep eliminates 504 divisions + 1,512 wide multiplies; adversarial every-block decay churn has zero coefficient-computation savings. Physical CPU/ISR improvement remains unverified.
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -322,4 +339,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11K proof/projection state to `p11-optimization`, then create one P11L production-validation branch. Apply only the proved FDN feedback-gain cache and require complete host/sanitizer, real-target, exact idle and exact active-Motion gates before promotion.
+Promote the frozen P11L production state to `p11-optimization`. Then return to measurement before selecting any P11M production candidate; no further DSP change is authorized until a concrete hotspot and falsifiable equivalence/regression gate are defined.
