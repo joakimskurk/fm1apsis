@@ -1,8 +1,10 @@
 name: APSIS Phase 11E bounded capacity inventory
 
+# Historical source-derived capacity gate. Authoritative green run 41322747611
+# on a294e6da89d82df1bd77f147c70c3ae032d34232. Later optimisation heads must
+# not reinterpret these pre-P11F capacities, so manual reruns check out the
+# proven P11E technical head.
 on:
-  push:
-    branches: [p11e-capacity-inventory-staging]
   workflow_dispatch:
 
 jobs:
@@ -12,6 +14,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: a294e6da89d82df1bd77f147c70c3ae032d34232
 
       - name: Gate P11E.1 - build frozen host stress probes
         run: |
