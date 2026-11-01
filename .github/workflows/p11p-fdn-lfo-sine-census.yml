@@ -82,6 +82,7 @@ jobs:
       - name: Gate P11P.3 - frozen P11O real-target authority and code shape
         run: |
           set -euo pipefail
+          bash ci/prepare_dinghy.sh
           bash ci/apply_apsis_p10g.sh
           bash ci/build_apsis_target.sh
           cp build/target_report.json "$P11P_EVIDENCE/target-report.json"
