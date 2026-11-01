@@ -21,7 +21,7 @@ Status legend: `[x]` complete, `[~]` active, `[ ]` not started.
 - [x] structural/runtime consumers and late binding
 - [x] long deterministic traces and 512-event shared heap
 
-Frozen host runtime remains 21,928 B; no module-private clocks.
+P11F explicitly re-approved the host runtime layout at 21,032 B with Bloom late slots 44/48 under the frozen stress trace; no module-private clocks.
 
 ## Phase 4 — five dry source engines
 - [x] String persistent / finite Rhythm / Attractor
@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. Measurement first; no redesign.**
+Status: **[~] active on `p11-optimization`. P11A–P11F are complete; measurement remains the prerequisite for every further change.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -139,14 +139,12 @@ Frozen P11C production target:
 - [x] configured user/system stack ranges identified and explicitly separated from runtime high-water
 - [x] green run `41320007779` on `2e1912f5d0ff8987382bd7af434fc322679bf762`
 
-Largest ordinary target-RAM owners:
+Largest ordinary target-RAM owners at the P11C/P11D baseline:
 - `bloom_dsp` 22,864 B
 - `apsis_runtime` 21,128 B on target ABI
 - `string_transient_pool` 7,188 B
 - `bloom_audio_runtime` 6,424 B
 - `spiral_audio_runtime` 4,792 B
-
-The top five account for 62,396 B / about 69.55% of the ordinary RAM span.
 
 Static configured stack ranges:
 - user stack 24,320 B + 256-B guard
@@ -154,30 +152,66 @@ Static configured stack ranges:
 
 These are **configured ranges only**, outside the 96-KiB ordinary RAM metric and after the POOL region. No runtime stack-high-water claim is made.
 
-### P11E — capacity/high-water stress inventory
+### P11E — bounded capacity/high-water inventory
 
-Status: **[ ] next. Measurement only; no capacity reduction yet.**
+Status: **[x] complete and frozen. Measurement only; no capacity changed.**
 
-- [ ] deterministic worst-case shared M3c queue/event-heap telemetry
-- [ ] Bloom DSP / occurrence / voice capacity high-water and steals/drops where available
-- [ ] String transient logical/physical pool high-water, steals and drops
-- [ ] Bloom manual/audio queue pressure
-- [ ] Spiral audio/runtime slot pressure
-- [ ] String Attractor pending/runtime pressure
-- [ ] combined stress scenarios that intentionally approach existing bounds
-- [ ] distinguish normal musical scenarios from artificial saturation probes
-- [ ] select a P11F reduction candidate only if measured safety margin is convincing
+- [x] shared queue observed max 415/512; no global mathematical upper bound, so no shrink authorized
+- [x] Spiral late slots 59/64; veto shrink
+- [x] String transient pool saturates 80/80 logical and 112/112 physical under legal burst; veto shrink
+- [x] String Attractor pending reaches 60/64; veto shrink
+- [x] Spiral DSP reaches 30/32 legs; veto shrink
+- [x] Bloom DSP reaches 125/136 petals; retain current stress margin
+- [x] exact Bloom scheduler proof: **44 simultaneous slots reachable and 45 impossible**
+- [x] P11F candidate selected: Bloom late/snapshot capacity only
+- [x] green inventory run `41322747611`; historical gate frozen to its proven head
 
-P11E must use existing counters where possible and test-only telemetry where necessary. It must not create a new scheduler or alter production musical behavior.
+P11E established a strict rule for later work: high-water alone does not authorize a reduction. A structural upper-bound proof or equally strong evidence is required.
+
+### P11F — conservative Bloom slot reduction
+
+Status: **[x] complete, exact-head validated, frozen and promoted to `p11-optimization`.**
+
+- [x] `APSIS_RUNTIME_BLOOM_SLOTS` **64 → 48**
+- [x] exact legal maximum remains 44, leaving four slots of structural reserve
+- [x] host `sizeof(ApsisRuntime)` **21,928 → 21,032 B**
+- [x] canonical/extreme Bloom high-water remains **44/48** with no late-slot overflow
+- [x] Bloom audio snapshot/bind bridge passes normal and ASAN/UBSAN
+- [x] full historical host + sanitizer behavior remains green
+- [x] exact frozen idle PCM/runtime remains bit-identical
+- [x] exact active Motion lifecycle remains identical
+- [x] real JieLi production RAM **89,716 → 87,476 B** (**−2,240 B**)
+- [x] production RAM headroom **10,828 B**
+- [x] active Motion target RAM **87,524 B**, also **−2,240 B** from its P11C baseline
+- [x] POOL remains **319,176 B**; no POOL capacity changed
+- [x] authoritative final run `41324331937` on technical head `eb651e768a049a1b4a1e88397a9021fccc69fd30`
+- [x] historical P11F workflow is manual-only and pinned to that proven technical head
+- [x] promoted/frozen Phase-11 working head `c68919a1002b9e200b2f026d46077a07207581ef`
+
+Frozen P11F production target:
+- image **140,408 / 581,564 B**
+- RAM **87,476 / 98,304 B**; headroom **10,828 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package SHA-256 `e0d0b826f0c2d5b8f1af781a9259b5d78dce9062939661ac7acad17bfefb78e5`
+
+### P11G — timing/workload proxy inventory
+
+Status: **[ ] next. Measurement only; no resource or behavior change.**
+
+- [ ] establish reproducible emulator/target-build workload proxies for the audio callback without claiming physical ISR timing
+- [ ] inventory display redraw/DMA work and its existing HAL gating without moving display work into audio
+- [ ] combine control/UI/audio stress scenarios and record queue/late/overflow invariants
+- [ ] inspect target code/static call paths for expensive operations in hot audio paths
+- [ ] keep physical stack high-water, real ISR margin, LCD-bus contention and listening quality explicitly unproven until hardware exists
+- [ ] authorize a later optimisation only if the proxy identifies a concrete hotspot and the change can be falsified against frozen behavior
 
 ### Later Phase-11 work
-- [ ] P11F evidence-backed RAM/capacity optimisation if P11E identifies one
-- [ ] target/emulator timing proxies, explicitly separated from physical ISR claims
-- [ ] UI redraw/DMA workload investigation without changing visual authority
-- [ ] combined control/UI/audio stress gates
+- [ ] evidence-backed CPU/workload optimisation if P11G identifies one
+- [ ] UI redraw/DMA workload optimisation only from measured evidence
+- [ ] combined control/UI/audio stress gates as permanent regression coverage where useful
 - [ ] Cathedral listening/tuning on physical hardware when available
 
-Phase-11 invariant: optimise only from measured evidence; preserve Phase-10 behavior and all frozen regression gates unless a change is explicitly re-approved.
+Phase-11 invariant: optimise only from measured evidence; preserve Phase-10/P11F behavior and all frozen regression gates unless a change is explicitly re-approved.
 
 ## Phase 12 — hardware validation/release
 - [ ] physical FM-1 install
@@ -193,4 +227,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote the completed P11D read-only instrumentation/evidence to `p11-optimization`, then start **P11E capacity/high-water stress inventory** from that head. Instrument existing bounded pools/counters without resizing them; establish reproducible worst observed occupancy/steal/drop margins before any P11F capacity reduction is considered.
+Create a P11G staging branch from the frozen P11F head. P11G is a **read-only timing/workload proxy inventory**: measure existing audio/UI/control workload and static hot paths without changing capacity, scheduling, musical behavior or visual authority. Do not infer physical ISR or stack margin from emulator timing.
