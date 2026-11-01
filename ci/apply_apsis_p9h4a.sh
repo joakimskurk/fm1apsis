@@ -8,6 +8,15 @@ cd "$ROOT"
 # has an isolated target/emulator checkpoint.
 bash ci/apply_apsis_p9h3b.sh
 
+# Phase 9 must not contaminate historical M4b/M4f authority. These are the
+# exact pre-H4a blobs from parent 9bead093 and are also exercised by staged CI.
+[[ "$(git hash-object apsis/apsis_string_rhythm_audio.c)" == "a3e58f2744917a5d97d2763832ed52b9b104e578" ]] || {
+  echo "FAIL: P9H4a modified frozen M4b apsis_string_rhythm_audio.c" >&2; exit 2; }
+[[ "$(git hash-object apsis/apsis_string_rhythm_audio.h)" == "b9b7506242cd0733c26149cd9a81f5c22aa3e381" ]] || {
+  echo "FAIL: P9H4a modified frozen M4b apsis_string_rhythm_audio.h" >&2; exit 2; }
+[[ "$(git hash-object tests/test_string_rhythm_audio.c)" == "76cad7635b2474690597b2ffe1408d3ae4bf2664" ]] || {
+  echo "FAIL: P9H4a modified frozen M4b String Rhythm test" >&2; exit 2; }
+
 cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
   apsis/apsis_controls_performance.c tests/test_controls_performance.c \
   -o /tmp/test_controls_performance
@@ -19,7 +28,25 @@ cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
   /tmp/test_controls_performance_san
 
+# P9C explicitly maps FM-1 keys onto Study-126 keyboardStringPress(), so its
+# manual acoustic path is P9-only and freezes the browser keyboard level .080.
+cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+  apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+  apsis/apsis_string.c apsis/apsis_string_dsp.c \
+  apsis/apsis_string_transient_pool.c apsis/apsis_string_manual_audio.c \
+  tests/test_string_manual_audio.c -o /tmp/test_string_manual_audio
+/tmp/test_string_manual_audio
+cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+  -fsanitize=address,undefined -Iapsis \
+  apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+  apsis/apsis_string.c apsis/apsis_string_dsp.c \
+  apsis/apsis_string_transient_pool.c apsis/apsis_string_manual_audio.c \
+  tests/test_string_manual_audio.c -o /tmp/test_string_manual_audio_san
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+  /tmp/test_string_manual_audio_san
+
 cp apsis/apsis_controls_performance.h apsis/apsis_controls_performance.c \
+   apsis/apsis_string_manual_audio.h apsis/apsis_string_manual_audio.c \
    work/apsis/firmware/src/
 
 python3 - <<'PY'
@@ -31,12 +58,16 @@ s = p.read_text()
 h_anchor = '#include "apsis_controls_dirty.h"'
 if h_anchor not in s:
     raise SystemExit('FAIL: P9H4a H3b header anchor missing')
-s = s.replace(h_anchor, h_anchor + '\n#include "apsis_controls_performance.h"', 1)
+s = s.replace(h_anchor, h_anchor +
+              '\n#include "apsis_controls_performance.h"'
+              '\n#include "apsis_string_manual_audio.h"', 1)
 
 c_anchor = '#include "apsis_controls_dirty.c"'
 if c_anchor not in s:
     raise SystemExit('FAIL: P9H4a H3b source anchor missing')
-s = s.replace(c_anchor, c_anchor + '\n#include "apsis_controls_performance.c"', 1)
+s = s.replace(c_anchor, c_anchor +
+              '\n#include "apsis_controls_performance.c"'
+              '\n#include "apsis_string_manual_audio.c"', 1)
 
 state_anchor = 'static ApsisControlsProjectDirty apsis_project_dirty;'
 if state_anchor not in s:
@@ -99,9 +130,11 @@ p.write_text(s)
 PY
 
 grep -q '#include "apsis_controls_performance.c"' work/apsis/firmware/src/dinghy.c
+grep -q '#include "apsis_string_manual_audio.c"' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_controls_performance_queue_string(&apsis_controls_performance' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_string_manual_trigger(&string_transient_pool' work/apsis/firmware/src/dinghy.c
 grep -q 'APSIS_CONTROLS_STRING_MANUAL_DEBOUNCE_SAMPLES 1323u' work/apsis/firmware/src/apsis_controls_performance.h
+grep -q 'APSIS_STRING_MANUAL_KEY_LEVEL_Q15 APSIS_Q15_MILLI(80)' work/apsis/firmware/src/apsis_string_manual_audio.h
 python3 - <<'PY'
 from pathlib import Path
 s = Path('work/apsis/firmware/src/dinghy.c').read_text()
@@ -119,7 +152,7 @@ for required in ('apsis_controls_performance_take_string(',
         raise SystemExit(f'FAIL: P9H4a audio consumer missing: {required}')
 if 'apsis_bloom_dsp_trigger_binding(' in main:
     raise SystemExit('FAIL: P9H4a stole H4b Bloom manual audition')
-print('PASS: P9H4a String intent crosses one-byte main->audio mailbox and reuses frozen M4b transient pool')
+print('PASS: P9H4a String intent crosses one-byte main->audio mailbox and P9-only manual audio reuses the frozen transient pool')
 PY
 
 echo "PASS: P9H4a direct String performance bound above frozen H3b target"

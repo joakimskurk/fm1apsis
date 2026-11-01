@@ -16,14 +16,4 @@ uint8_t apsis_string_rhythm_trigger_event(ApsisStringTransientPool *pool,
                                           ApsisStringPitchMemory *pitch_memory,
                                           const ApsisTransportEvent *event);
 
-/* Study-126 direct/manual String gesture. This deliberately reuses the same
- * native BODY/WIRE/composite transient topology already frozen for M4b rather
- * than creating a second performance synth. Debounce/timing belongs to the
- * physical-control handoff; this function only emits the acoustic transient.
- * Returns physical transient voices accepted into the finite pool. */
-uint8_t apsis_string_manual_trigger(ApsisStringTransientPool *pool,
-                                    const ApsisState *state,
-                                    ApsisStringPitchMemory *pitch_memory,
-                                    uint8_t side);
-
 #endif

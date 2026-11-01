@@ -162,35 +162,3 @@ uint8_t apsis_string_rhythm_trigger_event(ApsisStringTransientPool *pool,
         return rhythm_motion(pool, s, event, level);
     return rhythm_dual_side(pool, s, pitch_memory, event, mode, level);
 }
-
-uint8_t apsis_string_manual_trigger(ApsisStringTransientPool *pool,
-                                    const ApsisState *s,
-                                    ApsisStringPitchMemory *pitch_memory,
-                                    uint8_t side)
-{
-    uint16_t level, side_level, voice_level;
-    uint32_t freq;
-    if (!pool || !s || !s->string.sound || !s->string.level_q15) return 0u;
-
-    /* Study-98 classicStringNote() uses .065 for a direct/manual note. Study
-     * 126 keeps that gesture level but routes it through the later BODY/WIRE
-     * side/composite topology already frozen above. */
-    level = rhythm_mul_q15(APSIS_Q15_MILLI(65), s->string.level_q15);
-    if (!level) return 0u;
-    if (s->string.surface_mode == APSIS_STRING_CLASSIC)
-        return rhythm_classic_composite(pool, s, pitch_memory, level);
-
-    side = side == APSIS_SIDE_LEFT ? APSIS_SIDE_LEFT : APSIS_SIDE_RIGHT;
-    side_level = side == APSIS_SIDE_LEFT
-        ? s->string.left_level_q15 : s->string.right_level_q15;
-    voice_level = rhythm_mul_q15(level, side_level);
-    if (!voice_level) return 0u;
-    freq = rhythm_side_frequency(s, pitch_memory, side);
-    if (side == APSIS_SIDE_LEFT) {
-        return rhythm_body(pool, s, freq, voice_level,
-                           rhythm_brightness_add(s->string.brightness_q15, -100),
-                           1180u, (int16_t)-APSIS_Q15_MILLI(300), 48u, 0u);
-    }
-    return rhythm_wire(pool, s, freq, voice_level,
-                       rhythm_brightness_add(s->string.brightness_q15, 180), 0u);
-}
