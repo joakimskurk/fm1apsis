@@ -28,7 +28,7 @@ Run `41323228057` on technical head `a4b26b3a83ca879980af43f2d61c0cf4c10b4d0f` p
 5. reduced-capacity active Motion target;
 6. exact frozen active Motion lifecycle.
 
-The documentation/exact-gate head must rerun the same matrix with the measured target values locked byte-for-byte before P11F is promoted.
+That run established the measured target values later frozen byte-for-byte in the exact-head gate.
 
 ## Historical-test handling
 
@@ -54,7 +54,7 @@ The reduction does not move the existing behavioral traces:
 
 ## Measured real JieLi production result
 
-The first complete green target run measured:
+The complete green target run measured:
 - image **140,408 / 581,564 B**;
 - RAM **87,476 / 98,304 B**;
 - RAM headroom **10,828 B**;
@@ -100,19 +100,28 @@ The active Motion lifecycle remains exactly the frozen reference:
 - overflow 0; late flags 0;
 - WAV frames 521,984; peak 1,171; RMS 173.
 
+## Final exact-head acceptance
+
+Authoritative final run **`41324331937`** on technical head **`eb651e768a049a1b4a1e88397a9021fccc69fd30`** passed the complete six-gate matrix with all measured production and active target values asserted exactly.
+
+That run therefore proves, at the strongest level currently available without physical FM-1 hardware:
+- the exact legal scheduler maximum remains 44 while the implementation retains 48 slots;
+- all historical host tests and ASAN/UBSAN behavior remain green after the intentional layout reduction;
+- Bloom snapshot/bind behavior remains valid;
+- production JieLi RAM is exactly **87,476 B**, a **2,240 B** reduction;
+- active Motion JieLi RAM is exactly **87,524 B**, also a **2,240 B** reduction;
+- POOL remains exactly **319,176 B** in both target builds;
+- frozen idle PCM/runtime remains bit-identical;
+- the complete active Motion lifecycle remains identical.
+
+The evidence artifact from the authoritative run is `p11f-bloom-slot-reduction-evidence` (artifact ID `13091170310`, ZIP digest `sha256:fabf6d34d0497f00c4617ca945200634e1d7f28993ffd799f1eb66734cc02700`).
+
 ## Acceptance result
 
-At the strongest level currently possible without physical FM-1 hardware, the `64 -> 48` Bloom-slot reduction is accepted:
-- the exact legal scheduler maximum is 44;
-- 48 retains four slots of structural reserve;
-- host and sanitizer behavior remains frozen;
-- the Bloom audio snapshot/bind path remains valid;
-- real JieLi RAM decreases by 2,240 B;
-- frozen idle audio/runtime is bit-identical;
-- active Motion behavior is identical.
+The `64 -> 48` Bloom-slot reduction is accepted. Four slots remain above the mathematically proven legal maximum, so P11F deliberately stops at 48 rather than attempting a zero-margin 44-slot implementation.
 
 P11F does **not** prove physical FM-1 ISR timing, stack high-water, LCD contention, NOR timing or DAC quality.
 
-## Final freeze rule
+## Historical freeze
 
-Before promotion to `p11-optimization`, rerun the documentation/exact-gate head with production and active image/RAM/POOL/package hashes asserted exactly. After that exact-head run is green, freeze the workflow manual-only to that proven SHA and update the project handoff/roadmap.
+`.github/workflows/p11-bloom-slot-reduction.yml` is retained as a manual-only historical gate and always checks out the proven technical head `eb651e768a049a1b4a1e88397a9021fccc69fd30`. Later Phase 11 work must not reinterpret the P11F acceptance baseline by changing the workflow and the implementation together.
