@@ -16,9 +16,11 @@ static void defaults(ApsisState *s)
 
 static void test_storage_budget(void)
 {
-    assert(sizeof(ApsisStringMotionPoint) == 8u);
-    assert(sizeof(ApsisStringMotionStore) <= 19216u);
-    assert(sizeof(ApsisStringMotionRuntime) < 128u);
+    assert(sizeof(ApsisStringMotionPitchContext) == 20u);
+    assert(sizeof(ApsisStringMotionPoint) == 4u);
+    assert(sizeof(ApsisStringMotionLane) == 4822u);
+    assert(sizeof(ApsisStringMotionStore) == 9644u);
+    assert(sizeof(ApsisStringMotionRuntime) == 88u);
 }
 
 static void test_target_resolution_and_arm(void)
@@ -100,13 +102,12 @@ static void test_right_overdub_preserves_left(void)
     s.string.surface_mode = APSIS_STRING_DUAL;
     s.string.linked = 0u;
     apsis_string_motion_reset(&store, &rt);
+    apsis_string_motion_freeze_pitch(&s, &store.left.pitch);
     store.left.count = 2u;
     store.left.point[0].phase_q16 = 0u;
     store.left.point[0].split_q15 = APSIS_Q15_MILLI(420);
-    store.left.point[0].pitch_milli = 1000;
     store.left.point[1].phase_q16 = 65535u;
     store.left.point[1].split_q15 = APSIS_Q15_MILLI(460);
-    store.left.point[1].pitch_milli = 3000;
     before = store.left;
 
     assert(apsis_string_motion_arm(&rt, &s, APSIS_STRING_MOTION_TARGET_RIGHT));
@@ -197,20 +198,25 @@ static void test_pitch_hold_continuous_and_manual_resume(void)
     ApsisStringMotionRuntime rt;
     ApsisStringMotionStore store;
     ApsisStringMotionPlayback out;
+    int32_t p0, p1, expected;
+    int64_t delta;
     defaults(&s);
     apsis_string_motion_reset(&store, &rt);
     apsis_string_motion_freeze_pitch(&s, &rt.pitch);
+    store.right.pitch = rt.pitch;
 
     store.right.count = 3u;
     store.right.point[0].phase_q16 = 0u;
     store.right.point[0].split_q15 = APSIS_Q15_MILLI(520);
-    store.right.point[0].pitch_milli = 0;
     store.right.point[1].phase_q16 = 32768u;
     store.right.point[1].split_q15 = APSIS_Q15_MILLI(700);
-    store.right.point[1].pitch_milli = 12000;
     store.right.point[2].phase_q16 = 65535u;
     store.right.point[2].split_q15 = APSIS_Q15_MILLI(520);
-    store.right.point[2].pitch_milli = 0;
+    p0 = apsis_string_motion_pitch_for_split(&store.right.pitch, APSIS_SIDE_RIGHT,
+                                             store.right.point[0].split_q15);
+    p1 = apsis_string_motion_pitch_for_split(&store.right.pitch, APSIS_SIDE_RIGHT,
+                                             store.right.point[1].split_q15);
+    assert(p1 != p0);
     s.string.motion_loop_play = 1u;
     rt.play_pulse_index = 1u;
     rt.play_pulse_sample = 1000u;
@@ -219,11 +225,13 @@ static void test_pitch_hold_continuous_and_manual_resume(void)
     s.string.motion_loop_pitch_continuous = 0u;
     assert(apsis_string_motion_playback(&store, &rt, &s, 1000u, &out));
     assert(out.phase_q16 >= 16380u && out.phase_q16 <= 16390u);
-    assert(out.right_pitch_milli == 0);
+    assert(out.right_pitch_milli == p0);
 
     s.string.motion_loop_pitch_continuous = 1u;
     assert(apsis_string_motion_playback(&store, &rt, &s, 1000u, &out));
-    assert(out.right_pitch_milli > 5900 && out.right_pitch_milli < 6100);
+    delta = (int64_t)p1 - p0;
+    expected = p0 + (int32_t)((delta * out.phase_q16 + 16384) / 32768);
+    assert(out.right_pitch_milli == expected);
 
     apsis_string_motion_manual_override(&rt, 1u);
     assert(!apsis_string_motion_playback(&store, &rt, &s, 1500u, &out));
@@ -242,6 +250,6 @@ int main(void)
     test_recording_ownership_restore();
     test_capture_throttle();
     test_pitch_hold_continuous_and_manual_resume();
-    puts("PASS: Phase 10A String Motion source contract");
+    puts("PASS: Phase 10A String Motion source contract (P11C compact store)");
     return 0;
 }
