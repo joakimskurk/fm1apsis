@@ -1,9 +1,9 @@
 name: APSIS Phase 11C compact Motion store
 
+# Historical optimisation gate. Authoritative exact-head green run 41318100472
+# on 7ce6993065186aa66c89bc723ba3edfa95448596. Manual reruns check out that
+# exact evidence-retention head so later P11 work cannot redefine P11C.
 on:
-  push:
-    branches: [p11c-motion-compact-staging, p11-optimization]
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,6 +13,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: 7ce6993065186aa66c89bc723ba3edfa95448596
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
