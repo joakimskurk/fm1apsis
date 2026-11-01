@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11O are complete. P11O is the current accepted production baseline after the invariant-simplified FDN line reader; P11P is the next measurement-only phase.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11P are complete. P11O remains the accepted production baseline; P11P measured the remaining FDN LFO/sine endpoint redundancy and authorizes P11Q proof-only.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -568,9 +568,52 @@ Active Motion authority remains exact:
 
 P11O therefore replaces P11L as the accepted production baseline. It proves exact behavior and target code shape, not physical FM-1 cycle or ISR improvement.
 
-## Exact next phase — P11P FDN LFO/sine workload census
+## P11P — FDN LFO/sine workload census complete
 
-Measure the remaining high-frequency FDN LFO/sine path without changing production DSP. Quantify sine lookup/interpolation behavior and target code shape, then authorize a later proof phase only if the evidence identifies a narrow exact candidate.
+Measurement authority:
+- technical head `2afb819dd865385f7547811b6422e7a281c80b7e`
+- run `41359406941` — PASS
+- artifact ID `13104249141`
+- artifact ZIP SHA-256 `d1a5d5898d00150c0f757f11fa01683d705a131bb35387d614741c49fa3b3517`
+- production `apsis_space_dsp.c/.h` and Cathedral room source remained exact P11O
+- historical workflow manual-only and pinned to the proven technical head
+
+Natural LFO trajectory:
+- cold 16,384 frames: **131,072** sine calls / **262,144** point evaluations
+- cold cache-model endpoint refreshes **96**; reuses **130,976**
+- warm continuing 65,536 frames: **524,288** calls / **1,048,576** point evaluations
+- warm refreshes **367**; reuses **523,921**
+- combined **655,360** calls, **463** refreshes, **654,897** reuses
+- combined avoidable point evaluations under the cache model: **1,309,794**
+- endpoint pair unchanged for **99.929%** of natural calls
+
+Exact-domain constraints:
+- all 256 fractional values occur naturally
+- exhaustive top-16 sweep covers all **65,536** index/fraction combinations
+- `frac == 0`: **256**; `frac != 0`: **65,280**
+- real endpoint-boundary crossings: **1,024**
+- equal adjacent endpoint pairs: **0**
+- therefore interpolation, quadrant and wrap semantics must remain exact
+
+Frozen target authority:
+- exact P11O image **140,440 B**, RAM **87,492 B**, POOL **319,176 B**
+- package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- inlined `apsis_space_fdn_render` **1,114 B / 374** static instruction lines
+- `space_sine_q15()` fully inlined on target
+- `space_sine_point()` survives as **48 B / 14** static instruction lines
+- complete historical host + sanitizer preparation also PASS in the target gate
+
+Decision: authorize P11Q proof-only for a per-line pair of exact signed-16-bit sine endpoints. Initialize them from each reset phase; refresh them only on an 8-bit phase-index transition; preserve the existing interpolation expression exactly. The source representation is 4 B/line (**32 B total**) before target ABI confirmation. Production remains P11O.
+
+## Exact next phase — P11Q FDN sine endpoint-cache equivalence proof
+
+Before any production source modification:
+1. prove exhaustive top-16 helper equivalence and every top-byte transition including `255 → 0`;
+2. prove reset initialization and complete-FDN output/state/storage equivalence across cold, warm, randomized trajectories and resets;
+3. run optimized + ASAN/UBSAN;
+4. measure exact host/target state-size cost;
+5. project the candidate ephemerally on the real JieLi target for image/RAM/POOL/package and inlined render code shape;
+6. authorize a separate production-validation phase only if every gate passes and the target tradeoff remains justified.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 
