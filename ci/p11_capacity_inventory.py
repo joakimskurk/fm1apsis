@@ -62,7 +62,7 @@ def main():
     chw, chcap, ctrig, cdrop = ints(one(
         r"worst Clock pool high-water=(\d+)/(\d+) triggers=(\d+) drops=(\d+)",
         clock, "Clock pool"))
-    sh, slog, sleg, sosc, ss, sd = ints(one(
+    stress_seconds, spiral_hits, spiral_logical, spiral_legs, spiral_oscs, spiral_steals, spiral_drops = ints(one(
         r"M4F_STRESS seconds=(\d+) hits=(\d+) logical_hw=(\d+) leg_hw=(\d+) osc_hw=(\d+) steals=(\d+) drops=(\d+)",
         spiral, "Spiral DSP stress"))
     btrig, bpetal, bpetalcap, bosc, bdrops, bpeak, bhash, bsize = one(
@@ -94,7 +94,8 @@ def main():
         "string": (sl, sp, ssteal, sdrop),
         "body": (bl, bp, bsteal, bdrop),
         "clock": (chw, chcap, ctrig, cdrop),
-        "spiral": (sh, slog, sleg, sosc, ss, sd),
+        "spiral": (stress_seconds, spiral_hits, spiral_logical, spiral_legs,
+                   spiral_oscs, spiral_steals, spiral_drops),
         "bloom": (btrig, bpetal, bpetalcap, bosc, bdrops, bpeak),
         "bloom_bound": (proven, current, life),
     }
@@ -145,8 +146,10 @@ def main():
             "physical_high_water": sp,
             "steals": ssteal,
             "drops": sdrop,
+            "body_composite_logical_high_water": bl,
             "body_composite_physical_high_water": bp,
             "body_composite_steals": bsteal,
+            "body_composite_drops": bdrop,
             "classification": "saturated under legal burst; veto shrink",
         },
         "string_attractor_pending": {
@@ -165,11 +168,15 @@ def main():
         },
         "spiral_dsp": {
             "leg_capacity": 32,
-            "logical_high_water": sleg,
-            "leg_high_water": sosc,
-            "oscillator_high_water": ss,
-            "steals": sd,
-            "drops": int(one(r"M4F_STRESS .* drops=(\d+)", spiral, "Spiral drops")),
+            "stress_seconds": stress_seconds,
+            "hits": spiral_hits,
+            "logical_high_water": spiral_logical,
+            "leg_high_water": spiral_legs,
+            "oscillator_high_water": spiral_oscs,
+            "steals": spiral_steals,
+            "drops": spiral_drops,
+            "leg_reserve": 32 - spiral_legs,
+            "classification": "one complete two-leg hit of reserve; veto shrink",
         },
         "bloom_dsp": {
             "petal_capacity": bpetalcap,
@@ -177,6 +184,8 @@ def main():
             "reserve": bpetalcap - bpetal,
             "oscillator_high_water": bosc,
             "drops": bdrops,
+            "peak": bpeak,
+            "hash": bhash.lower(),
             "sizeof_host": bsize,
             "classification": "intentional bounded margin already source-stressed; no P11E shrink",
         },
@@ -199,20 +208,6 @@ def main():
         ],
     }
 
-    # Correct the Spiral tuple labels after the frozen tuple check above.
-    report["spiral_dsp"] = {
-        "leg_capacity": 32,
-        "stress_seconds": sh,
-        "hits": slog,
-        "logical_high_water": sleg,
-        "leg_high_water": sosc,
-        "oscillator_high_water": ss,
-        "steals": sd,
-        "drops": 0,
-        "leg_reserve": 32 - sosc,
-        "classification": "one complete two-leg hit of reserve; veto shrink",
-    }
-
     a.out_json.parent.mkdir(parents=True, exist_ok=True)
     a.out_json.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
@@ -230,7 +225,7 @@ def main():
         f"| String transient physical | {sp} | 112 | 0 | saturated; veto shrink |",
         f"| String Attractor pending | {apend} | {apendcap} | {apendcap-apend} | minimal; veto shrink |",
         f"| Clock finite pool | {chw} | {chcap} | {chcap-chw} | measured reserve; low priority |",
-        f"| Spiral DSP legs | {sosc} | 32 | {32-sosc} | one hit reserve; veto shrink |",
+        f"| Spiral DSP legs | {spiral_legs} | 32 | {32-spiral_legs} | one hit reserve; veto shrink |",
         f"| Bloom DSP petals | {bpetal} | {bpetalcap} | {bpetalcap-bpetal} | retain current stress margin |",
         "",
         "## Exact Bloom late-slot proof",
@@ -269,7 +264,7 @@ def main():
         "queue_max": max_queue,
         "string_physical": [sp, 112],
         "spiral_slots": [rs, rscap],
-        "spiral_legs": [sosc, 32],
+        "spiral_legs": [spiral_legs, 32],
         "attractor_pending": [apend, apendcap],
         "bloom_slots_observed": rb,
         "bloom_slots_proven_max": proven,
