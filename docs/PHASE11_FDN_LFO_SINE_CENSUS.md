@@ -1,6 +1,16 @@
 # Phase 11P — FDN LFO/sine workload census
 
-Status: measurement-only. Production `apsis_space_dsp.c/.h` and Cathedral room source remain exact P11O.
+Status: **complete, frozen measurement-only phase.** Production `apsis_space_dsp.c/.h` and Cathedral room source remain exact P11O.
+
+## Authority
+
+- technical head: `2afb819dd865385f7547811b6422e7a281c80b7e`
+- authoritative run: `41359406941` — PASS
+- evidence artifact ID: `13104249141`
+- evidence ZIP SHA-256: `d1a5d5898d00150c0f757f11fa01683d705a131bb35387d614741c49fa3b3517`
+- historical census workflow is manual-only and explicitly checks out the proven technical head
+
+The authoritative run passed the optimized census, ASAN/UBSAN census, complete historical host + sanitizer preparation through the frozen P11F adaptation, and an exact real JieLi P11O target rebuild.
 
 ## Question
 
@@ -61,7 +71,7 @@ Combined natural window:
 - avoidable point evaluations under that model: **1,309,794**
 - endpoint pair is unchanged for **99.929%** of calls
 
-The first eight cold refreshes are cache initialization, one per line. A proof candidate may move those endpoint calculations into reset and then refresh only when the phase top byte actually changes; P11P does not yet authorize that implementation.
+The first eight cold refreshes are cache initialization, one per line. A proof candidate may move those endpoint calculations into reset and then refresh only when the phase top byte actually changes; P11P does not authorize a production implementation.
 
 ## Exhaustive helper-domain census
 
@@ -83,23 +93,40 @@ Consequences:
 - there is no zero-slope adjacent endpoint special case to exploit;
 - the measured redundancy is specifically repeated evaluation of the same two endpoints while the fractional byte continues to move.
 
+## Frozen real-target authority
+
+The successful P11P run regenerated the P11O target exactly:
+
+- product `FM-1_972`
+- image **140,440 B**
+- RAM **87,492 B**; headroom **10,812 B**
+- POOL **319,176 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- `apsis_space_fdn_render`: **1,114 B / 374** static instruction lines
+- `space_sine_q15`: fully inlined; no standalone target symbol
+- `space_sine_point`: **48 B / 14** static instruction lines
+
+This is useful structural evidence: the interpolation is already folded into the render, while the repeatedly evaluated endpoint helper survives as a real target function.
+
 ## Candidate decision
 
-P11P supports one narrow next proof candidate: **per-line endpoint caching keyed by the LFO phase top-byte transition while preserving the existing interpolation expression exactly**.
+P11P supports one narrow next **proof-only** candidate: **per-line endpoint caching keyed by the LFO phase top-byte transition while preserving the existing interpolation expression exactly**.
 
-A preferred proof shape is to initialize the two exact endpoints from each line's reset phase, retain only those two signed 16-bit endpoints per line if possible, and refresh them when the 8-bit phase index changes. This potentially needs only 4 B additional state per line (**32 B total before ABI/layout confirmation**) and avoids adding a persistent index if the refresh test can safely use the old/new `lfo_phase` top byte.
+A preferred proof shape is to initialize the two exact endpoints from each line's reset phase, retain only those two signed 16-bit endpoints per line if possible, and refresh them when the 8-bit phase index changes. This source-level representation is 4 B additional state per line (**32 B total before target ABI/layout confirmation**) and avoids a persistent index if the refresh test can safely compare the old and new `lfo_phase` top bytes.
 
-This is not production authorization. A later proof phase must establish:
+This is not production authorization. P11Q must establish:
 
-- bit-identical sine output for the complete relevant phase domain;
+- bit-identical sine output across the complete top-16 helper domain;
+- exact behavior across every top-byte transition, including `255 → 0` wrap;
 - bit-identical complete-FDN output/state/storage across startup, warm continuation, resets and randomized trajectories;
 - exact target ABI/state-size cost rather than assuming 32 B;
-- target image/RAM/POOL and inlined render code-shape delta;
+- ephemeral real-target image/RAM/POOL/package and inlined render code-shape delta;
 - optimized + ASAN/UBSAN behavior;
-- no regression to reset/startup semantics.
+- no reset/startup semantic regression.
 
-If those gates fail or the target tradeoff is poor, the candidate is rejected.
+If those gates fail or the target tradeoff is poor, the candidate is rejected and production remains P11O.
 
 ## Physical-hardware boundary
 
-No P11P result measures FM-1 CPU cycles, ISR margin, runtime stack high-water or audible quality. The census only identifies repeated work and a falsifiable exact-equivalence candidate.
+No P11P result measures FM-1 CPU cycles, ISR margin, runtime stack high-water or audible quality. The census identifies repeated work and a falsifiable exact-equivalence candidate only.
