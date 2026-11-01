@@ -29,6 +29,9 @@ typedef struct {
     ApsisSpaceFdnLine line[APSIS_SPACE_FDN_LINES];
     int32_t post_left_q15;
     int32_t post_right_q15;
+    uint16_t feedback_q15[APSIS_SPACE_FDN_LINES];
+    uint16_t feedback_decay_ms;
+    uint8_t feedback_cache_valid;
     uint8_t storage_bound;
 } ApsisSpaceFdn;
 
