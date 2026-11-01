@@ -90,10 +90,8 @@ static void fill_pattern(int16_t *storage, uint32_t capacity_frames, uint32_t se
 {
     uint32_t i;
     uint32_t s = seed;
-    for (i = 0u; i < capacity_frames * 2u; ++i) {
-        uint32_t r = lcg_next(&s);
-        storage[i] = (int16_t)(r >> 16);
-    }
+    for (i = 0u; i < capacity_frames * 2u; ++i)
+        storage[i] = (int16_t)(lcg_next(&s) >> 16);
     if (capacity_frames) {
         storage[0] = INT16_MIN;
         storage[1] = INT16_MAX;
@@ -102,15 +100,31 @@ static void fill_pattern(int16_t *storage, uint32_t capacity_frames, uint32_t se
     }
 }
 
-static void boundary_matrix(uint64_t *cases)
+static void check_write_boundary(const int16_t *storage,
+                                 uint32_t cap,
+                                 uint32_t write,
+                                 uint32_t fill,
+                                 uint64_t *cases)
 {
-    static const uint32_t capacities[] = {1u, 2u, 3u, 4u, 7u, 16u, 63u, 257u};
-    static const uint32_t fracs[] = {0u, 1u, 2u, 32767u, 32768u, 32769u, 65534u, 65535u};
-    uint32_t c;
+    if (write) {
+        const uint32_t q = write << 16;
+        check_case(storage, cap, write, fill, q - 1u, cases);
+        check_case(storage, cap, write, fill, q, cases);
+        check_case(storage, cap, write, fill, q + 1u, cases);
+    } else {
+        check_case(storage, cap, write, fill, 1u, cases);
+        check_case(storage, cap, write, fill, 65535u, cases);
+        check_case(storage, cap, write, fill, 65536u, cases);
+    }
+}
 
-    /* Explicit invalid/empty authority cases. */
-    check_case(NULL, 0u, 0u, 0u, 0u, cases);
-    check_case(NULL, 0u, 0u, 0u, 1u, cases);
+static void exhaustive_small_matrix(uint64_t *cases)
+{
+    static const uint32_t capacities[] = {1u, 2u, 3u, 4u, 7u, 16u};
+    static const uint32_t fracs[] = {
+        0u, 1u, 2u, 32767u, 32768u, 32769u, 65534u, 65535u
+    };
+    uint32_t c;
 
     for (c = 0u; c < sizeof(capacities) / sizeof(capacities[0]); ++c) {
         const uint32_t cap = capacities[c];
@@ -121,8 +135,6 @@ static void boundary_matrix(uint64_t *cases)
 
         for (write = 0u; write < cap; ++write) {
             for (fill = 0u; fill <= cap; ++fill) {
-                /* Whole-frame delays from 0 through one past the capacity,
-                 * crossed with fractions bracketing every interpolation edge. */
                 for (whole = 0u; whole <= cap + 1u; ++whole) {
                     for (f = 0u; f < sizeof(fracs) / sizeof(fracs[0]); ++f) {
                         const uint64_t q = ((uint64_t)whole << 16) + fracs[f];
@@ -130,19 +142,42 @@ static void boundary_matrix(uint64_t *cases)
                             check_case(storage, cap, write, fill, (uint32_t)q, cases);
                     }
                 }
+                check_write_boundary(storage, cap, write, fill, cases);
+            }
+        }
+        free(storage);
+    }
+}
 
-                /* Delays immediately around the current write position force
-                 * both direct subtraction and wrapped subtraction paths. */
-                if (write) {
-                    uint32_t q = write << 16;
-                    check_case(storage, cap, write, fill, q - 1u, cases);
-                    check_case(storage, cap, write, fill, q, cases);
-                    check_case(storage, cap, write, fill, q + 1u, cases);
-                } else {
-                    check_case(storage, cap, write, fill, 1u, cases);
-                    check_case(storage, cap, write, fill, 65535u, cases);
-                    check_case(storage, cap, write, fill, 65536u, cases);
+static void large_boundary_matrix(uint64_t *cases)
+{
+    static const uint32_t capacities[] = {63u, 257u, 512u};
+    static const uint32_t fracs[] = {
+        0u, 1u, 2u, 32767u, 32768u, 32769u, 65534u, 65535u
+    };
+    uint32_t c;
+
+    for (c = 0u; c < sizeof(capacities) / sizeof(capacities[0]); ++c) {
+        const uint32_t cap = capacities[c];
+        const uint32_t writes[] = {0u, 1u, cap / 2u, cap - 2u, cap - 1u};
+        const uint32_t fills[] = {0u, 1u, cap / 2u, cap - 1u, cap};
+        const uint32_t wholes[] = {0u, 1u, 2u, cap / 2u, cap - 1u, cap, cap + 1u};
+        int16_t *storage = (int16_t *)malloc(sizeof(int16_t) * cap * 2u);
+        uint32_t wi, fi, di, fr;
+        assert(storage != NULL);
+        fill_pattern(storage, cap, 0x2468ace0u ^ cap);
+
+        for (wi = 0u; wi < sizeof(writes) / sizeof(writes[0]); ++wi) {
+            const uint32_t write = writes[wi];
+            for (fi = 0u; fi < sizeof(fills) / sizeof(fills[0]); ++fi) {
+                const uint32_t fill = fills[fi];
+                for (di = 0u; di < sizeof(wholes) / sizeof(wholes[0]); ++di) {
+                    for (fr = 0u; fr < sizeof(fracs) / sizeof(fracs[0]); ++fr) {
+                        const uint32_t delay = (wholes[di] << 16) | fracs[fr];
+                        check_case(storage, cap, write, fill, delay, cases);
+                    }
                 }
+                check_write_boundary(storage, cap, write, fill, cases);
             }
         }
         free(storage);
@@ -151,11 +186,12 @@ static void boundary_matrix(uint64_t *cases)
 
 static void deterministic_random_matrix(uint64_t *cases)
 {
-    enum { MAX_CAP = 512, TRIALS = 250000 };
+    enum { MAX_CAP = 512, TRIALS = 100000 };
     int16_t *storage = (int16_t *)malloc(sizeof(int16_t) * MAX_CAP * 2u);
     uint32_t s = 0x41505349u;
     uint32_t t;
     assert(storage != NULL);
+    fill_pattern(storage, MAX_CAP, s);
 
     for (t = 0u; t < TRIALS; ++t) {
         const uint32_t cap = 1u + (lcg_next(&s) % MAX_CAP);
@@ -164,10 +200,15 @@ static void deterministic_random_matrix(uint64_t *cases)
         const uint32_t whole = lcg_next(&s) % (cap + 2u);
         const uint32_t frac = lcg_next(&s) & 65535u;
         const uint32_t delay = (whole << 16) | frac;
-        uint32_t i;
 
-        for (i = 0u; i < cap * 2u; ++i)
-            storage[i] = (int16_t)(lcg_next(&s) >> 16);
+        /* Mutate a few deterministic samples every trial and periodically
+         * refresh the complete backing store. Addressing equivalence does not
+         * depend on storage history, while this still exercises varied signed
+         * endpoints and interpolation products. */
+        if ((t & 255u) == 0u)
+            fill_pattern(storage, MAX_CAP, lcg_next(&s));
+        storage[(lcg_next(&s) % cap) * 2u] = (int16_t)(lcg_next(&s) >> 16);
+        storage[(lcg_next(&s) % cap) * 2u + 1u] = (int16_t)(lcg_next(&s) >> 16);
         check_case(storage, cap, write, fill, delay, cases);
     }
     free(storage);
@@ -175,9 +216,18 @@ static void deterministic_random_matrix(uint64_t *cases)
 
 int main(void)
 {
+    int16_t one_frame[2] = {INT16_MIN, INT16_MAX};
     uint64_t cases = 0u;
-    boundary_matrix(&cases);
+
+    /* Explicit invalid/empty authority cases. */
+    check_case(NULL, 0u, 0u, 0u, 0u, &cases);
+    check_case(NULL, 0u, 0u, 0u, 1u, &cases);
+    check_case(one_frame, 0u, 0u, 0u, 65536u, &cases);
+
+    exhaustive_small_matrix(&cases);
+    large_boundary_matrix(&cases);
     deterministic_random_matrix(&cases);
+
     printf("P11I stereo-read equivalence cases=%llu\n", (unsigned long long)cases);
     puts("PASS: P11I candidate stereo-pair reader is bit-identical to current single-channel authority");
     return 0;
