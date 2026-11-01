@@ -1,9 +1,10 @@
 name: APSIS Phase 11D target memory ownership inventory
 
+# Historical read-only inventory gate. Authoritative green run 41320007779 on
+# 2e1912f5d0ff8987382bd7af434fc322679bf762. Later optimisation heads must not
+# reinterpret this exact P11C memory baseline, so manual reruns check out the
+# proven P11D technical head.
 on:
-  push:
-    branches: [p11d-memory-inventory-staging, p11-optimization]
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,6 +14,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: 2e1912f5d0ff8987382bd7af434fc322679bf762
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
