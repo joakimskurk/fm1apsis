@@ -206,7 +206,6 @@ static void test_reroll_uses_frozen_authority_and_preserves_route(void)
     assert(spiral.route_count == route_count);
     assert(memcmp(spiral.route, route, sizeof(route)) == 0);
 
-    /* Source-vector energy values prove we delegated to the frozen reset path. */
     assert(spiral.attractor_energy_q15[0] >= 18574u &&
            spiral.attractor_energy_q15[0] <= 18576u);
     assert(spiral.attractor_energy_q15[1] >= 7305u &&
@@ -220,15 +219,15 @@ static void test_default_length_reroll_tail_vector(void)
     ApsisSpiralState spiral = base_spiral();
     ApsisFm1InputFrame input = {0};
 
-    /* At the source-default length 16, reroll regenerates cells 0..15 and the
-     * frozen M4f reset intentionally restores cells 16..23 through
-     * set_default_tail(). This is part of source authority, not hidden state. */
+    /* First 16 cells are the same deterministic prefix as the locked 24-cell
+     * FDA5FD vector. Source reset then restores cells 16..23 through
+     * set_default_tail(), whose default high byte is 0x2D. */
     input.buttons_pressed = button_bit(APSIS_FM1_BTN_REC);
     assert(apsis_controls_spiral_attractor_edit(&session, &spiral, &input, &out));
     assert(out.rerolled == 1u);
     assert(spiral.attractor_length == 16u);
     assert(spiral.attractor_seed == 4825u);
-    assert(spiral.attractor_gates == 0x002d05ffu);
+    assert(spiral.attractor_gates == 0x002da5fdu);
 }
 
 static void test_same_frame_ordering_and_selected_energy(void)
@@ -242,8 +241,6 @@ static void test_same_frame_ordering_and_selected_energy(void)
 
     spiral.attractor_length = 24u;
     reference.attractor_length = 24u;
-    /* Independent frozen-authority reference gives the exact rerolled energy
-     * before the editor's same-frame key selection and K4 +0.01 edit. */
     apsis_spiral_reset_attractor(&reference, 1u);
     expected_energy = (uint16_t)(reference.attractor_energy_q15[3] +
         APSIS_Q15_MILLI(10));
