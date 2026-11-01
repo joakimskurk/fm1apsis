@@ -1,8 +1,6 @@
 name: APSIS Phase 11I stereo-pair production validation
 
 on:
-  push:
-    branches: [p11i-space-stereo-read-staging]
   workflow_dispatch:
 
 jobs:
@@ -14,6 +12,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: ab6960ad3acf78dbc9f366d2a5e9358b42011cca
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
@@ -28,6 +27,7 @@ jobs:
       - name: Gate P11I.1 - production pair reader equals frozen single-read authority
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ab6960ad3acf78dbc9f366d2a5e9358b42011cca'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             apsis/apsis_space_dsp.c tests/test_p11i_stereo_read_equivalence.c \
             -o /tmp/test_p11i_stereo_read_equivalence
