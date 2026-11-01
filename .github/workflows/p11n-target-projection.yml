@@ -1,0 +1,161 @@
+name: APSIS Phase 11N ephemeral target line-read projection
+
+on:
+  push:
+    branches: [p11n-fdn-line-read-proof-staging]
+  workflow_dispatch:
+
+jobs:
+  p11n-target-projection:
+    runs-on: ubuntu-24.04
+    env:
+      P11N_EVIDENCE: /tmp/p11n-target-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11N_EVIDENCE"
+          mkdir -p "$P11N_EVIDENCE"
+
+      - name: Gate P11N.1 - repeat host equivalence proof
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11n_fdn_line_read_equivalence.c \
+            -o /tmp/test_p11n_fdn_line_read_equivalence
+          /tmp/test_p11n_fdn_line_read_equivalence | tee "$P11N_EVIDENCE/host-proof.log"
+          grep -q 'P11N helper_cases=905504 full_render_blocks=3328 full_render_frames=210677' "$P11N_EVIDENCE/host-proof.log"
+          grep -q 'PASS: P11N invariant-simplified line read is bit-identical' "$P11N_EVIDENCE/host-proof.log"
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11N.2 - exact P11L baseline target
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11N_EVIDENCE/baseline-target.json"
+          cp build/SHA256SUMS "$P11N_EVIDENCE/baseline-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11N_EVIDENCE/baseline-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11N_EVIDENCE/baseline-disassembly.txt"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972','image':140440,'ram':87492,'pool':319176,
+              'ram_headroom':10812,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'131aeaffac35f1443abdaa4b1ce944c8d08b311e22bc5709b1acb071fd2e86e3',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          print('PASS: exact frozen P11L target regenerated')
+          PY
+
+      - name: Gate P11N.3 - apply candidate only to generated target and rebuild
+        run: |
+          set -euo pipefail
+          python3 ci/p11n_apply_ephemeral_line_read.py
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11N_EVIDENCE/candidate-target.json"
+          cp build/SHA256SUMS "$P11N_EVIDENCE/candidate-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11N_EVIDENCE/candidate-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11N_EVIDENCE/candidate-disassembly.txt"
+
+      - name: Gate P11N.4 - quantify target resource and code-shape deltas
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee "$P11N_EVIDENCE/projection.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+
+          base=json.load(open('/tmp/p11n-target-evidence/baseline-target.json'))
+          cand=json.load(open('/tmp/p11n-target-evidence/candidate-target.json'))
+          assert cand['product'] == 'FM-1_972', cand
+          assert cand['image'] <= cand['image_max'], cand
+          assert cand['ram'] <= cand['ram_max'], cand
+          assert cand['pool'] == base['pool'], (base,cand)
+          assert cand['ram'] == base['ram'], (base,cand)
+          assert cand['package_bytes'] == base['package_bytes'], (base,cand)
+
+          def shape(prefix):
+              symbols=inv.parse_symbols(Path(f'/tmp/p11n-target-evidence/{prefix}-symbols.txt').read_text(errors='replace'))
+              insns=inv.parse_disassembly(Path(f'/tmp/p11n-target-evidence/{prefix}-disassembly.txt').read_text(errors='replace'))
+              line_names=sorted(n for n in set(symbols)|set(insns) if 'space_line_read' in n)
+              render_names=['apsis_space_fdn_render']
+              return {
+                  'line_names': line_names,
+                  'line_text_bytes': sum(symbols.get(n,0) for n in line_names),
+                  'line_instruction_lines': sum(insns.get(n,0) for n in line_names),
+                  'fdn_render_text_bytes': sum(symbols.get(n,0) for n in render_names),
+                  'fdn_render_instruction_lines': sum(insns.get(n,0) for n in render_names),
+              }
+          bs=shape('baseline'); cs=shape('candidate')
+          report={
+              'baseline_target':base,
+              'candidate_target':cand,
+              'target_delta':{
+                  'image':cand['image']-base['image'],
+                  'ram':cand['ram']-base['ram'],
+                  'pool':cand['pool']-base['pool'],
+                  'ram_headroom':cand['ram_headroom']-base['ram_headroom'],
+              },
+              'baseline_shape':bs,
+              'candidate_shape':cs,
+              'shape_delta':{
+                  'line_text_bytes':cs['line_text_bytes']-bs['line_text_bytes'],
+                  'line_instruction_lines':cs['line_instruction_lines']-bs['line_instruction_lines'],
+                  'fdn_render_text_bytes':cs['fdn_render_text_bytes']-bs['fdn_render_text_bytes'],
+                  'fdn_render_instruction_lines':cs['fdn_render_instruction_lines']-bs['fdn_render_instruction_lines'],
+              },
+              'physical_timing_proven':False,
+          }
+          Path('/tmp/p11n-target-evidence/projection.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          print('PASS: P11N ephemeral target candidate fits; exact target/code-shape deltas recorded')
+          PY
+
+      - name: Gate P11N.5 - repo production sources remain untouched
+        run: |
+          set -euo pipefail
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '0c472f3844210f0dfb3d31bf6dacf007272ac078'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = '71afae3c4c52bbd735121597dfa7ad6cea4f32f5'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          echo 'PASS: P11N projection changed generated target only; repo production Space remains P11L'
+
+      - name: Upload P11N projection evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11n-line-read-target-projection
+          path: /tmp/p11n-target-evidence
+          if-no-files-found: error
