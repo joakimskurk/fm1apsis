@@ -1,8 +1,9 @@
 name: APSIS Phase 11H Cathedral dynamic workload census
 
+# Historical read-only workload gate. Authoritative green run 41341918347 on
+# ca20dd8608ae685349d483f68d72ce4022b90402. Manual reruns always check out
+# that proven technical head so later optimisation cannot reinterpret P11H.
 on:
-  push:
-    branches: [p11h-cathedral-workload-staging]
   workflow_dispatch:
 
 jobs:
@@ -14,6 +15,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: ca20dd8608ae685349d483f68d72ce4022b90402
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
