@@ -1,0 +1,61 @@
+name: APSIS Phase 10 String Attractor editor
+
+on:
+  push:
+    branches: [p10-string-motion]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  p10e-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Build host contract
+        run: |
+          mkdir -p build/p10e
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_string_attractor.c \
+            apsis/apsis_controls_string_attractor.c \
+            tests/test_controls_string_attractor.c \
+            -o build/p10e/test_controls_string_attractor
+
+      - name: Gate P10E.1 - host editor contract
+        run: build/p10e/test_controls_string_attractor
+
+      - name: Build sanitizer contract
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_string_attractor.c \
+            apsis/apsis_controls_string_attractor.c \
+            tests/test_controls_string_attractor.c \
+            -o build/p10e/san_controls_string_attractor
+
+      - name: Gate P10E.2 - ASAN/UBSAN editor contract
+        run: |
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            build/p10e/san_controls_string_attractor
+
+      - name: Gate P10E.3 - frozen-layer ownership
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c = Path('apsis/apsis_controls_string_attractor.c').read_text()
+          forbidden = (
+              'apsis_runtime_',
+              'apsis_string_attractor_plan_pulse(',
+              'apsis_string_attractor_pending_',
+              'apsis_string_attractor_begin_process(',
+          )
+          for token in forbidden:
+              if token in c:
+                  raise SystemExit(f'FAIL: P10E editor crossed runtime ownership: {token}')
+          if 'filter_attractor_gates' not in c or 'filter_attractor_seed' not in c:
+              raise SystemExit('FAIL: P10E editor is not editing existing String attractor state')
+          print('PASS: P10E editor is a control/state layer above frozen M4c')
+          PY
