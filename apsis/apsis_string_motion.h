@@ -14,26 +14,6 @@ typedef enum {
     APSIS_STRING_MOTION_TARGET_BOTH
 } ApsisStringMotionTarget;
 
-/* Native bounded representation of Study-126 [phase, split, frozen pitch].
- * pitch_milli is absolute semitone position relative to C3=0, including the
- * recording-time tuning deviation. Linear interpolation in pitch_milli is the
- * log-pitch equivalent of the browser's geometric Hz interpolation. */
-typedef struct {
-    uint16_t phase_q16;
-    uint16_t split_q15;
-    int32_t pitch_milli;
-} ApsisStringMotionPoint;
-
-typedef struct {
-    ApsisStringMotionPoint point[APSIS_STRING_MOTION_POINTS_MAX];
-    uint16_t count;
-} ApsisStringMotionLane;
-
-typedef struct {
-    ApsisStringMotionLane left;
-    ApsisStringMotionLane right;
-} ApsisStringMotionStore;
-
 /* Minimum frozen musical context required to reproduce
  * Study-126 stringFrequencyForSplitInContext() after later Gravity/Tuning edits. */
 typedef struct {
@@ -56,6 +36,27 @@ typedef struct {
     uint8_t scale_lock;
     uint8_t temper_mode;
 } ApsisStringMotionPitchContext;
+
+/* P11C lossless compact representation. Every point in one recorded lane is
+ * captured under one immutable pitch context, so frozen absolute pitch is
+ * exactly derivable from that lane context + split_q15. Keeping only phase and
+ * split removes the redundant int32 pitch from all 1200 points without reducing
+ * capture rate, point capacity or millisemintone playback precision. */
+typedef struct {
+    uint16_t phase_q16;
+    uint16_t split_q15;
+} ApsisStringMotionPoint;
+
+typedef struct {
+    ApsisStringMotionPoint point[APSIS_STRING_MOTION_POINTS_MAX];
+    ApsisStringMotionPitchContext pitch;
+    uint16_t count;
+} ApsisStringMotionLane;
+
+typedef struct {
+    ApsisStringMotionLane left;
+    ApsisStringMotionLane right;
+} ApsisStringMotionStore;
 
 typedef struct {
     ApsisStringMotionPitchContext pitch;
