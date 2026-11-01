@@ -66,15 +66,6 @@ static int16_t space_sine_point(uint8_t index)
     return (int16_t)-SPACE_SINE_QUARTER[64u - o];
 }
 
-static int16_t space_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = space_sine_point(i);
-    int32_t b = space_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
-
 static uint16_t space_damping_alpha(uint16_t hz)
 {
     uint32_t index, frac, a, b;
@@ -179,6 +170,11 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
         line->lfo_phase = (uint32_t)i * 0x20000000u;
         line->lfo_phase_inc = SPACE_LFO_INC[i];
         line->damping_state_q15 = 0;
+        {
+            uint8_t sine_i = (uint8_t)(line->lfo_phase >> 24);
+            line->lfo_sine_a_q15 = space_sine_point(sine_i);
+            line->lfo_sine_b_q15 = space_sine_point((uint8_t)(sine_i + 1u));
+        }
         offset += line->capacity;
     }
     if (offset != APSIS_SPACE_FDN_STORAGE_SAMPLES) fdn->storage_bound = 0u;
@@ -210,9 +206,21 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
 
         for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k) {
             ApsisSpaceFdnLine *line = &fdn->line[k];
+            uint32_t old_phase = line->lfo_phase;
             int32_t mod_q8, delayed;
+            int32_t sine_a, sine_b;
+            uint8_t sine_i, sine_frac;
             line->lfo_phase += line->lfo_phase_inc;
-            mod_q8 = ((int32_t)space_sine_q15(line->lfo_phase) * SPACE_MOD_DEPTH_Q8) >> 15;
+            sine_i = (uint8_t)(line->lfo_phase >> 24);
+            if ((uint8_t)(old_phase >> 24) != sine_i) {
+                line->lfo_sine_a_q15 = space_sine_point(sine_i);
+                line->lfo_sine_b_q15 = space_sine_point((uint8_t)(sine_i + 1u));
+            }
+            sine_frac = (uint8_t)(line->lfo_phase >> 16);
+            sine_a = line->lfo_sine_a_q15;
+            sine_b = line->lfo_sine_b_q15;
+            mod_q8 = (int32_t)(int16_t)(sine_a + (((sine_b - sine_a) * sine_frac) >> 8));
+            mod_q8 = (mod_q8 * SPACE_MOD_DEPTH_Q8) >> 15;
             delayed = space_line_read(fdn, line, mod_q8);
             line->damping_state_q15 += space_mul_q15(
                 delayed - line->damping_state_q15, alpha);
