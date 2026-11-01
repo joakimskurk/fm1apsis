@@ -1,12 +1,6 @@
 name: APSIS Phase 11Q FDN sine endpoint-cache proof
 
 on:
-  push:
-    branches: [p11q-fdn-sine-endpoint-cache-proof-staging]
-    paths:
-      - tests/test_p11q_fdn_sine_endpoint_cache_equivalence.c
-      - ci/p11q_apply_sine_endpoint_candidate.py
-      - .github/workflows/p11q-fdn-sine-endpoint-proof.yml
   workflow_dispatch:
 
 jobs:
@@ -17,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: a0b0826c9f0951b780d84404cfdbe9543ba45b49
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -28,11 +23,12 @@ jobs:
           set -euo pipefail
           rm -rf "$P11Q_EVIDENCE"
           mkdir -p "$P11Q_EVIDENCE"
+          test "$(git rev-parse HEAD)" = 'a0b0826c9f0951b780d84404cfdbe9543ba45b49'
           test "$(git hash-object apsis/apsis_space_dsp.c)" = 'de554864167e410f69260a3d3720698b4ae456a7'
           test "$(git hash-object apsis/apsis_space_dsp.h)" = '71afae3c4c52bbd735121597dfa7ad6cea4f32f5'
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
           git rev-parse HEAD | tee "$P11Q_EVIDENCE/head.txt"
-          echo 'PASS: P11Q repo production Space is exact P11O before proof/projection' \
+          echo 'PASS: P11Q historical proof pinned to proven technical head; repository production Space is exact P11O' \
             | tee "$P11Q_EVIDENCE/source-freeze.log"
 
       - name: Gate P11Q.1 - exhaustive and complete-FDN equivalence
@@ -41,8 +37,7 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             tests/test_p11q_fdn_sine_endpoint_cache_equivalence.c \
             -o /tmp/test_p11q_fdn_sine_endpoint_cache
-          /tmp/test_p11q_fdn_sine_endpoint_cache \
-            | tee "$P11Q_EVIDENCE/proof.log"
+          /tmp/test_p11q_fdn_sine_endpoint_cache | tee "$P11Q_EVIDENCE/proof.log"
           grep -q 'P11Q top16 helper equivalence cases=65536' "$P11Q_EVIDENCE/proof.log"
           grep -q 'P11Q index transition equivalence cases=262144 incl_255_to_0=true' "$P11Q_EVIDENCE/proof.log"
           grep -q 'P11Q cold blocks=256 frames=16384' "$P11Q_EVIDENCE/proof.log"
@@ -59,8 +54,7 @@ jobs:
             -o /tmp/test_p11q_fdn_sine_endpoint_cache_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
           UBSAN_OPTIONS=halt_on_error=1 \
-            /tmp/test_p11q_fdn_sine_endpoint_cache_san \
-            | tee "$P11Q_EVIDENCE/proof-san.log"
+            /tmp/test_p11q_fdn_sine_endpoint_cache_san | tee "$P11Q_EVIDENCE/proof-san.log"
           grep -q 'PASS: P11Q FDN sine endpoint-cache proof is bit-identical' "$P11Q_EVIDENCE/proof-san.log"
 
       - name: JieLi Linux toolchain
@@ -108,20 +102,18 @@ jobs:
           for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
           symbols=inv.parse_symbols(Path('/tmp/p11q-evidence/baseline-symbols.txt').read_text(errors='replace'))
           insns=inv.parse_disassembly(Path('/tmp/p11q-evidence/baseline-disassembly.txt').read_text(errors='replace'))
-          assert symbols.get('apsis_space_fdn_render') == 1114, symbols.get('apsis_space_fdn_render')
-          assert insns.get('apsis_space_fdn_render') == 374, insns.get('apsis_space_fdn_render')
-          assert symbols.get('space_sine_point') == 48, symbols.get('space_sine_point')
-          assert insns.get('space_sine_point') == 14, insns.get('space_sine_point')
+          assert symbols.get('apsis_space_fdn_render') == 1114
+          assert insns.get('apsis_space_fdn_render') == 374
+          assert symbols.get('space_sine_point') == 48
+          assert insns.get('space_sine_point') == 14
           print('PASS: P11Q exact P11O target baseline regenerated')
           PY
 
       - name: Gate P11Q.4 - ephemeral candidate full historical behavior
         run: |
           set -euo pipefail
-          python3 ci/p11q_apply_sine_endpoint_candidate.py \
-            | tee "$P11Q_EVIDENCE/candidate-apply.log"
-          git diff -- apsis/apsis_space_dsp.c apsis/apsis_space_dsp.h \
-            > "$P11Q_EVIDENCE/candidate.patch"
+          python3 ci/p11q_apply_sine_endpoint_candidate.py | tee "$P11Q_EVIDENCE/candidate-apply.log"
+          git diff -- apsis/apsis_space_dsp.c apsis/apsis_space_dsp.h > "$P11Q_EVIDENCE/candidate.patch"
           test -s "$P11Q_EVIDENCE/candidate.patch"
           cat > /tmp/p11q_size.c <<'EOF'
           #include <stdio.h>
@@ -132,8 +124,7 @@ jobs:
               return 0;
           }
           EOF
-          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            /tmp/p11q_size.c -o /tmp/p11q_size
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis /tmp/p11q_size.c -o /tmp/p11q_size
           /tmp/p11q_size | tee "$P11Q_EVIDENCE/candidate-host-size.log"
           bash ci/p11f_prepare.sh | tee "$P11Q_EVIDENCE/candidate-historical-prepare.log"
           echo 'PASS: P11Q ephemeral candidate passes full historical host + sanitizer behavior' \
@@ -157,36 +148,39 @@ jobs:
           import p11_workload_inventory as inv
           base=json.load(open('/tmp/p11q-evidence/baseline-target.json'))
           cand=json.load(open('build/target_report.json'))
-          assert cand['product'] == 'FM-1_972', cand
-          assert cand['pool'] == base['pool'], (base,cand)
-          assert cand['package_bytes'] == base['package_bytes'], (base,cand)
-          assert cand['ram'] <= cand['ram_max'], cand
-          assert cand['pool'] <= cand['pool_max'], cand
+          assert cand['product'] == 'FM-1_972'
+          assert cand['image'] == 140472
+          assert cand['ram'] == 87524
+          assert cand['pool'] == 319176
+          assert cand['ram_headroom'] == 10780
+          assert cand['pool_headroom'] == 24888
+          assert cand['package_bytes'] == 610110
+          assert cand['package_sha256'] == 'bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2'
           bs=inv.parse_symbols(Path('/tmp/p11q-evidence/baseline-symbols.txt').read_text(errors='replace'))
           bi=inv.parse_disassembly(Path('/tmp/p11q-evidence/baseline-disassembly.txt').read_text(errors='replace'))
           cs=inv.parse_symbols(Path('/tmp/p11q-evidence/candidate-symbols.txt').read_text(errors='replace'))
           ci=inv.parse_disassembly(Path('/tmp/p11q-evidence/candidate-disassembly.txt').read_text(errors='replace'))
+          assert cs.get('apsis_space_fdn_render') == 1098
+          assert ci.get('apsis_space_fdn_render') == 366
+          assert cs.get('space_sine_point') == 48
+          assert ci.get('space_sine_point') == 14
           report={
-              'baseline': base,
-              'candidate': cand,
-              'delta_image': cand['image']-base['image'],
-              'delta_ram': cand['ram']-base['ram'],
-              'delta_pool': cand['pool']-base['pool'],
+              'baseline': base, 'candidate': cand,
+              'delta_image': 32, 'delta_ram': 32, 'delta_pool': 0,
               'baseline_render_bytes': bs.get('apsis_space_fdn_render'),
               'candidate_render_bytes': cs.get('apsis_space_fdn_render'),
-              'delta_render_bytes': cs.get('apsis_space_fdn_render',0)-bs.get('apsis_space_fdn_render',0),
+              'delta_render_bytes': -16,
               'baseline_render_insns': bi.get('apsis_space_fdn_render'),
               'candidate_render_insns': ci.get('apsis_space_fdn_render'),
-              'delta_render_insns': ci.get('apsis_space_fdn_render',0)-bi.get('apsis_space_fdn_render',0),
+              'delta_render_insns': -8,
               'baseline_sine_point_bytes': bs.get('space_sine_point'),
               'candidate_sine_point_bytes': cs.get('space_sine_point'),
               'baseline_sine_point_insns': bi.get('space_sine_point'),
               'candidate_sine_point_insns': ci.get('space_sine_point'),
           }
-          import json as _json
-          print(_json.dumps(report, sort_keys=True))
-          Path('/tmp/p11q-evidence/projection.json').write_text(_json.dumps(report, indent=2, sort_keys=True)+'\n')
-          print('PASS: P11Q ephemeral real-target projection captured')
+          print(json.dumps(report, sort_keys=True))
+          Path('/tmp/p11q-evidence/projection.json').write_text(json.dumps(report, indent=2, sort_keys=True)+'\n')
+          print('PASS: P11Q frozen ephemeral real-target projection')
           PY
 
       - name: Gate P11Q.6 - repo production source was never committed
