@@ -119,16 +119,30 @@ Frozen technical P9 head `02a0cfe55ffd4fb6ee3e346d5a49e037f2b6ad7e`:
 
 ## Phase 10 — String Motion and advanced interactive parity
 
-Status: **[~] current.**
+Status: **[~] current. String Motion checkpoint P10D3 is green; P10E String Attractor editor is next.**
 
-- [ ] Clock-quantized String Motion capture
-- [ ] Classic/Dual ownership and frozen pitch context
-- [ ] overdub/manual override
+- [x] Clock-quantized String Motion capture
+- [x] Classic/Dual ownership and frozen pitch context
+- [x] overdub/manual override
+- [x] finite main→audio mailbox + dedicated 19,208-B Motion POOL
+- [x] deterministic Motion host/sanitizer contracts
+- [x] real JieLi Motion target + exact frozen Phase-9 idle PCM/runtime regression
+- [x] active pinned-emulator lifecycle: arm → next Clock 1 → record → loop → manual override → resume
 - [ ] String Attractor editor
 - [ ] Spiral Attractor editor
 - [ ] selected Gravity-point editor
-- [ ] deterministic host/sanitizer contracts before target integration
-- [ ] target/emulator regression preserving frozen Phase-9 idle audio/runtime
+- [ ] final advanced-interaction target/emulator regression preserving frozen Phase-9 idle audio/runtime
+
+P10D3 evidence on `e750655141bb87e83949bb262426ab2ee42d734b`:
+- production P10D2 target: image 136,984 B; RAM 89,668 B; POOL 328,740 B
+- production RAM headroom 8,636 B; POOL headroom 15,324 B
+- active D3 telemetry target: image 137,240 B; RAM 89,732 B; POOL 328,740 B
+- active lifecycle flags `ff`; final flags `14`
+- Dual+LINK capture 149 points left / 149 right
+- record start sample 220,672; finish 441,088; cycle 220,416 samples
+- manual override sample 450,560 → resume 466,176
+- runtime cursor 481,024; queue high-water 30/512; overflow 0; late flags 0
+- active WAV peak 1,171; RMS 173
 
 ## Phase 11 — FM-1 optimisation
 - [ ] real ISR timing under DSP load
@@ -150,4 +164,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Begin Phase 10A by freezing the Study-126 String Motion capture/ownership contract before changing target behavior. Host-test Clock-quantized capture, Classic/Dual ownership, frozen pitch context, overdub and manual override first. Only then integrate target controls, while retaining the frozen Phase-9 idle PCM `c4fa1895…`, cursor 123,392 and zero late/overflow flags.
+Begin **Phase 10E — String Attractor editor** as a host-first control/state layer above the already-frozen M4c String Attractor runtime. The first N physical keys must edit the existing `filter_attractor_gates` cells (maximum 16), reroll must change the existing bounded seed and let `apsis_string_attractor_sync()` regenerate deterministically, and no private scheduler/DSP state may be introduced. Preserve the Phase-9 String performance mapping outside the explicit Attractor edit context, then bind the editor to the FM-1 target only after host + sanitizer contracts are green.
