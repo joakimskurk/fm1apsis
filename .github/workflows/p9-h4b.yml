@@ -30,7 +30,8 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
             apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
             apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
-            apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
+            apsis/apsis_string_transient_pool.c apsis/apsis_spiral.c \
+            apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
             apsis/apsis_late_binding.c apsis/apsis_bloom_dsp.c \
             apsis/apsis_bloom_manual_audio.c tests/test_bloom_manual_audio.c \
             -o /tmp/test_bloom_manual_audio
@@ -41,7 +42,8 @@ jobs:
             -fsanitize=address,undefined -Iapsis \
             apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
             apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
-            apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
+            apsis/apsis_string_transient_pool.c apsis/apsis_spiral.c \
+            apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
             apsis/apsis_late_binding.c apsis/apsis_bloom_dsp.c \
             apsis/apsis_bloom_manual_audio.c tests/test_bloom_manual_audio.c \
             -o /tmp/test_bloom_manual_audio_san
