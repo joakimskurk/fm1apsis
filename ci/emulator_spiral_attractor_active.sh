@@ -70,10 +70,11 @@ if violations != 0:
     raise SystemExit(f'FAIL: P10F ATTRACTOR mutated P9 route violations={violations:#x}')
 if initial_seed != 911 or final_seed != 4825:
     raise SystemExit(f'FAIL: P10F frozen reroll seed {initial_seed}->{final_seed}, expected 911->4825')
-# Default length is 16. Frozen M4f reroll produces low mask A5FD; the later
-# physical n0 edge must toggle gate0 to A5FC.
-if final_gates != 0x0000a5fc:
-    raise SystemExit(f'FAIL: P10F reroll+gate final={final_gates:#010x}, expected 0x0000a5fc')
+# Default length is 16. The frozen M4f reset regenerates cells 0..15 to 05FF,
+# then set_default_tail() deliberately restores source-default cells 16..23 to
+# 0x2D. The later physical n0 edge therefore produces the exact 0x2D05FE mask.
+if final_gates != 0x002d05fe:
+    raise SystemExit(f'FAIL: P10F reroll+gate final={final_gates:#010x}, expected 0x002d05fe')
 initial_route_count = route_counts & 0xffff
 final_route_count = (route_counts >> 16) & 0xffff
 if initial_route_count != 0 or final_route_count != 0:

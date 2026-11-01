@@ -213,6 +213,24 @@ static void test_reroll_uses_frozen_authority_and_preserves_route(void)
            spiral.attractor_energy_q15[1] <= 7307u);
 }
 
+static void test_default_length_reroll_tail_vector(void)
+{
+    ApsisSpiralAttractorEditorSession session = {1u, 0u};
+    ApsisSpiralAttractorControlResult out;
+    ApsisSpiralState spiral = base_spiral();
+    ApsisFm1InputFrame input = {0};
+
+    /* At the source-default length 16, reroll regenerates cells 0..15 and the
+     * frozen M4f reset intentionally restores cells 16..23 through
+     * set_default_tail(). This is part of source authority, not hidden state. */
+    input.buttons_pressed = button_bit(APSIS_FM1_BTN_REC);
+    assert(apsis_controls_spiral_attractor_edit(&session, &spiral, &input, &out));
+    assert(out.rerolled == 1u);
+    assert(spiral.attractor_length == 16u);
+    assert(spiral.attractor_seed == 4825u);
+    assert(spiral.attractor_gates == 0x002d05ffu);
+}
+
 static void test_same_frame_ordering_and_selected_energy(void)
 {
     ApsisSpiralAttractorEditorSession session = {1u, 9u};
@@ -251,6 +269,7 @@ int main(void)
     test_parameters_and_bounds();
     test_gate_only_preserves_seed_energy_route();
     test_reroll_uses_frozen_authority_and_preserves_route();
+    test_default_length_reroll_tail_vector();
     test_same_frame_ordering_and_selected_energy();
     puts("PASS: P10F Spiral Attractor editor is bounded, route-isolated and M4f-backed");
     return 0;
