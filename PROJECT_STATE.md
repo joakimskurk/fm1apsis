@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11P are complete. P11O remains the accepted production baseline; P11P measured the remaining FDN LFO/sine endpoint redundancy and authorizes P11Q proof-only.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11Q are complete. P11O remains the accepted production baseline; P11Q proved and target-projected the FDN sine-endpoint cache and authorizes P11R production validation.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -605,15 +605,47 @@ Frozen target authority:
 
 Decision: authorize P11Q proof-only for a per-line pair of exact signed-16-bit sine endpoints. Initialize them from each reset phase; refresh them only on an 8-bit phase-index transition; preserve the existing interpolation expression exactly. The source representation is 4 B/line (**32 B total**) before target ABI confirmation. Production remains P11O.
 
-## Exact next phase — P11Q FDN sine endpoint-cache equivalence proof
+## P11Q — FDN sine endpoint-cache proof complete
 
-Before any production source modification:
-1. prove exhaustive top-16 helper equivalence and every top-byte transition including `255 → 0`;
-2. prove reset initialization and complete-FDN output/state/storage equivalence across cold, warm, randomized trajectories and resets;
-3. run optimized + ASAN/UBSAN;
-4. measure exact host/target state-size cost;
-5. project the candidate ephemerally on the real JieLi target for image/RAM/POOL/package and inlined render code shape;
-6. authorize a separate production-validation phase only if every gate passes and the target tradeoff remains justified.
+Proof authority:
+- technical head `a0b0826c9f0951b780d84404cfdbe9543ba45b49`
+- run `41360291892` — PASS
+- artifact ID `13104793891`
+- artifact ZIP SHA-256 `7e7699b82e6540c64e099d4f8ea4d5a6d508e6a88d402a8c91c1d0aaa0cfcd05`
+- repository production Space remained exact P11O
+- historical workflow manual-only and pinned to the proven technical head
+
+Exact equivalence coverage:
+- top-16 helper domain **65,536** cases
+- index-transition matrix **262,144** cases including `255 → 0`
+- complete FDN **5,376 blocks / 164,767 frames**
+- cold **256 blocks / 16,384 frames**, **88** hot-path refreshes after reset initialization
+- warm **1,024 blocks / 65,536 frames**, **367** refreshes
+- randomized continuation **4,096 blocks** with resets and randomized LFO phases
+- stereo output, every pre-existing FDN state field and full delay storage bit-identical
+- optimized + ASAN/UBSAN PASS
+- full historical host + sanitizer behavior PASS with the ephemeral candidate
+
+State/layout cost:
+- host `ApsisSpaceFdnLine` **24 → 28 B**
+- host `ApsisSpaceFdn` **232 → 264 B**
+- target ordinary RAM delta **+32 B**, confirming exactly 4 B per line
+
+Ephemeral real-target projection:
+- baseline P11O: image **140,440 B**, RAM **87,492 B**, POOL **319,176 B**, package `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- candidate: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**
+- candidate RAM headroom **10,780 B**; POOL headroom **24,888 B**
+- package bytes **610,110 B**
+- candidate package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- inlined FDN render **1,114 → 1,098 B**, **374 → 366** static instruction lines
+- `space_sine_point` stays **48 B / 14** static instruction lines
+- dead `space_sine_q15` wrapper is removed by the candidate
+
+Combined with P11P, the candidate replaces repeated endpoint evaluation on more than 99.9% of the measured natural sine calls for a bounded 32-B RAM/image cost and a smaller render code shape. P11Q therefore authorizes P11R production validation. It does not claim measured physical CPU or ISR improvement.
+
+## Exact next phase — P11R production FDN sine endpoint-cache validation
+
+Apply exactly the P11Q candidate to production `apsis_space_dsp.c/.h` and nothing else in Space. Require actual-production equivalence against frozen P11O authority, complete historical host + sanitizer behavior, exact real-target match to the P11Q projection, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 

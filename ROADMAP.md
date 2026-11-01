@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11P are complete; P11Q is authorized as a proof-only phase for the measured FDN sine-endpoint cache candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11Q are complete; P11R is authorized as the separate production-validation phase for the proved FDN sine-endpoint cache.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -413,15 +413,38 @@ Decision: authorize P11Q **proof only** for two exact signed-16-bit sine endpoin
 
 ### P11Q — FDN sine endpoint-cache equivalence proof
 
-Status: **[ ] next. No production patch until proof and projection pass.**
+Status: **[x] complete, exact proof + ephemeral real-target projection frozen. Production Space remains P11O.**
 
-- [ ] exhaustive 65,536-case top-16 sine equivalence
-- [ ] all 256 top-byte transitions including `255 → 0` wrap and reset initialization
-- [ ] complete-FDN output/state/storage equivalence across cold, warm, randomized trajectories and resets
-- [ ] optimized + ASAN/UBSAN proof
-- [ ] exact host and target state/layout cost
-- [ ] ephemeral real-target image/RAM/POOL/package and inlined-render projection
-- [ ] only after all gates pass, decide whether a separate production-validation phase is justified
+- [x] complete top-16 sine domain **65,536** cases bit-identical
+- [x] all old→new top-byte transitions × fractions {0,1,127,255}: **262,144** cases, including `255 → 0`
+- [x] complete-FDN comparison **5,376 blocks / 164,767 frames** with cold, warm, randomized trajectories, resets and randomized phases
+- [x] cold hot-path endpoint refreshes **88** after exact reset initialization; warm **367** over 65,536 frames
+- [x] optimized + ASAN/UBSAN PASS
+- [x] full historical host + sanitizer behavior PASS with ephemeral candidate
+- [x] host `ApsisSpaceFdnLine` **24 → 28 B**; `ApsisSpaceFdn` **232 → 264 B** (**+32 B**)
+- [x] exact P11O target regenerated before projection
+- [x] candidate target image **140,472 B** (**+32 B**), RAM **87,524 B** (**+32 B**), POOL **319,176 B** (**0 B**)
+- [x] candidate package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- [x] inlined FDN render **1,114 → 1,098 B**, **374 → 366** static instruction lines
+- [x] `space_sine_point` remains **48 B / 14** static instruction lines; dead `space_sine_q15` wrapper removed in candidate
+- [x] authoritative run `41360291892` on technical head `a0b0826c9f0951b780d84404cfdbe9543ba45b49`
+- [x] evidence artifact ID `13104793891`; ZIP SHA-256 `7e7699b82e6540c64e099d4f8ea4d5a6d508e6a88d402a8c91c1d0aaa0cfcd05`
+- [x] repo production Space blobs remained exact P11O throughout P11Q
+- [x] proof/projection workflow manual-only and pinned to the proven technical head
+
+Decision: authorize P11R production validation. The candidate spends exactly 32 B RAM / 32 B image, no POOL, while P11P measured endpoint-pair reuse on 99.929% of natural sine calls and P11Q produces a smaller target render hot path. Physical CPU/ISR improvement remains unverified.
+
+### P11R — production FDN sine endpoint-cache validation
+
+Status: **[ ] next.**
+
+- [ ] apply only the exact P11Q endpoint-cache candidate to production `apsis_space_dsp.c/.h`
+- [ ] keep reset phase, phase increment, interpolation, quadrant/wrap and all other FDN arithmetic/topology exact
+- [ ] actual-production P11Q equivalence against frozen P11O authority
+- [ ] complete historical host + ASAN/UBSAN behavior
+- [ ] exact real JieLi target resources matching P11Q projection
+- [ ] exact idle PCM/runtime and active Motion lifecycle
+- [ ] narrow-diff verification and frozen final package hashes before promotion
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -445,4 +468,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11P measurement state to `p11-optimization`, then create one P11Q proof branch. Prove the per-line FDN sine-endpoint cache against frozen P11O authority and project it ephemerally on the real JieLi target; do not modify production Space until all equivalence and target-cost gates pass.
+Promote frozen P11Q proof/projection state to `p11-optimization`, then create one P11R production-validation branch. Apply only the proved FDN sine-endpoint cache and require actual-production equivalence, full historical host/sanitizer, exact real-target, exact idle and exact active-Motion gates before promotion.
