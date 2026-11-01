@@ -15,19 +15,21 @@ jobs:
         with:
           persist-credentials: true
           fetch-depth: 1
-      - name: Apply exact-anchor production patch
-        run: python3 ci/p11i_apply_stereo_pair.py
-      - name: Commit only when source changed
+      - name: Apply exact-anchor P11I patches
+        run: |
+          python3 ci/p11i_apply_stereo_pair.py
+          python3 ci/p11i_patch_p6_adapter.py
+      - name: Commit only when authorized files changed
         run: |
           set -euo pipefail
-          if git diff --quiet -- apsis/apsis_space_room.c; then
-            echo 'PASS: production patch already present; no commit required'
+          if git diff --quiet -- apsis/apsis_space_room.c ci/apply_apsis_p6.sh; then
+            echo 'PASS: P11I production source and target adapter already patched; no commit required'
             exit 0
           fi
           git diff --check
-          git diff -- apsis/apsis_space_room.c
+          git diff -- apsis/apsis_space_room.c ci/apply_apsis_p6.sh
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apsis/apsis_space_room.c
-          git commit -m 'phase11i: apply stereo-pair Cathedral delay reader'
+          git add apsis/apsis_space_room.c ci/apply_apsis_p6.sh
+          git commit -m 'phase11i: support stereo-pair reader in P6 target adapter'
           git push origin HEAD:p11i-space-stereo-read-staging
