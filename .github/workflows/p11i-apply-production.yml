@@ -1,35 +1,24 @@
-name: APSIS Phase 11I apply authorized production patch
+name: APSIS Phase 11I frozen production-patch verifier
 
 on:
-  push:
-    branches: [p11i-space-stereo-read-staging]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-patch:
+  verify-patch:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: true
+          persist-credentials: false
+          ref: ab6960ad3acf78dbc9f366d2a5e9358b42011cca
           fetch-depth: 1
-      - name: Apply exact-anchor P11I patches
-        run: |
-          python3 ci/p11i_apply_stereo_pair.py
-          python3 ci/p11i_patch_p6_adapter.py
-      - name: Commit only when authorized files changed
+      - name: Verify exact-anchor P11I patch is already applied
         run: |
           set -euo pipefail
-          if git diff --quiet -- apsis/apsis_space_room.c ci/apply_apsis_p6.sh; then
-            echo 'PASS: P11I production source and target adapter already patched; no commit required'
-            exit 0
-          fi
-          git diff --check
-          git diff -- apsis/apsis_space_room.c ci/apply_apsis_p6.sh
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apsis/apsis_space_room.c ci/apply_apsis_p6.sh
-          git commit -m 'phase11i: support stereo-pair reader in P6 target adapter'
-          git push origin HEAD:p11i-space-stereo-read-staging
+          python3 ci/p11i_apply_stereo_pair.py
+          python3 ci/p11i_patch_p6_adapter.py
+          git diff --exit-code -- apsis/apsis_space_room.c ci/apply_apsis_p6.sh
+          echo 'PASS: frozen P11I technical head already contains the authorized production and target-adapter patches'
