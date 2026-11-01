@@ -149,13 +149,6 @@ static uint16_t p10_motion_total_pulses(const ApsisState *state)
     return (uint16_t)(n * cycles);
 }
 
-static ApsisStringMotionLane *p10_motion_lane(ApsisStringMotionStore *store,
-                                              uint8_t side)
-{
-    if (!store) return 0;
-    return side == APSIS_SIDE_LEFT ? &store->left : &store->right;
-}
-
 static const ApsisStringMotionLane *p10_motion_lane_const(const ApsisStringMotionStore *store,
                                                           uint8_t side)
 {
@@ -363,7 +356,7 @@ int32_t apsis_string_motion_pitch_for_split(const ApsisStringMotionPitchContext 
                                             uint8_t side,
                                             uint16_t split_q15)
 {
-    int32_t raw, pitch, whole, dev;
+    int32_t raw, pitch, whole, dev, pc_i;
     uint8_t pc;
     if (!ctx) return 0;
     side = p10_motion_side(side);
@@ -382,8 +375,9 @@ int32_t apsis_string_motion_pitch_for_split(const ApsisStringMotionPitchContext 
 
     whole = p10_motion_round_step(pitch);
     if (pitch == whole * 1000) {
-        pc = (uint8_t)(whole % 12);
-        if ((int8_t)pc < 0) pc = (uint8_t)(pc + 12u);
+        pc_i = whole % 12;
+        if (pc_i < 0) pc_i += 12;
+        pc = (uint8_t)pc_i;
         dev = apsis_tuning_deviation_milli(pc, ctx->tonic,
                                            ctx->temper_mode,
                                            ctx->temper_strength_q15);
