@@ -4,31 +4,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Include the production implementation so its current static
- * space_room_stereo_read() is the reference authority in this translation
- * unit. P11I must prove the candidate before apsis_space_room.c is edited. */
+/* Include the production implementation so its current static pair reader is
+ * directly testable in this translation unit. The reference below is the exact
+ * pre-P11I single-channel authority frozen by run 41343196262. */
 #include "../apsis/apsis_space_room.c"
 
-typedef struct {
-    int32_t left;
-    int32_t right;
-} P11iStereoPair;
-
-static P11iStereoPair p11i_candidate_stereo_read_pair(
-    const int16_t *storage,
-    uint32_t capacity_frames,
-    uint32_t write_frame,
-    uint32_t fill_frames,
-    uint32_t delay_q16)
+static int32_t p11i_reference_stereo_read(const int16_t *storage,
+                                          uint32_t capacity_frames,
+                                          uint32_t write_frame,
+                                          uint32_t fill_frames,
+                                          uint32_t delay_q16,
+                                          uint8_t channel)
 {
-    P11iStereoPair out = {0, 0};
     uint32_t needed, span_q16, write_q16, read_q16, i0, i1, frac;
-    int32_t a_left, a_right, b_left, b_right;
+    int32_t a, b;
     int64_t mixed;
-
-    if (!storage || !capacity_frames) return out;
+    if (!storage || !capacity_frames || channel > 1u) return 0;
     needed = (delay_q16 + 65535u) >> 16;
-    if (!needed || fill_frames < needed) return out;
+    if (!needed || fill_frames < needed) return 0;
     span_q16 = capacity_frames << 16;
     write_q16 = write_frame << 16;
     if (write_q16 >= delay_q16) read_q16 = write_q16 - delay_q16;
@@ -38,22 +31,11 @@ static P11iStereoPair p11i_candidate_stereo_read_pair(
     frac = read_q16 & 65535u;
     i1 = i0 + 1u;
     if (i1 >= capacity_frames) i1 = 0u;
-
-    a_left = storage[i0 * 2u];
-    a_right = storage[i0 * 2u + 1u];
-    if (!frac) {
-        out.left = a_left;
-        out.right = a_right;
-        return out;
-    }
-
-    b_left = storage[i1 * 2u];
-    b_right = storage[i1 * 2u + 1u];
-    mixed = (int64_t)a_left * (65536u - frac) + (int64_t)b_left * frac;
-    out.left = (int32_t)(mixed >> 16);
-    mixed = (int64_t)a_right * (65536u - frac) + (int64_t)b_right * frac;
-    out.right = (int32_t)(mixed >> 16);
-    return out;
+    a = storage[i0 * 2u + channel];
+    if (!frac) return a;
+    b = storage[i1 * 2u + channel];
+    mixed = (int64_t)a * (65536u - frac) + (int64_t)b * frac;
+    return (int32_t)(mixed >> 16);
 }
 
 static void check_case(const int16_t *storage,
@@ -63,11 +45,11 @@ static void check_case(const int16_t *storage,
                        uint32_t delay_q16,
                        uint64_t *cases)
 {
-    const int32_t ref_left = space_room_stereo_read(
+    const int32_t ref_left = p11i_reference_stereo_read(
         storage, capacity_frames, write_frame, fill_frames, delay_q16, 0u);
-    const int32_t ref_right = space_room_stereo_read(
+    const int32_t ref_right = p11i_reference_stereo_read(
         storage, capacity_frames, write_frame, fill_frames, delay_q16, 1u);
-    const P11iStereoPair got = p11i_candidate_stereo_read_pair(
+    const SpaceRoomStereoPair got = space_room_stereo_read_pair(
         storage, capacity_frames, write_frame, fill_frames, delay_q16);
 
     if (got.left != ref_left || got.right != ref_right) {
@@ -201,10 +183,6 @@ static void deterministic_random_matrix(uint64_t *cases)
         const uint32_t frac = lcg_next(&s) & 65535u;
         const uint32_t delay = (whole << 16) | frac;
 
-        /* Mutate a few deterministic samples every trial and periodically
-         * refresh the complete backing store. Addressing equivalence does not
-         * depend on storage history, while this still exercises varied signed
-         * endpoints and interpolation products. */
         if ((t & 255u) == 0u)
             fill_pattern(storage, MAX_CAP, lcg_next(&s));
         storage[(lcg_next(&s) % cap) * 2u] = (int16_t)(lcg_next(&s) >> 16);
@@ -219,7 +197,6 @@ int main(void)
     int16_t one_frame[2] = {INT16_MIN, INT16_MAX};
     uint64_t cases = 0u;
 
-    /* Explicit invalid/empty authority cases. */
     check_case(NULL, 0u, 0u, 0u, 0u, &cases);
     check_case(NULL, 0u, 0u, 0u, 1u, &cases);
     check_case(one_frame, 0u, 0u, 0u, 65536u, &cases);
@@ -229,6 +206,6 @@ int main(void)
     deterministic_random_matrix(&cases);
 
     printf("P11I stereo-read equivalence cases=%llu\n", (unsigned long long)cases);
-    puts("PASS: P11I candidate stereo-pair reader is bit-identical to current single-channel authority");
+    puts("PASS: P11I production stereo-pair reader is bit-identical to frozen single-channel authority");
     return 0;
 }
