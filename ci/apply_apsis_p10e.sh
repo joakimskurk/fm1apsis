@@ -165,7 +165,10 @@ s = Path('work/apsis/firmware/src/dinghy.c').read_text()
 a = s.index('static void app_audio(')
 b = s.index('static const char *surface_name', a)
 audio = s[a:b]
-main = s[s.index('static uint8_t apsis_p9h3_dispatch('):b]
+# P9 layers place some control helpers after surface_name, while app_main and
+# dispatcher code are generated in a different source order. Validate the whole
+# non-audio translation unit instead of assuming those helpers precede b.
+control = s[:a] + s[b:]
 
 for forbidden in ('apsis_controls_string_attractor_context(',
                   'apsis_controls_string_attractor_edit(',
@@ -176,8 +179,8 @@ for required in ('apsis_controls_string_attractor_context(',
                  'apsis_controls_string_attractor_edit(',
                  'if (!attractor_editor_frame)',
                  'current == SURF_STRING && !attractor_editor_frame'):
-    if required not in main:
-        raise SystemExit(f'FAIL: P10E target binding missing: {required}')
+    if required not in control:
+        raise SystemExit(f'FAIL: P10E target binding missing outside app_audio: {required}')
 if s.count('apsis_controls_string_attractor_editor_reset(') != 2:
     raise SystemExit('FAIL: P10E expected boot + leave-surface editor resets only')
 if s.count('apsis_string_attractor_visual_dirty = 1u;') != 1:
@@ -185,19 +188,19 @@ if s.count('apsis_string_attractor_visual_dirty = 1u;') != 1:
 for required in ('drawn = 0xFFu;',
                  'apsis_native_draw_active = 0u;',
                  'apsis_native_draw_ui_surface = 0xFFu;'):
-    if required not in s:
-        raise SystemExit(f'FAIL: P10E missing existing-P8 redraw invalidation: {required}')
+    if required not in control:
+        raise SystemExit(f'FAIL: P10E missing existing-P8 redraw invalidation outside audio: {required}')
 renderer = Path('work/apsis/firmware/src/apsis_visual_p8b.c').read_text()
 if 'filter_attractor_gates >> i' not in renderer:
     raise SystemExit('FAIL: P10E existing P8 STRING renderer no longer reads attractor gates')
 for required in ('apsis_string_motion_mailbox_publish(',
                  'apsis_controls_performance_queue_string(',
                  'apsis_controls_performance_queue_bloom('):
-    if required not in main:
-        raise SystemExit(f'FAIL: P10E disturbed existing main-loop path: {required}')
+    if required not in control:
+        raise SystemExit(f'FAIL: P10E disturbed existing non-audio control path: {required}')
 for required in ('project_store.save_pending && !apsis_runtime.transport.running',
                  'apsis_project_fm1_service_save('):
-    if required not in s:
+    if required not in control:
         raise SystemExit(f'FAIL: P10E disturbed P7 deferred save path: {required}')
 if 'static ApsisRuntime apsis_runtime;' not in s:
     raise SystemExit('FAIL: P10E disturbed shared runtime declaration')
