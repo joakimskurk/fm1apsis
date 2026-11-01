@@ -1,0 +1,49 @@
+name: APSIS Phase 9 H4b Bloom performance
+
+on:
+  push:
+    branches: [p9-controls]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  h4b-bloom-performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: H4 performance mailbox
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_controls_performance.c tests/test_controls_performance.c \
+            -o /tmp/test_controls_performance
+          /tmp/test_controls_performance
+      - name: H4 performance mailbox ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_controls_performance.c tests/test_controls_performance.c \
+            -o /tmp/test_controls_performance_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_controls_performance_san
+      - name: H4b manual Bloom audio
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
+            apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
+            apsis/apsis_late_binding.c apsis/apsis_bloom_dsp.c \
+            apsis/apsis_bloom_manual_audio.c tests/test_bloom_manual_audio.c \
+            -o /tmp/test_bloom_manual_audio
+          /tmp/test_bloom_manual_audio
+      - name: H4b manual Bloom audio ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
+            apsis/apsis_spiral.c apsis/apsis_bloom.c apsis/apsis_bloom_audio.c \
+            apsis/apsis_late_binding.c apsis/apsis_bloom_dsp.c \
+            apsis/apsis_bloom_manual_audio.c tests/test_bloom_manual_audio.c \
+            -o /tmp/test_bloom_manual_audio_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_bloom_manual_audio_san
