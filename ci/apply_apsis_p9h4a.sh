@@ -30,16 +30,18 @@ ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 
 # P9C explicitly maps FM-1 keys onto Study-126 keyboardStringPress(), so its
 # manual acoustic path is P9-only and freezes the browser keyboard level .080.
+# String DSP also reads the frozen Drift beating delta, so the isolated host
+# contract links apsis_drift.c exactly as the generated target already does.
 cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
   apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
-  apsis/apsis_string.c apsis/apsis_string_dsp.c \
+  apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
   apsis/apsis_string_transient_pool.c apsis/apsis_string_manual_audio.c \
   tests/test_string_manual_audio.c -o /tmp/test_string_manual_audio
 /tmp/test_string_manual_audio
 cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
   -fsanitize=address,undefined -Iapsis \
   apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
-  apsis/apsis_string.c apsis/apsis_string_dsp.c \
+  apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
   apsis/apsis_string_transient_pool.c apsis/apsis_string_manual_audio.c \
   tests/test_string_manual_audio.c -o /tmp/test_string_manual_audio_san
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
