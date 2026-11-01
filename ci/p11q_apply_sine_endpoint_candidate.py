@@ -19,6 +19,19 @@ h.write_text(s.replace(old, new, 1))
 
 c = Path('apsis/apsis_space_dsp.c')
 s = c.read_text()
+old_sine = '''static int16_t space_sine_q15(uint32_t phase)
+{
+    uint8_t i = (uint8_t)(phase >> 24);
+    uint8_t frac = (uint8_t)(phase >> 16);
+    int32_t a = space_sine_point(i);
+    int32_t b = space_sine_point((uint8_t)(i + 1u));
+    return (int16_t)(a + (((b - a) * frac) >> 8));
+}
+
+'''
+if s.count(old_sine) != 1:
+    raise SystemExit(f'sine helper removal anchor count {s.count(old_sine)} != 1')
+s = s.replace(old_sine, '', 1)
 old_reset = '''        line->lfo_phase = (uint32_t)i * 0x20000000u;
         line->lfo_phase_inc = SPACE_LFO_INC[i];
         line->damping_state_q15 = 0;
