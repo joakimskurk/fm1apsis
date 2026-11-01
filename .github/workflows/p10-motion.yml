@@ -27,3 +27,21 @@ jobs:
             tests/test_string_motion.c -o /tmp/test_string_motion_san
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_string_motion_san
+      - name: P10B String Motion persistent DSP pitch override
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_drift.c \
+            apsis/apsis_string_motion.c apsis/apsis_string_motion_dsp.c \
+            tests/test_string_motion_dsp.c -o /tmp/test_string_motion_dsp
+          /tmp/test_string_motion_dsp
+      - name: P10B String Motion DSP ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_drift.c \
+            apsis/apsis_string_motion.c apsis/apsis_string_motion_dsp.c \
+            tests/test_string_motion_dsp.c -o /tmp/test_string_motion_dsp_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_dsp_san
