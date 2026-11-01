@@ -4,7 +4,7 @@ Last updated: 2026-11-01
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11M are complete. P11L remains the production baseline; P11M measured FDN line-read branch behavior and P11N is proof-only until the invariant-simplified reader is bit-identical.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11N are complete. P11L remains the production baseline; P11N proved and target-projected the invariant-simplified FDN line reader, and P11O is authorized as the separate production-validation phase.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -491,9 +491,48 @@ Structural P11M bounds:
 
 Decision: P11N may prove only a narrow production-caller-specialized reader: partial lines retain the exact readiness calculation, full lines bypass it; unreachable minimum-delay and upper-wrap branches may be removed; negative-wrap, interpolation and `i1` wrap remain exact. Defensive helper-guard removal is not authorized without separate call-path proof.
 
-## Exact next phase — P11N FDN line-read invariant proof
+## P11N — FDN line-read invariant proof complete
 
-Before production modification, prove current and candidate helper outputs bit-identical across all eight line topologies, boundary modulation/readiness/wrap classes and deterministic randomized valid states, then confirm complete FDN render equivalence under cold/warm/randomized trajectories. Run optimized + ASAN/UBSAN. Only then may an ephemeral real-target projection be used to decide whether a production phase is justified.
+Proof/projection authority:
+- combined head `a13bce4ce821b68d8daab66ec1432ba3b5bf9a99`
+- authoritative proof re-run `41355949491` — PASS
+- target-projection run `41355949486` — PASS
+- optimized + ASAN/UBSAN proof PASS
+- production P11L Space blobs remained unchanged
+
+Helper proof:
+- all eight FDN line topologies
+- every integer production modulation value −2,304..+2,303 Q8
+- readiness and ring boundary classes
+- 500,000 deterministic randomized valid states
+- **905,504** total helper comparisons, all bit-identical
+
+Complete-FDN proof:
+- cold startup 16,384 frames
+- warm continuation 65,536 frames
+- 2,048 deterministic randomized parameter/frame blocks with resets and randomized LFO phases
+- **3,328 blocks / 210,677 frames** total
+- bit-identical stereo output, FDN state, feedback-cache state and full delay storage after every block
+
+Ephemeral real-target projection:
+- exact P11L baseline regenerated first
+- candidate patched only into generated target worktree
+- image **140,440 B** unchanged
+- RAM **87,492 B** unchanged; headroom **10,812 B**
+- POOL **319,176 B** unchanged
+- package bytes **610,110 B** unchanged
+- candidate projection package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- inlined `apsis_space_fdn_render` **1,118 → 1,114 B**, **379 → 374** static instruction lines
+- artifact ID `13103071866`
+- artifact ZIP SHA-256 `6d39137a817dd8a2d842790c40b4f51f6d0c0ef12ce7b33c56733f6aaa84711b`
+
+P11M provides the repeated-work rationale: 100% of warm measured line reads and 85.37% of the cold census are full-line, so the candidate skips readiness setup on the dominant path while preserving exact startup semantics. Minimum-delay and upper-wrap branches are structurally unreachable under the frozen caller.
+
+Decision: P11O may apply only the proved candidate to production `space_line_read()`. No other DSP/state/header change is authorized.
+
+## Exact next phase — P11O production FDN line-read validation
+
+Apply the proved candidate to production DSP, then require actual-production equivalence against frozen P11L authority, complete historical host/sanitizer behavior, exact real-target match to the P11N projection, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 

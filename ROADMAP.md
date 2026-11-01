@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11M are complete; P11N is proof-only for the measured FDN line-read invariant simplification candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11N are complete; P11O is authorized as the separate production-validation phase for the proved FDN line-read simplification.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -341,14 +341,38 @@ Decision: authorize P11N **proof only** for a production-caller-specialized `spa
 
 ### P11N — FDN line-read invariant simplification proof
 
-Status: **[ ] next. No production patch until equivalence is proved.**
+Status: **[x] complete, exact proof + ephemeral real-target projection frozen. Production Space source remains P11L.**
 
-- [ ] prove current P11L line-read authority vs candidate across all eight line topologies, boundary modulation values, readiness thresholds, ring boundaries and deterministic randomized valid states
-- [ ] preserve exact partial-fill/startup zero-return behavior
-- [ ] preserve negative wrap, fractional interpolation and `i1` wrap exactly
-- [ ] full-FDN render equivalence across cold, warm, randomized phase/state and reset trajectories
-- [ ] optimized + ASAN/UBSAN proof
-- [ ] only after proof, measure an ephemeral real-target code-shape/resource projection before production authorization
+- [x] current P11L helper vs candidate bit-identical across all eight line topologies and every integer modulation value **−2,304 .. +2,303 Q8**
+- [x] readiness/ring boundary matrix + **500,000** deterministic randomized valid states
+- [x] total helper comparisons **905,504**
+- [x] complete-FDN authority/candidate comparison **3,328 blocks / 210,677 frames**
+- [x] cold startup, warm continuation, randomized frame/decay/damping, resets and randomized LFO phases covered
+- [x] exact partial-fill zero-return, negative wrap, fractional interpolation and `i1` wrap preserved
+- [x] optimized + ASAN/UBSAN PASS
+- [x] authoritative proof run `41355949491` on combined head `a13bce4ce821b68d8daab66ec1432ba3b5bf9a99`
+- [x] ephemeral target projection run `41355949486` on the same head
+- [x] P11L baseline regenerated exactly before candidate application
+- [x] target image **140,440 B**, RAM **87,492 B**, POOL **319,176 B** — all unchanged
+- [x] candidate package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
+- [x] inlined FDN-render code shape **1,118 → 1,114 B**, **379 → 374** static instruction lines
+- [x] evidence artifact ID `13103071866`; ZIP SHA-256 `6d39137a817dd8a2d842790c40b4f51f6d0c0ef12ce7b33c56733f6aaa84711b`
+- [x] repo production Space blobs remained exact P11L throughout P11N
+- [x] proof/projection workflows manual-only and pinned to the combined proven head
+
+Decision: authorize P11O production validation. The candidate has zero target-resource cost, a small strict code-shape reduction, and removes repeated full-line readiness work identified by P11M. Physical CPU/ISR improvement remains unverified.
+
+### P11O — production FDN line-read validation
+
+Status: **[ ] next.**
+
+- [ ] apply only the proved `space_line_read()` simplification to production DSP
+- [ ] retain defensive helper guard, exact partial-line readiness, negative wrap, interpolation and `i1` wrap
+- [ ] actual-production helper/full-FDN equivalence against frozen P11L authority
+- [ ] complete historical host + ASAN/UBSAN behavior
+- [ ] exact real JieLi target match to P11N projection
+- [ ] exact idle PCM/runtime and active Motion lifecycle
+- [ ] freeze final target/package evidence before promotion
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -372,4 +396,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11M measurement state to `p11-optimization`, then create one P11N proof branch. Prove the production-caller-specialized FDN line-read candidate bit-identical to current P11L behavior before any production source is modified.
+Promote frozen P11N proof/projection state to `p11-optimization`, then create one P11O production-validation branch. Apply only the proved FDN line-read simplification and require actual-production equivalence, full historical host/sanitizer, real-target, exact idle and exact active-Motion gates before promotion.
