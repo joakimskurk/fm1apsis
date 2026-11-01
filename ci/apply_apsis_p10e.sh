@@ -154,7 +154,10 @@ grep -q 'current == SURF_STRING && !attractor_editor_frame' work/apsis/firmware/
 grep -q 'apsis_controls_string_attractor_edit(' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_controls_string_attractor_editor_reset(' work/apsis/firmware/src/dinghy.c
 grep -q 'apsis_string_attractor_visual_dirty = 1u;' work/apsis/firmware/src/dinghy.c
-grep -q 'filter_attractor_gates >> i' work/apsis/firmware/src/dinghy.c
+# P8 compiles the renderer by including its copied source file from dinghy.c;
+# validate both the include and the actual gate-read expression in that source.
+grep -q '#include "apsis_visual_p8b.c"' work/apsis/firmware/src/dinghy.c
+grep -q 'filter_attractor_gates >> i' work/apsis/firmware/src/apsis_visual_p8b.c
 
 python3 - <<'PY'
 from pathlib import Path
@@ -184,6 +187,9 @@ for required in ('drawn = 0xFFu;',
                  'apsis_native_draw_ui_surface = 0xFFu;'):
     if required not in s:
         raise SystemExit(f'FAIL: P10E missing existing-P8 redraw invalidation: {required}')
+renderer = Path('work/apsis/firmware/src/apsis_visual_p8b.c').read_text()
+if 'filter_attractor_gates >> i' not in renderer:
+    raise SystemExit('FAIL: P10E existing P8 STRING renderer no longer reads attractor gates')
 for required in ('apsis_string_motion_mailbox_publish(',
                  'apsis_controls_performance_queue_string(',
                  'apsis_controls_performance_queue_bloom('):
