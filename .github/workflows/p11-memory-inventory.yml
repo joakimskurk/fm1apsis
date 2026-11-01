@@ -1,0 +1,105 @@
+name: APSIS Phase 11D target memory ownership inventory
+
+on:
+  push:
+    branches: [p11d-memory-inventory-staging, p11-optimization]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  p11d-memory-inventory:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11D.1 - pinned historical regressions
+        run: bash ci/prepare_dinghy.sh
+
+      - name: Gate P11D.2 - regenerate exact P11C production stack
+        run: bash ci/apply_apsis_p10g.sh
+
+      - name: Gate P11D.3 - real JieLi production target
+        run: |
+          bash ci/build_apsis_target.sh
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 140408,
+              'image_max': 581564,
+              'ram': 89716,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'package_bytes': 610110,
+              'package_sha256': 'e10c01525a808a4dea18d6b3f8777307bf4acf180c2cf958bebc4e1546b0d0be',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          print('PASS: P11D starts from exact frozen P11C production target')
+          PY
+
+      - name: Gate P11D.4 - emit raw ELF/linker inventory
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence/p11d
+          ELF=work/apsis/build/dinghy.elf
+          test -f "$ELF"
+          OBJDUMP="${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN not set}/common/bin/objdump"
+          test -x "$OBJDUMP"
+          "$OBJDUMP" -h "$ELF" > build/evidence/p11d/sections.txt
+          "$OBJDUMP" -t "$ELF" > build/evidence/p11d/symbols.txt
+          cp work/apsis/firmware/app.ld build/evidence/p11d/app.ld
+          cp build/target_report.json build/evidence/p11d/target_report.json
+          cp build/SHA256SUMS build/evidence/p11d/SHA256SUMS
+          find work/apsis/build -maxdepth 2 -type f -printf '%p\t%s\n' \
+            | sort > build/evidence/p11d/build_files.txt
+          grep -q 'apsis_string_motion_store' build/evidence/p11d/symbols.txt
+          grep -q '.apsis_motion_pool' build/evidence/p11d/sections.txt
+
+      - name: Gate P11D.5 - static ownership report
+        run: |
+          python3 ci/p11_memory_inventory.py \
+            --sections build/evidence/p11d/sections.txt \
+            --symbols build/evidence/p11d/symbols.txt \
+            --linker build/evidence/p11d/app.ld \
+            --target build/evidence/p11d/target_report.json \
+            --out-json build/evidence/p11d/memory_inventory.json \
+            --out-md build/evidence/p11d/memory_inventory.md \
+            | tee build/evidence/p11d/memory_inventory.log
+          cat build/evidence/p11d/memory_inventory.md
+
+      - name: Upload P11D memory evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11d-memory-inventory-evidence
+          path: build/evidence/p11d
+          if-no-files-found: error
