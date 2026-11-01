@@ -77,12 +77,16 @@ helper = r'''static void apsis_p10e_attractor_probe_update(uint8_t current)
 '''
 s = s.replace(dispatch_anchor, helper + dispatch_anchor, 1)
 
-# Replace the exact production context/edit block with an observational version.
+# Replace the exact production context/edit block with an observational version
+# while preserving the production visual-dirty producer.
 editor = '''    (void)apsis_controls_string_attractor_context(
         &apsis_string_attractor_editor, current, &input, 0);
-    if (current == SURF_STRING && apsis_string_attractor_editor.active)
+    if (current == SURF_STRING && apsis_string_attractor_editor.active) {
         attractor_editor_frame = apsis_controls_string_attractor_edit(
             &apsis.string, 1u, &input, &attractor_control);
+        if (attractor_control.state_changed)
+            apsis_string_attractor_visual_dirty = 1u;
+    }
 '''
 if s.count(editor) != 1:
     raise SystemExit(f'FAIL: P10E probe editor block count {s.count(editor)} != 1')
@@ -103,6 +107,8 @@ s = s.replace(editor, '''    {
                 apsis_attractor_probe_seen |= APSIS_ATTR_SEEN_REC;
             if (attractor_control.rerolled)
                 apsis_attractor_probe_seen |= APSIS_ATTR_SEEN_REROLL;
+            if (attractor_control.state_changed)
+                apsis_string_attractor_visual_dirty = 1u;
         }
     }
 ''', 1)
@@ -132,25 +138,40 @@ s = s.replace(dispatch, dispatch + '''    if (attractor_editor_frame) {
     apsis_p10e_attractor_probe_update(current);
 ''', 1)
 
-# Observe the production leave-STRING reset without changing its semantics.
-nav = '''        if (next != SURF_STRING)
+# Observe the production leave-STRING reset and existing P8 redraw invalidation
+# without changing either semantic.
+nav = '''        if (next != SURF_STRING) {
             apsis_controls_string_attractor_editor_reset(
-                &apsis_string_attractor_editor);'''
+                &apsis_string_attractor_editor);
+            apsis_string_attractor_visual_dirty = 0u;
+        } else if (apsis_string_attractor_visual_dirty) {
+            drawn = 0xFFu;
+            apsis_native_draw_active = 0u;
+            apsis_native_draw_ui_surface = 0xFFu;
+            apsis_string_attractor_visual_dirty = 0u;
+        }'''
 if s.count(nav) != 1:
-    raise SystemExit(f'FAIL: P10E probe leave-STRING anchor count {s.count(nav)} != 1')
+    raise SystemExit(f'FAIL: P10E probe navigation/redraw anchor count {s.count(nav)} != 1')
 s = s.replace(nav, '''        if (next != SURF_STRING) {
             if (apsis_string_attractor_editor.active)
                 apsis_attractor_probe_seen |= APSIS_ATTR_SEEN_EXIT;
             apsis_controls_string_attractor_editor_reset(
                 &apsis_string_attractor_editor);
-            apsis_p10e_attractor_probe_update(next);
-        }''', 1)
+            apsis_string_attractor_visual_dirty = 0u;
+        } else if (apsis_string_attractor_visual_dirty) {
+            drawn = 0xFFu;
+            apsis_native_draw_active = 0u;
+            apsis_native_draw_ui_surface = 0xFFu;
+            apsis_string_attractor_visual_dirty = 0u;
+        }
+        apsis_p10e_attractor_probe_update(next);''', 1)
 
 # Initialize only at the unique production boot reset, after ApsisState defaults
 # already exist. This is deliberately an exact boot anchor, never a generic
 # assignment in a runtime helper (the P10D3 lesson).
 boot = '''    apsis_controls_string_attractor_editor_reset(
-        &apsis_string_attractor_editor);'''
+        &apsis_string_attractor_editor);
+    apsis_string_attractor_visual_dirty = 0u;'''
 if s.count(boot) != 1:
     raise SystemExit(f'FAIL: P10E probe boot editor-reset count {s.count(boot)} != 1')
 s = s.replace(boot, boot + r'''
@@ -177,6 +198,8 @@ if 'apsis_p10e_attractor_probe_update(' in s[a:b]:
     raise SystemExit('FAIL: P10E active probe leaked into app_audio')
 if s.count('apsis_attractor_probe_seen = 0u;') != 1:
     raise SystemExit('FAIL: P10E active probe has multiple history-reset sites')
+if s.count('apsis_string_attractor_visual_dirty = 1u;') != 1:
+    raise SystemExit('FAIL: P10E active probe disturbed visual-dirty producer count')
 print('PASS: P10E active editor telemetry is test-only and main/control-side')
 PY
 
