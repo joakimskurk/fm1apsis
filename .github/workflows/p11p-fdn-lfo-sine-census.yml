@@ -1,11 +1,6 @@
 name: APSIS Phase 11P FDN LFO sine workload census
 
 on:
-  push:
-    branches: [p11p-fdn-lfo-sine-census-staging]
-    paths:
-      - tests/test_p11p_fdn_lfo_sine_census.c
-      - .github/workflows/p11p-fdn-lfo-sine-census.yml
   workflow_dispatch:
 
 jobs:
@@ -16,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: 2afb819dd865385f7547811b6422e7a281c80b7e
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -27,11 +23,12 @@ jobs:
           set -euo pipefail
           rm -rf "$P11P_EVIDENCE"
           mkdir -p "$P11P_EVIDENCE"
+          test "$(git rev-parse HEAD)" = '2afb819dd865385f7547811b6422e7a281c80b7e'
           test "$(git hash-object apsis/apsis_space_dsp.c)" = 'de554864167e410f69260a3d3720698b4ae456a7'
           test "$(git hash-object apsis/apsis_space_dsp.h)" = '71afae3c4c52bbd735121597dfa7ad6cea4f32f5'
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
           git rev-parse HEAD | tee "$P11P_EVIDENCE/head.txt"
-          echo 'PASS: P11P is measurement-only; production Space blobs are exact P11O' \
+          echo 'PASS: P11P historical census pinned to proven technical head; production Space blobs are exact P11O' \
             | tee "$P11P_EVIDENCE/source-freeze.log"
 
       - name: Gate P11P.1 - natural and exhaustive sine/LFO census
@@ -107,11 +104,14 @@ jobs:
           insns=inv.parse_disassembly(Path('/tmp/p11p-evidence/disassembly.txt').read_text(errors='replace'))
           assert symbols.get('apsis_space_fdn_render') == 1114, symbols.get('apsis_space_fdn_render')
           assert insns.get('apsis_space_fdn_render') == 374, insns.get('apsis_space_fdn_render')
+          assert symbols.get('space_sine_q15') is None
+          assert insns.get('space_sine_q15') is None
+          assert symbols.get('space_sine_point') == 48, symbols.get('space_sine_point')
+          assert insns.get('space_sine_point') == 14, insns.get('space_sine_point')
           print('P11P target render_bytes=1114 render_static_insns=374')
-          print('P11P target space_sine_q15_symbol_bytes=', symbols.get('space_sine_q15'))
-          print('P11P target space_sine_q15_static_insns=', insns.get('space_sine_q15'))
-          print('P11P target space_sine_point_symbol_bytes=', symbols.get('space_sine_point'))
-          print('P11P target space_sine_point_static_insns=', insns.get('space_sine_point'))
+          print('P11P target space_sine_q15 fully_inlined=true')
+          print('P11P target space_sine_point_symbol_bytes=48')
+          print('P11P target space_sine_point_static_insns=14')
           print('PASS: P11P frozen P11O target/package and code shape')
           PY
 
