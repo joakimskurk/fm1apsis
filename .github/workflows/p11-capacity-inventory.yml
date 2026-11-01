@@ -1,0 +1,79 @@
+name: APSIS Phase 11E bounded capacity inventory
+
+on:
+  push:
+    branches: [p11e-capacity-inventory-staging]
+  workflow_dispatch:
+
+jobs:
+  p11e-capacity-inventory:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Gate P11E.1 - build frozen host stress probes
+        run: |
+          set -euo pipefail
+          make build/test_runtime_extreme \
+               build/test_string_attractor_runtime \
+               build/test_string_transient \
+               build/test_string_body_transient \
+               build/test_clock_dsp
+
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            build/apsis_*.o \
+            apsis/apsis_spiral_audio.c apsis/apsis_spiral_dsp.c \
+            tests/test_spiral_dsp.c -o build/test_p11e_spiral_dsp
+
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            build/apsis_*.o \
+            apsis/apsis_bloom_audio.c apsis/apsis_bloom_dsp.c \
+            tests/test_bloom_dsp.c -o build/test_p11e_bloom_dsp
+
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            build/apsis_*.o tests/test_p11_bloom_slot_bound.c \
+            -o build/test_p11e_bloom_slot_bound
+
+      - name: Gate P11E.2 - frozen scheduler and finite-pool high-water
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence/p11e
+          build/test_runtime_extreme | tee build/evidence/p11e/runtime_extreme.log
+          build/test_string_attractor_runtime | tee build/evidence/p11e/string_attractor_runtime.log
+          build/test_string_transient | tee build/evidence/p11e/string_transient.log
+          build/test_string_body_transient | tee build/evidence/p11e/string_body_transient.log
+          build/test_clock_dsp | tee build/evidence/p11e/clock_dsp.log
+          build/test_p11e_spiral_dsp | tee build/evidence/p11e/spiral_dsp.log
+          build/test_p11e_bloom_dsp | tee build/evidence/p11e/bloom_dsp.log
+
+      - name: Gate P11E.3 - exact legal Bloom scheduler upper bound
+        run: |
+          set -euo pipefail
+          build/test_p11e_bloom_slot_bound | tee build/evidence/p11e/bloom_slot_bound.log
+
+      - name: Gate P11E.4 - classify measured reserves without resizing
+        run: |
+          set -euo pipefail
+          python3 ci/p11_capacity_inventory.py \
+            --runtime build/evidence/p11e/runtime_extreme.log \
+            --attractor build/evidence/p11e/string_attractor_runtime.log \
+            --string build/evidence/p11e/string_transient.log \
+            --body build/evidence/p11e/string_body_transient.log \
+            --clock build/evidence/p11e/clock_dsp.log \
+            --spiral build/evidence/p11e/spiral_dsp.log \
+            --bloom build/evidence/p11e/bloom_dsp.log \
+            --bloom-bound build/evidence/p11e/bloom_slot_bound.log \
+            --out-json build/evidence/p11e/capacity_inventory.json \
+            --out-md build/evidence/p11e/capacity_inventory.md \
+            | tee build/evidence/p11e/capacity_inventory.log
+          cat build/evidence/p11e/capacity_inventory.md
+
+      - name: Upload P11E evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11e-capacity-inventory-evidence
+          path: build/evidence/p11e
+          if-no-files-found: error
