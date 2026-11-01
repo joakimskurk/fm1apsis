@@ -1,0 +1,31 @@
+name: APSIS Phase 10 String Motion
+
+on:
+  push:
+    branches: [p10-motion]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  motion-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Phase 10A String Motion source contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
+            apsis/apsis_string_motion.c tests/test_string_motion.c \
+            -o /tmp/test_string_motion
+          /tmp/test_string_motion
+      - name: Phase 10A ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_drift.c apsis/apsis_string_dsp.c \
+            apsis/apsis_string_motion.c tests/test_string_motion.c \
+            -o /tmp/test_string_motion_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_san
