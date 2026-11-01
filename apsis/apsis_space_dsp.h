@@ -21,6 +21,8 @@ typedef struct {
     uint32_t lfo_phase;
     uint32_t lfo_phase_inc;
     int32_t damping_state_q15;
+    int16_t lfo_sine_a_q15;
+    int16_t lfo_sine_b_q15;
 } ApsisSpaceFdnLine;
 
 typedef struct {
