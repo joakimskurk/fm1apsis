@@ -1,0 +1,72 @@
+name: APSIS Phase 10 Spiral Attractor editor
+
+on:
+  push:
+    branches: [p10-string-motion]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  p10f-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Build host contract
+        run: |
+          mkdir -p build/p10f
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_harmony.c \
+            apsis/apsis_spiral.c \
+            apsis/apsis_controls_spiral_attractor.c \
+            tests/test_controls_spiral_attractor.c \
+            -o build/p10f/test_controls_spiral_attractor
+
+      - name: Gate P10F.1 - host editor contract
+        run: build/p10f/test_controls_spiral_attractor
+
+      - name: Build sanitizer contract
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_harmony.c \
+            apsis/apsis_spiral.c \
+            apsis/apsis_controls_spiral_attractor.c \
+            tests/test_controls_spiral_attractor.c \
+            -o build/p10f/san_controls_spiral_attractor
+
+      - name: Gate P10F.2 - ASAN/UBSAN editor contract
+        run: |
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            build/p10f/san_controls_spiral_attractor
+
+      - name: Gate P10F.3 - frozen-layer ownership
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c = Path('apsis/apsis_controls_spiral_attractor.c').read_text()
+          forbidden = (
+              'apsis_runtime_',
+              'apsis_event_',
+              'random_state',
+              'apsis_event_queue',
+          )
+          for token in forbidden:
+              if token in c:
+                  raise SystemExit(f'FAIL: P10F editor crossed runtime ownership: {token}')
+          required = (
+              'apsis_spiral_reset_attractor(spiral, 1u)',
+              'attractor_gates',
+              'attractor_energy_q15',
+              'attractor_rate',
+              'attractor_lock_q15',
+              'attractor_density_q15',
+          )
+          for token in required:
+              if token not in c:
+                  raise SystemExit(f'FAIL: P10F editor missing existing authority/state: {token}')
+          print('PASS: P10F editor is a control/state layer above frozen M3c/M4f')
+          PY
