@@ -1,0 +1,31 @@
+name: APSIS Phase 11R one-shot documentation finalizer
+
+on:
+  push:
+    branches:
+      - p11r-fdn-sine-endpoint-cache-production-staging
+    paths:
+      - .github/workflows/p11r-finalize-docs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - name: Freeze P11R documentation and historical validator
+        run: |
+          set -euo pipefail
+          python3 ci/p11r_finalize_docs.py
+          git diff --check
+          git diff --exit-code -- apsis/apsis_space_dsp.c apsis/apsis_space_dsp.h apsis/apsis_space_room.c
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ROADMAP.md PROJECT_STATE.md .github/workflows/p11r-fdn-sine-endpoint-validation.yml
+          git diff --cached --check
+          git commit -m 'phase11r: freeze production validation and authorize P11S measurement'
+          git push
