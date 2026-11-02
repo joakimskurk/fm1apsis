@@ -441,85 +441,83 @@ APSIS_INLINE int32_t strx_sat_q15(int32_t v)
     return (int32_t)v;
 }
 
-APSIS_INLINE uint16_t strx_envelope(const ApsisStringTransientVoice *v)
-{
-    uint32_t idx = v->env_phase_q16 >> 16;
-    if (idx > 64u) idx = 64u;
-    return STRX_ENV_Q15[idx];
-}
 
-APSIS_INLINE void strx_advance_envelope(ApsisStringTransientVoice *v)
-{
-    if (v->envelope_stage == 0u) {
-        if (v->attack_left_samples) --v->attack_left_samples;
-        if (v->env_phase_q16 + STRX_ATTACK_STEP_Q16 >= STRX_ENV_PHASE_ONE)
-            v->env_phase_q16 = STRX_ENV_PHASE_ONE;
-        else
-            v->env_phase_q16 += STRX_ATTACK_STEP_Q16;
-        if (!v->attack_left_samples) {
-            v->envelope_stage = 1u;
-            v->env_phase_q16 = STRX_ENV_PHASE_ONE;
-        }
-    } else {
-        if (v->env_phase_q16 > v->decay_step_q16)
-            v->env_phase_q16 -= v->decay_step_q16;
-        else
-            v->env_phase_q16 = 0u;
-    }
-}
 
-APSIS_INLINE void strx_advance_steal(ApsisStringTransientVoice *v)
-{
-    int32_t delta;
-    if (!v->stealing) return;
-    delta = (int32_t)(((int64_t)-v->steal_gain_q15 * STRX_STEAL_ALPHA_Q15) >> 15);
-    if (!delta && v->steal_gain_q15 > 0) delta = -1;
-    v->steal_gain_q15 += delta;
-    if (v->steal_gain_q15 < 0) v->steal_gain_q15 = 0;
-    if (v->steal_left_samples) --v->steal_left_samples;
-    if (!v->steal_left_samples) v->active = 0u;
-}
 
-/* One voice over the whole block, added into out unsaturated (the caller saturates once per pass, as the
- * per-sample mix did: integer sums do not depend on the order of the voices). Each voice touches only its own
- * state, so voice-outer equals the old sample-outer loop bit for bit, and an idle slot costs one test a block. */
+/* One voice over the whole block, added into out unsaturated (the caller saturates once, as the per-sample mix
+ * did: integer sums do not depend on the order of the voices). Each voice touches only its own state, so
+ * voice-outer equals the old sample-outer loop bit for bit. The state lives in locals for the block and is
+ * written back once: out[] could alias the voice, so field accesses in the loop were each a load and a store. */
 static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint32_t frames)
 {
-    uint32_t n;
-    for (n = 0u; n < frames; ++n) {
+    uint32_t n = 0u;
+    uint32_t phase = v->phase, inc = v->phase_inc, age = v->age_samples, duration = v->duration_samples;
+    uint32_t env_phase = v->env_phase_q16, decay_step = v->decay_step_q16;
+    int32_t lp = v->lowpass_q15, steal_gain = v->steal_gain_q15;
+    uint16_t attack_left = v->attack_left_samples, steal_left = v->steal_left_samples;
+    const uint16_t peak = v->peak_gain_q15, alpha = v->lowpass_alpha_q15;
+    const int32_t mix_l = (int32_t)v->mix_left_q15, mix_r = (int32_t)v->mix_right_q15;
+    const uint8_t triangle = v->waveform == APSIS_STRING_DSP_WAVE_TRIANGLE, stealing = v->stealing;
+    uint8_t stage = v->envelope_stage, active = v->active;
+
+    if (v->start_delay_samples) {               /* the not-yet-started part of the block: nothing sounds */
+        n = v->start_delay_samples < frames ? v->start_delay_samples : frames;
+        v->start_delay_samples -= n;
+    }
+    for (; active && n < frames; ++n) {
         int32_t raw, filtered, voiced;
-        uint16_t env, gain;
-        if (!v->active) return;
-        if (v->start_delay_samples) {
-            --v->start_delay_samples;
-            continue;
+        uint16_t gain;
+        uint32_t idx;
+        if (age >= duration) {
+            active = 0u;
+            break;
         }
-        if (v->age_samples >= v->duration_samples) {
-            v->active = 0u;
-            return;
-        }
-        v->phase += v->phase_inc;
-        raw = v->waveform == APSIS_STRING_DSP_WAVE_TRIANGLE
-            ? strx_triangle_q15(v->phase) : apsis_sine_q15(v->phase);
-        if (v->lowpass_alpha_q15) {
-            v->lowpass_q15 += (int32_t)(((int64_t)(raw - v->lowpass_q15) *
-                                           v->lowpass_alpha_q15) >> 15);
-            filtered = v->lowpass_q15;
+        phase += inc;
+        raw = triangle ? strx_triangle_q15(phase) : apsis_sine_q15(phase);
+        if (alpha) {
+            lp += (int32_t)(((int64_t)(raw - lp) * alpha) >> 15);
+            filtered = lp;
         } else {
             filtered = raw;
         }
-        env = strx_envelope(v);
-        gain = strx_gain_q15(v->peak_gain_q15, env);
-        if (v->stealing)
-            gain = strx_gain_q15(gain, (uint16_t)v->steal_gain_q15);
+        idx = env_phase >> 16;
+        gain = strx_gain_q15(peak, STRX_ENV_Q15[idx > 64u ? 64u : idx]);
+        if (stealing)
+            gain = strx_gain_q15(gain, (uint16_t)steal_gain);
         voiced = (filtered * (int32_t)gain) >> 15;              /* |filtered|, gain <= 32767 */
-        out[n * 2u] += (voiced * (int32_t)v->mix_left_q15) >> 15;      /* 32767 * 65535 < 2^31 */
-        out[n * 2u + 1u] += (voiced * (int32_t)v->mix_right_q15) >> 15;
-        ++v->age_samples;
-        strx_advance_envelope(v);
-        strx_advance_steal(v);
-        if (v->age_samples >= v->duration_samples) v->active = 0u;
+        out[n * 2u] += (voiced * mix_l) >> 15;                   /* 32767 * 65535 < 2^31 */
+        out[n * 2u + 1u] += (voiced * mix_r) >> 15;
+        ++age;
+        if (stage == 0u) {                                       /* strx_advance_envelope */
+            if (attack_left) --attack_left;
+            env_phase = env_phase + STRX_ATTACK_STEP_Q16 >= STRX_ENV_PHASE_ONE
+                ? STRX_ENV_PHASE_ONE : env_phase + STRX_ATTACK_STEP_Q16;
+            if (!attack_left) {
+                stage = 1u;
+                env_phase = STRX_ENV_PHASE_ONE;
+            }
+        } else {
+            env_phase = env_phase > decay_step ? env_phase - decay_step : 0u;
+        }
+        if (stealing) {                                          /* strx_advance_steal */
+            int32_t delta = (int32_t)(((int64_t)-steal_gain * STRX_STEAL_ALPHA_Q15) >> 15);
+            if (!delta && steal_gain > 0) delta = -1;
+            steal_gain += delta;
+            if (steal_gain < 0) steal_gain = 0;
+            if (steal_left) --steal_left;
+            if (!steal_left) active = 0u;
+        }
+        if (age >= duration) active = 0u;
     }
+    v->phase = phase;
+    v->age_samples = age;
+    v->env_phase_q16 = env_phase;
+    v->lowpass_q15 = lp;
+    v->steal_gain_q15 = steal_gain;
+    v->attack_left_samples = attack_left;
+    v->steal_left_samples = steal_left;
+    v->envelope_stage = stage;
+    v->active = active;
 }
 
 static void strx_saturate(int32_t *out, uint32_t frames)
