@@ -10,7 +10,7 @@ set -e
 PKG=${1:?package}; ELF=${2:?elf}; OUT=${3:-build/emu}
 EMU=${EMU:?EMU must point at fm1-live}
 OBJDUMP=${OBJDUMP:-${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN or OBJDUMP}/common/bin/objdump}
-mkdir -p "$OUT"
+mkdir -p "$OUT" work                 # (fm1-live --shot writes work/panel.ppm)
 "$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
 ADDR=$(awk '$NF == "apsis_load_probe" { print $1 }' "$OUT/symbols.txt")
 [ -n "$ADDR" ] || { echo "apsis_load_probe not in $ELF"; exit 2; }
