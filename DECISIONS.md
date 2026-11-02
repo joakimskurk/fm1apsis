@@ -212,3 +212,16 @@ BODY wave per sample, no BODY transients).
 
 **Not yet:** Study 98's hybrid and bowed characters (stringSolo's body/noise path); the Dual remnants in the
 controls, Motion lanes and surfaces are unreachable and still to be removed.
+
+## 2026-11-02 - Bloom is classic 2-operator FM
+
+**Decision:** Each Bloom petal is a sine carrier and a sine modulator, with no filter. Brightness sets the FM
+index. Veil is 1:1 and soft. Choir is 1:1 with the modulator 6 cents up. Organ is 1:1 at a fixed index. Glass is
+1:4, with an index that falls with the envelope squared. The level, envelope, pan, timing and voicing are Study
+126's Bloom. Only the timbre engine differs, so it no longer copies Study 126's three oscillators and biquad a
+petal.
+
+**Why:** The additive petal (three oscillators and a biquad in 64-bit products) cost about 130 cycles a petal a
+sample before its oscillators, which made it the largest sound cost under dense Bloom. The user suggested FM as
+the FM-1's own idiom and approved it after an A/B listen (bloom-ab, demo A/B). Under FM1_STRICT a Bloom
+oscillator went from 128 to 48 us a block, and a petal is about 4x cheaper.

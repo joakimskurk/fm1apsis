@@ -12,23 +12,11 @@
 #define BLOOM_GAIN_MIN_SUSTAIN_Q15 4u
 #define BLOOM_FILTER_STATE_LIMIT 131071
 
-
 static void bloom_dsp_zero(void *ptr, uint32_t n)
 {
     uint8_t *p = (uint8_t *)ptr;
     while (n--) *p++ = 0u;
 }
-
-
-/* the filter state's clamp, on a value known to fit 32 bits (no 64-bit compare) */
-#ifdef APSIS_BLOOM_ADDITIVE
-APSIS_INLINE int32_t bloom_clamp32(int32_t v)
-{
-    if (v > BLOOM_FILTER_STATE_LIMIT) return BLOOM_FILTER_STATE_LIMIT;
-    if (v < -BLOOM_FILTER_STATE_LIMIT) return -BLOOM_FILTER_STATE_LIMIT;
-    return v;
-}
-#endif
 
 static uint32_t bloom_samples_ms(uint32_t ms)
 {
@@ -39,21 +27,6 @@ static uint16_t bloom_dsp_mul_q15(uint16_t a, uint16_t b)
 {
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
-
-
-
-
-
-
-#ifdef APSIS_BLOOM_ADDITIVE
-APSIS_INLINE int16_t bloom_triangle_q15(uint32_t phase)
-{
-    uint16_t p = (uint16_t)(phase >> 16);
-    if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
-    if (p < 49152u) return (int16_t)(32767 - (int32_t)(p - 16384u) * 2);
-    return (int16_t)(-32767 + (int32_t)(p - 49152u) * 2);
-}
-#endif
 
 static uint16_t bloom_quarter_sine_q15(uint16_t x_q15)
 {
@@ -87,46 +60,6 @@ static uint32_t bloom_phase_inc_from_millihz(uint32_t mhz)
 {
     return (uint32_t)(((uint64_t)mhz * 6382653u + 32768u) >> 16);
 }
-
-#ifdef APSIS_BLOOM_ADDITIVE
-static int32_t bloom_sin_q30_for_hz(uint16_t hz)
-{
-    uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)apsis_sine_q15(phase) * BLOOM_Q30_ONE) / 32767ll);
-}
-
-static int32_t bloom_cos_q30_for_hz(uint16_t hz)
-{
-    uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)apsis_sine_q15(phase + 0x40000000u) *
-                      BLOOM_Q30_ONE) / 32767ll);
-}
-
-static int32_t bloom_norm_q30(int64_t value_q30, int64_t a0_q30)
-{
-    return (int32_t)((value_q30 * BLOOM_Q30_ONE) / a0_q30);
-}
-
-static void bloom_biquad_lowpass(ApsisBloomDspBiquad *b,
-                                 uint16_t hz, uint16_t q_milli)
-{
-    int64_t s, c, alpha, a0, one_minus_c;
-    uint16_t q = q_milli < 100u ? 100u : q_milli;
-    if (!b) return;
-    s = bloom_sin_q30_for_hz(hz);
-    c = bloom_cos_q30_for_hz(hz);
-    /* alpha = sin(w0)/(2Q), Q represented as milli-units. */
-    alpha = (s * 500ll + q / 2u) / q;
-    a0 = BLOOM_Q30_ONE + alpha;
-    one_minus_c = BLOOM_Q30_ONE - c;
-    b->b0_q30 = bloom_norm_q30(one_minus_c / 2ll, a0);
-    b->b1_q30 = bloom_norm_q30(one_minus_c, a0);
-    b->b2_q30 = b->b0_q30;
-    b->a1_q30 = bloom_norm_q30(-2ll * c, a0);
-    b->a2_q30 = bloom_norm_q30(BLOOM_Q30_ONE - alpha, a0);
-    b->x1 = b->x2 = b->y1 = b->y2 = 0;
-}
-#endif
 
 static uint32_t bloom_detune_q20(int8_t cents)
 {
@@ -211,41 +144,6 @@ static uint32_t bloom_attack_samples(const ApsisBloomAudioBinding *b)
     return base;
 }
 
-#ifdef APSIS_BLOOM_ADDITIVE
-static uint16_t bloom_cutoff_hz(uint8_t voice, uint16_t brightness_q15,
-                                uint32_t freq_mhz)
-{
-    uint32_t base, span, hz, cutoff;
-    uint16_t bright = brightness_q15 > APSIS_Q15_ONE
-        ? APSIS_Q15_ONE : brightness_q15;
-    if (voice == APSIS_BLOOM_CHOIR) {
-        base = 1100u; span = 5600u;
-    } else if (voice == APSIS_BLOOM_ORGAN) {
-        base = 1500u; span = 6500u;
-    } else if (voice == APSIS_BLOOM_GLASS) {
-        base = 2200u; span = 8800u;
-    } else {
-        base = 1500u; span = 7800u;
-    }
-    base += (span * bright + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
-    hz = (freq_mhz + 500u) / 1000u;
-    if (hz < 30u) hz = 30u;
-    cutoff = base + (hz * 45u + 50u) / 100u;
-    if (cutoff < 1000u) cutoff = 1000u;
-    if (cutoff > 12000u) cutoff = 12000u;
-    return (uint16_t)cutoff;
-}
-
-static uint16_t bloom_q_milli(uint8_t voice, uint16_t brightness_q15)
-{
-    if (voice == APSIS_BLOOM_ORGAN) return 420u;
-    if (voice == APSIS_BLOOM_GLASS) return 240u;
-    return (uint16_t)(300u +
-        ((uint32_t)240u * brightness_q15 + APSIS_Q15_ONE / 2u) /
-        APSIS_Q15_ONE);
-}
-#endif
-
 static void bloom_add_osc(ApsisBloomDspPetal *v, uint8_t waveform,
                           uint8_t ratio, uint16_t gain_q15, int8_t detune,
                           uint32_t base_mhz)
@@ -260,13 +158,12 @@ static void bloom_add_osc(ApsisBloomDspPetal *v, uint8_t waveform,
     o->waveform = waveform;
 }
 
-#ifndef APSIS_BLOOM_ADDITIVE
 /* radians -> the FM index's phase units: 2^32 / (2 pi * 32767) per full-scale modulator sample */
 #define BLOOM_FM_RAD_MILLI(m) ((uint32_t)(m) * 20861u / 1000u)
 
 /* Bloom as classic 2-operator FM (the FM-1's own idiom; the user's choice 2026-11-02, docs/MARGIN_PLAN.md B): a sine
- * carrier at the petal's pitch and a sine modulator, no filter. Brightness sets the index, where the additive bank
- * set a cutoff. Veil 1:1, soft; Choir 1:1 with the modulator 6 cents up (a slow chorus-like drift of the
+ * carrier at the petal's pitch and a sine modulator, no filter. Brightness sets the index (the additive Bloom
+ * before it, three oscillators and a biquad a petal, set a cutoff). Veil 1:1, soft; Choir 1:1 with the modulator 6 cents up (a slow chorus-like drift of the
  * spectrum); Organ 1:1 at a fixed index (steady overtones); Glass 1:4 with an index that falls with the
  * envelope squared (a bell's bright strike). Level, envelope, pan and timing are the additive Bloom's. */
 static void bloom_voice_fm(ApsisBloomDspPetal *v, uint8_t voice, uint8_t petal_index, uint32_t base_mhz,
@@ -300,30 +197,6 @@ static void bloom_voice_fm(ApsisBloomDspPetal *v, uint8_t voice, uint8_t petal_i
     v->fm_index_peak = (uint16_t)BLOOM_FM_RAD_MILLI(milli);
     v->fm_follow = follow;
 }
-#else
-static void bloom_voice_bank(ApsisBloomDspPetal *v, uint8_t voice,
-                             uint8_t petal_index, uint32_t base_mhz)
-{
-    if (!v) return;
-    if (voice == APSIS_BLOOM_CHOIR) {
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 1u, APSIS_Q15_MILLI(520), -6, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 1u, APSIS_Q15_MILLI(520), 6, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 2u, APSIS_Q15_MILLI(80), 0, base_mhz);
-    } else if (voice == APSIS_BLOOM_ORGAN) {
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 1u, APSIS_Q15_MILLI(740), 0, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 2u, APSIS_Q15_MILLI(220), 0, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 3u, APSIS_Q15_MILLI(75), 0, base_mhz);
-    } else if (voice == APSIS_BLOOM_GLASS) {
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 1u, APSIS_Q15_MILLI(820), 0, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 2u, APSIS_Q15_MILLI(180), 2, base_mhz);
-        bloom_add_osc(v, APSIS_BLOOM_DSP_SINE, 4u, APSIS_Q15_MILLI(35), -2, base_mhz);
-    } else {
-        bloom_add_osc(v, petal_index == 0u ? APSIS_BLOOM_DSP_TRIANGLE
-                                            : APSIS_BLOOM_DSP_SINE,
-                      1u, APSIS_Q15_ONE, 0, base_mhz);
-    }
-}
-#endif
 
 static void bloom_sort_env_events(ApsisBloomDspPetal *v)
 {
@@ -469,15 +342,8 @@ uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
 
     bloom_pan_q15(binding->acoustic.pan_q15, &v->mix_left_q15,
                   &v->mix_right_q15);
-#ifdef APSIS_BLOOM_ADDITIVE
-    v->cutoff_hz = bloom_cutoff_hz(v->voice, binding->brightness_q15, base_mhz);
-    v->q_milli = bloom_q_milli(v->voice, binding->brightness_q15);
-    bloom_biquad_lowpass(&v->filter, v->cutoff_hz, v->q_milli);
-    bloom_voice_bank(v, v->voice, v->petal_index, base_mhz);
-#else
     v->fm_env_peak_q15 = (uint16_t)peak;
     bloom_voice_fm(v, v->voice, v->petal_index, base_mhz, binding->brightness_q15);
-#endif
 
     dsp->trigger_count++;
     active = bloom_active_count(dsp, &oscs);
@@ -486,35 +352,6 @@ uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
     return 1u;
 }
 
-/* One petal over the whole block, added into out unsaturated; the caller saturates once. Petals touch only their
- * own state, so this equals the old sample-outer loop bit for bit (|term| < 2^19, 136 of them fit in 32 bits), and
- * an idle slot costs one test a block instead of one a sample. */
-#define BLOOM_CHUNK 256u
-#ifdef APSIS_BLOOM_ADDITIVE
-static int32_t bloom_tmp[BLOOM_CHUNK];
-#endif
-
-/* one oscillator's m samples added into tmp (the wave at the phase, then the phase steps, as before) */
-#ifdef APSIS_BLOOM_ADDITIVE
-APSIS_INLINE void bloom_osc_add(int32_t *tmp, uint32_t m, ApsisBloomDspOsc *o)
-{
-    uint32_t k, ph = o->phase;
-    const uint32_t inc = o->phase_inc;
-    const int32_t g = o->gain_q15;
-    /* |wave * gain| < 2^31: the old int64 products, in 32 bits */
-    if (o->waveform == APSIS_BLOOM_DSP_TRIANGLE)
-        for (k = 0u; k < m; ++k) { tmp[k] += (bloom_triangle_q15(ph) * g) >> 15; ph += inc; }
-    else
-        for (k = 0u; k < m; ++k) { tmp[k] += (apsis_sine_q15(ph) * g) >> 15; ph += inc; }
-    o->phase = ph;
-}
-#endif
-
-/* One petal over the block in two passes that each fit the registers: its oscillators summed into tmp, then the
- * filter, the envelope and the mix, with their state in locals (written back at the end and around an envelope
- * stage change, bloom_env_prepare, a few times in a petal's life). Integer sums: the same samples as the old
- * per-sample loop. */
-#ifndef APSIS_BLOOM_ADDITIVE
 /* the FM index for the envelope's current gain: fixed, or the peak index scaled by gain/peak (or its square) */
 APSIS_INLINE int32_t bloom_fm_index(const ApsisBloomDspPetal *v, uint32_t gain_q23)
 {
@@ -525,8 +362,10 @@ APSIS_INLINE int32_t bloom_fm_index(const ApsisBloomDspPetal *v, uint32_t gain_q
     return (int32_t)((v->fm_index_peak * r) >> 15);
 }
 
-/* One FM petal over the block: modulator, carrier at the modulated phase, the envelope's gain and the pan, with
- * the state in locals; the index follows the envelope every 32 samples. */
+/* One FM petal over the block, added into out unsaturated (the caller saturates once; petals touch only their own
+ * state): modulator, carrier at the modulated phase, the envelope's gain and the pan, with the state in locals
+ * (written back at the end and around an envelope stage change, bloom_env_prepare, a few times a petal's life);
+ * the index follows the envelope every 32 samples. */
 static void bloom_petal_render(ApsisBloomDspPetal *v, int32_t *out, uint32_t frames)
 {
     uint32_t k = 0u, age = v->age_samples;
@@ -591,83 +430,6 @@ static void bloom_petal_render(ApsisBloomDspPetal *v, int32_t *out, uint32_t fra
     v->osc[1].phase = pm;
     if (age >= life) v->active = 0u;
 }
-#else
-static void bloom_petal_render(ApsisBloomDspPetal *v, int32_t *out, uint32_t frames)
-{
-    uint32_t base = 0u, age = v->age_samples;
-    const uint32_t life = v->life_samples;
-    const int32_t mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
-    const int32_t b0 = v->filter.b0_q30, b1 = v->filter.b1_q30, b2 = v->filter.b2_q30;
-    const int32_t a1 = v->filter.a1_q30, a2 = v->filter.a2_q30;
-    int32_t x1 = v->filter.x1, x2 = v->filter.x2, y1 = v->filter.y1, y2 = v->filter.y2;
-    uint32_t gain = v->env_gain_q23, left = v->env_stage_left, step = v->env_linear_step_q23;
-    uint32_t rem = v->env_linear_rem_q23, acc = v->env_linear_acc_q23, den = v->env_linear_den;
-    uint32_t mul = v->env_decay_mul_q31;
-    uint8_t rising = v->env_stage_rising, j;
-
-    if (v->start_delay_samples) {
-        base = v->start_delay_samples < frames ? v->start_delay_samples : frames;
-        v->start_delay_samples -= base;
-    }
-    while (base < frames && age < life) {
-        uint32_t m = frames - base, k;
-        if (m > BLOOM_CHUNK) m = BLOOM_CHUNK;
-        if (m > life - age) m = life - age;
-        for (k = 0u; k < m; ++k) bloom_tmp[k] = 0;
-        for (j = 0u; j < v->osc_count && j < APSIS_BLOOM_DSP_OSC_MAX; ++j) bloom_osc_add(bloom_tmp, m, &v->osc[j]);
-        for (k = 0u; k < m; ++k) {
-            int32_t x = bloom_tmp[k], y, mono;
-            int64_t f = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
-            y = bloom_clamp32((int32_t)(f >> 30));   /* |x| < 3 * 2^16, |y| <= 2^17: |f >> 30| < 2^22 */
-            x2 = x1;
-            x1 = x;
-            y2 = y1;
-            y1 = y;
-            mono = (int32_t)(((int64_t)y * (uint16_t)(gain >> 8)) >> 15);
-            out[(base + k) * 2u] += (int32_t)(((int64_t)mono * mix_l) >> 15);
-            out[(base + k) * 2u + 1u] += (int32_t)(((int64_t)mono * mix_r) >> 15);
-            if (left) {                             /* the envelope's step */
-                if (rising) {
-                    gain += step;
-                    acc += rem;
-                    if (acc >= den) {
-                        gain++;
-                        acc -= den;
-                    }
-                } else {
-                    gain = (uint32_t)(((uint64_t)gain * mul + (1ull << 30)) >> 31);
-                }
-                left--;
-            }
-            age++;
-            if (!left && v->env_event_index < 3u && age >= v->env_event_sample[v->env_event_index]) {
-                v->age_samples = age;
-                v->env_gain_q23 = v->env_stage_target_q23;
-                v->env_event_index++;
-                bloom_env_prepare(v);
-                gain = v->env_gain_q23;
-                left = v->env_stage_left;
-                step = v->env_linear_step_q23;
-                rem = v->env_linear_rem_q23;
-                acc = v->env_linear_acc_q23;
-                den = v->env_linear_den;
-                mul = v->env_decay_mul_q31;
-                rising = v->env_stage_rising;
-            }
-        }
-        base += m;
-    }
-    v->age_samples = age;
-    v->env_gain_q23 = gain;
-    v->env_stage_left = left;
-    v->env_linear_acc_q23 = acc;
-    v->filter.x1 = x1;
-    v->filter.x2 = x2;
-    v->filter.y1 = y1;
-    v->filter.y2 = y2;
-    if (age >= life) v->active = 0u;
-}
-#endif
 
 void apsis_bloom_dsp_render(ApsisBloomDsp *dsp, int32_t *out,
                             uint32_t frames)

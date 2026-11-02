@@ -5,7 +5,7 @@
 #include "apsis_bloom_audio_runtime.h"
 
 #define APSIS_BLOOM_DSP_RATE 44100u
-#define APSIS_BLOOM_DSP_OSC_MAX 3u
+#define APSIS_BLOOM_DSP_OSC_MAX 2u   /* the FM pair: carrier, modulator */
 /* Frozen from the legal 11-second worst-case probe: 125 simultaneous petals
  * / 375 oscillators with zero drops. 136 leaves 11 petal slots of margin,
  * enough for more than two complete five-petal occurrences beyond the measured
@@ -23,18 +23,6 @@ typedef struct {
     uint16_t gain_q15;
     uint8_t waveform;
 } ApsisBloomDspOsc;
-
-typedef struct {
-    int32_t b0_q30;
-    int32_t b1_q30;
-    int32_t b2_q30;
-    int32_t a1_q30;
-    int32_t a2_q30;
-    int32_t x1;
-    int32_t x2;
-    int32_t y1;
-    int32_t y2;
-} ApsisBloomDspBiquad;
 
 typedef struct {
     uint8_t active;
@@ -60,12 +48,8 @@ typedef struct {
     uint8_t env_stage_rising;
     uint16_t mix_left_q15;
     uint16_t mix_right_q15;
-    uint16_t cutoff_hz;
-    uint16_t q_milli;
     ApsisBloomDspOsc osc[APSIS_BLOOM_DSP_OSC_MAX];
-    ApsisBloomDspBiquad filter;
-    /* the FM petal (the default; APSIS_BLOOM_ADDITIVE builds the old oscillator bank + biquad): osc[0] is the
-     * carrier, osc[1] the modulator. The index in phase units per full-scale modulator sample (radians * 20861),
+    /* the FM petal: osc[0] is the carrier, osc[1] the modulator. The index in phase units per full-scale modulator sample (radians * 20861),
      * at the envelope's peak; it follows the envelope not at all (0), linearly (1) or squared (2). */
     uint16_t fm_index_peak;
     uint16_t fm_env_peak_q15;
