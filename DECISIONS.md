@@ -225,3 +225,17 @@ petal.
 sample before its oscillators, which made it the largest sound cost under dense Bloom. The user suggested FM as
 the FM-1's own idiom and approved it after an A/B listen (bloom-ab, demo A/B). Under FM1_STRICT a Bloom
 oscillator went from 128 to 48 us a block, and a petal is about 4x cheaper.
+
+## 2026-11-02 - Two cores: the String sources and the room on core 1, the room one block late
+
+**Decision:** Each audio block, core 1 does one job while core 0 renders Clock and runs the planning (Spiral and
+Bloom with it). The job is the String drone, Drift, the String notes and the room. The code is the FM-1
+community's own dual-core HAL, via fm1-dock (PLATFORM.md). Each source renders into its own buffer, and the
+buffers are committed in the one-core order with that order's gains, so the dry mix is bit-identical. The room
+runs one block (5.8 ms) late, from the previous block's sends. With core 1 off, core 0 runs the same job in the
+same place. That happens while core 1 is screened, when it never started, or when it was held after a misread
+or a timeout, so one core and two sound the same.
+
+**Why:** After every cut on one core, the parts' worsts in the densest panel settings still added up to more
+than a block (148 %). The room's extra 5.8 ms sits on its 72 ms pre-delay. The re-pinned WAVs differ from the
+one-core ones only from the room's first input on, by -24 dB RMS (the shifted tail).

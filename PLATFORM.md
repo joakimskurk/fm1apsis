@@ -36,3 +36,21 @@ APSIS uses the platform as Dinghy documents it (`docs/dinghy/API.md`):
 2. Apply upstream changes; re-apply the table above.
 3. `sh tests/apsis/run.sh`, `sh tests/sound.sh` (the sound should not change), CI's firmware and emulator jobs.
 4. Update the commit here and in `PROJECT_STATE.md`.
+
+## The second core (APSIS v2.2, from fm1-dock 94f8087, GPL-3.0)
+
+The FM-1 firmwares' own dual-core code (X0X, after Melodee; through SLOOP into fm1-dock) is taken over unchanged
+but for a notice:
+
+- `hal/fm1_cpu1.h`, `hal/fm1_cpu1.S`: core 1's start, its waiting loop in RAM, one job at a time.
+- `hal/fm1_power.h`: the supplies as M-VAVE's own firmware sets them; some units misread with two cores below them.
+- `src/cpu1.c`: start at power-on, a self-test, screening for misreads over the first 128 blocks, one core until
+  power-off after a crash with two.
+
+Changes to Dinghy's files:
+
+- `hal/fm1_sys.h`: the supply levels, `fm1_core1_stop` and `fm1_c1_ran` in every reset.
+- `hal/fm1_guard.h`: the PC limits opened while core 1 starts.
+- `app.ld`: `.c1_text`.
+- `src/platform.c`: `fm1_power_init`, the `.c1_text` copy, `cpu1_boot`, the hold in a fault.
+- `tools/build.py`: `fm1_cpu1.S`, the `.c1_text` image and its no-call check.

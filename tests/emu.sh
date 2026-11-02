@@ -63,7 +63,7 @@ def words(name, n):
     a = syms[name] - 0x01C00000
     return struct.unpack_from("<%dI" % n, ram, a)
 last, worst, blocks, total = words("apsis_load_probe", 4)
-PARTS = ["updates+Clock triggers", "String drone", "Drift", "Clock", "String notes", "planning",
+PARTS = ["updates+Clock triggers", "String job (here)", "wait for core 1", "Clock", "commits", "planning",
          "triggers", "room+Motion", "Spiral+Bloom sound"]
 parts = words("apsis_worst_probe", 9)
 part_max = words("apsis_part_max_probe", 9)
@@ -110,6 +110,11 @@ if "apsis_bench_probe" in syms:
 if "apsis_plan_probe" in syms:
     pl = words("apsis_plan_probe", 3)
     print(f"planning by piece, worst (us): runtime {pl[0]}, Spiral setup {pl[1]}, Bloom setup {pl[2]}")
+if "apsis_c1_probe" in syms:
+    c1 = words("apsis_c1_probe", 4)
+    r["core1"] = {"blocks_on_core1": c1[0], "blocks_on_core0": c1[1], "timeouts": c1[2], "job_worst_us": c1[3]}
+    (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
+    print(f"core 1: {c1[0]} blocks there, {c1[1]} on core 0 (screening or off), {c1[2]} late; its job's worst {c1[3]} us")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:

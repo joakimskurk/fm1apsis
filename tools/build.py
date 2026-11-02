@@ -176,6 +176,7 @@ def build_app():
     cmds = [("cc", "-c", FW / "crt0.S", "-o", OUT / "crt0.o"),
             ("cc", "-c", FW / "hal" / "fm1_vec.S", "-o", OUT / "fm1_vec.o"),
             ("cc", "-c", FW / "hal" / "fm1_isr.S", "-o", OUT / "fm1_isr.o"),
+            ("cc", "-c", FW / "hal" / "fm1_cpu1.S", "-o", OUT / "fm1_cpu1.o"),   # (APSIS, from fm1-dock)
             ("cc", *flags, "-c", FW / "src" / "app.c", "-o", OUT / "app.o")]
     tc_all(*cmds)
     elf = OUT / "apsis.elf"
@@ -187,12 +188,13 @@ def build_app():
         ld = OUT / "app.ld"
         ld.write_text(txt.replace("LENGTH = 0x8DFBC", f"LENGTH = {APP_SLOT:#X}".replace("0X", "0x")))
     tc("pi32v2/bin/ld", "--gc-sections", "-e", "_start", "-T", ld, OUT / "crt0.o", OUT / "fm1_vec.o",
-       OUT / "fm1_isr.o", OUT / "app.o", "-o", elf)
-    for sect in ("text.bin", "data.bin", "ramtext.bin"):
+       OUT / "fm1_isr.o", OUT / "fm1_cpu1.o", OUT / "app.o", "-o", elf)
+    for sect in ("text.bin", "data.bin", "ramtext.bin", "c1text.bin"):
         (OUT / sect).unlink(missing_ok=True)
     *_, syms, dis, rt = tc_all(("common/bin/objcopy", "-O", "binary", "-j", ".text", elf, OUT / "text.bin"),
                                ("common/bin/objcopy", "-O", "binary", "-j", ".data", elf, OUT / "data.bin"),
                                ("common/bin/objcopy", "-O", "binary", "-j", ".ram_text", elf, OUT / "ramtext.bin"),
+                               ("common/bin/objcopy", "-O", "binary", "-j", ".c1_text", elf, OUT / "c1text.bin"),
                                ("common/bin/objdump", "-t", elf),
                                ("common/bin/objdump", "-d", elf),
                                ("common/bin/objdump", "-d", "-j", ".ram_text", elf))
@@ -201,8 +203,9 @@ def build_app():
     def symv(name):
         return int(re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M).group(1), 16)
     img = bytearray((OUT / "text.bin").read_bytes())
-    # .ram_text and .data follow .text at their load addresses; crt0 copies them by words
-    for sect, lname in (("ramtext.bin", "_rt_load"), ("data.bin", "_data_load")):
+    # .ram_text, .c1_text (the second core's loop) and .data follow .text at their load addresses, in that
+    # order; crt0 copies them by words
+    for sect, lname in (("ramtext.bin", "_rt_load"), ("c1text.bin", "_c1_load"), ("data.bin", "_data_load")):
         load = symv(lname)
         if load % 4:
             raise SystemExit(f"{lname} {load:#x} is not word aligned")
@@ -229,6 +232,15 @@ def check(img, syms, dis, rt):
         errors.append(f".ram_text contains calls: {rt_calls[:3]}")
     else:
         notes.append(f".ram_text: {len([ln for ln in rt.splitlines() if LINE.match(ln)])} insns, no calls")
+    mc1 = [re.search(r"^([0-9a-f]+) .*\s" + n + r"$", syms, re.M) for n in ("_c1_start", "_c1_end")]   # (APSIS, from fm1-dock)
+    c1 = re.search(r"Disassembly of section \.c1_text:\n(.*?)(?=\nDisassembly of section|\Z)", dis, re.S)
+    c1_calls = [ln.strip() for ln in (c1.group(1).splitlines() if c1 else [])
+                if re.search(r"\bcall\b", ln) and not re.search(r"\bcall r\d+\b", ln)]
+    if c1_calls:                    # its idle loop and no-op run while the flash may be off: the job only by pointer
+        errors.append(f".c1_text calls by address: {c1_calls[:3]}")
+    elif all(mc1):
+        notes.append(f".c1_text: {int(mc1[1].group(1), 16) - int(mc1[0].group(1), 16)} B, the second core's loop "
+                     "in RAM, calls only by pointer")
     for ln in dis.splitlines():     # nothing may call or load an address in the chip ROM
         mm = LINE.match(ln)
         if not mm:

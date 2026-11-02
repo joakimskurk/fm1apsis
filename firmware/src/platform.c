@@ -52,6 +52,7 @@ enum { ENC_SELECT = 0, ENC_ALGORITHM = 1, ENC_KNOB1 = 2, ENC_KNOB2 = 3, ENC_KNOB
 #include "fm1_sys.h"
 #include "fm1_irq.h"
 #include "fm1_guard.h"
+#include "fm1_power.h"                          /* (APSIS, from fm1-dock) the supplies as M-VAVE's firmware sets them */
 #if BOARD_SMK37
 #include "smk_input.h"                          /* keys with velocity, buttons, 8 encoders, LEDs, pads, faders, wheels */
 static void fm1_led_key_glow(uint32_t id, int on) { (void)id; (void)on; }   /* (no key LEDs: the pads glow) */
@@ -72,6 +73,7 @@ static void fm1_led_key_glow(uint32_t id, int on)   /* as fm1_led_key, the dim l
 #include "fm1_timer.h"
 #include "fm1_lcd_hw.h"
 #include "fm1_audio.h"
+#include "cpu1.c"                               /* (APSIS, from fm1-dock) the second core: cpu1_run / cpu1_wait */
 #if !BOARD_SMK37
 #include "fm1_adc.h"                            /* (SMK: smk_input.h stands in, MASTER = K1) */
 #endif
@@ -426,6 +428,8 @@ static void fm1_fault(const fm1_crash_t *c)
 {
     char b[12];
     uint32_t i, t0, v[3] = {c->vec, c->pc, c->rets};
+    fm1_cpu1_hold();                            /* (APSIS, from fm1-dock) the second core first */
+    (void)cpu1_crashed();                       /* a crash with two cores: one core until power-off (cpu1.c) */
     fm1_audio_stop();
     lcd_fill(0, 0, 240, 240, RGB(160, 0, 0));
     draw_text_box(0, 20, 240, &FONT_S, APP_NAME " CRASH", C_WHITE, 1);
@@ -445,8 +449,11 @@ void fm1_cstart(void)
 {
     extern uint32_t _data_start[], _data_end[], _data_load[], _bss_start[], _bss_end[];
     extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[];
+    extern uint32_t _c1_start[], _c1_end[], _c1_load[];
     uint32_t *s, *d, p3, boot_mode;
     fm1_time_init();
+    fm1_power_init();                           /* (APSIS, from fm1-dock) the supplies as M-VAVE's firmware starts
+                                                 * them, VDC14 1.60 V and SYSVDD 1.38 V: two cores need them (fm1_power.h) */
     fm1_reset_reason();
     p3 = fm1_boot.p3_rst;
     fm1_wdt_arm(0x0D);
@@ -460,6 +467,7 @@ void fm1_cstart(void)
     for (d = _pool_start; d < _pool_end; d++) *d = 0;
     for (s = _data_load, d = _data_start; d < _data_end; s++, d++) *d = *s;
     for (s = _rt_load, d = _rt_start; d < _rt_end; s++, d++) *d = *s;
+    for (s = _c1_load, d = _c1_start; d < _c1_end; s++, d++) *d = *s;   /* the second core's loop (fm1_cpu1.h) */
     fm1_mailbox_clear();
     fm1_guard_enable(FM1_GUARD_STACK | FM1_GUARD_WRITE | FM1_GUARD_BUS | FM1_GUARD_PC);
     fm1_boot.p3_rst = (uint8_t)p3;
@@ -480,6 +488,8 @@ void fm1_cstart(void)
     smk_trim_read();                            /* (after fm1_input_init: it sets the defaults first) */
     smk_owner_check();
 #endif
+    cpu1_boot();                                /* (APSIS, from fm1-dock) the second core: before the audio and the
+                                                 * timers; if it does not answer, one core */
     fm1_audio_init(abuf, HALF_WORDS, isr_alnk0, 3);   /* (abuf is zero: .bss) */
     usb_start();
 #if FELUCCA_UART

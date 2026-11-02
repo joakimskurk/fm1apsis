@@ -200,10 +200,10 @@ static volatile uint8_t runtime_ready;
  * block, blocks rendered, their total (us; a block is 5805 us). */
 static volatile uint32_t apsis_runtime_probe[6];
 static volatile uint32_t apsis_load_probe[4];
-/* the worst block so far, by part (us): 0 the block's updates and Clock triggers, 1 String drone, 2 Drift,
- * 3 Clock, 4 String notes (each with its bus commit), 5 the runtime's planning (Spiral, Bloom, the attractor),
- * 6 the triggered notes (strums, rhythm, plucks, Bloom gestures), 7 the room and Motion, 8 Spiral and Bloom's
- * sound (rendered inside part 5, timed apart) */
+/* the worst block so far, by part, on core 0 (us): 0 the block's updates and Clock triggers, 1 the String job
+ * handed to core 1 (or done here: drone, Drift, notes), 2 the wait for core 1, 3 Clock, 4 the six commits,
+ * 5 the runtime's planning (Spiral, Bloom, the attractor), 6 the triggered notes (strums, rhythm, plucks, Bloom
+ * gestures), 7 the room and Motion, 8 Spiral and Bloom's sound (rendered inside part 5, timed apart) */
 #define BLOCK_PARTS 9u
 static volatile uint32_t apsis_worst_probe[BLOCK_PARTS];
 /* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
@@ -450,6 +450,40 @@ static void apsis_p10_motion_finish_block(void)
     apsis_p10_motion_recompute_active();
 }
 
+/* ---- the second core (docs/MARGIN_PLAN.md D; platform cpu1.c, from fm1-dock): each block, core 1 renders the
+ * String drone, Drift and the String notes while core 0 renders Clock and plans (Spiral and Bloom with it). Every
+ * source renders into its own buffer, and they are all committed in the one-core order with the gains of that
+ * order, so two cores sound exactly as one. With core 1 off (not started, screening, held), core 0 runs the job
+ * itself in the same place. */
+#ifdef DINGHY_HOST
+#define APSIS_POOL_BUF __attribute__((aligned(4)))
+static int cpu1_run(void (*fn)(uint32_t), uint32_t arg) { (void)fn; (void)arg; return 0; }
+static int cpu1_wait(void) { return 0; }
+static void cpu1_screen_begin(void) {}
+static void cpu1_screen_end(void) {}
+#else
+#define APSIS_POOL_BUF __attribute__((section(".pool.apsis_c1"), used, aligned(4)))
+#endif
+#define SRC_SAMPLES 512u                            /* 256 frames, stereo */
+static int32_t buf_drone[SRC_SAMPLES] APSIS_POOL_BUF, buf_drift[SRC_SAMPLES] APSIS_POOL_BUF;
+static int32_t buf_notes[SRC_SAMPLES] APSIS_POOL_BUF, buf_clock[SRC_SAMPLES] APSIS_POOL_BUF;
+static int32_t buf_spiral[SRC_SAMPLES] APSIS_POOL_BUF, buf_bloom[SRC_SAMPLES] APSIS_POOL_BUF;
+static volatile uint32_t apsis_c1_probe[4];       /* blocks core 1 rendered, blocks core 0 did the job, timeouts, the job's worst (us) */
+
+static ApsisSpaceState room_state;                /* the room's settings at the block's start, for core 1 */
+
+static void job_strings(uint32_t frames)         /* core 1's (or core 0's, with one core) */
+{
+    apsis_space_target_room_wet(&space_target, &room_state);   /* the last block's room (one block late) */
+    apsis_string_dsp_render(&string_dsp, buf_drone, frames);
+    apsis_drift_dsp_render(&drift_dsp, buf_drift, frames);
+    {
+        COST_BEGIN(apsis_string_dsp_transient_physical_active(&string_transient_pool));
+        apsis_string_transient_render(&string_transient_pool, buf_notes, frames);
+        COST_END(0u);
+    }
+}
+
 static void render_block(int32_t *out, uint32_t n)
 {
     /* Dinghy enables IRQs before app_main(), so the ISR can run while static
@@ -488,42 +522,26 @@ static void render_block(int32_t *out, uint32_t n)
                                                 &clock_batch.event[clock_ix],
                                                 clock_block_start);
         block_part(0u);
-        {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
-            apsis_string_dsp_render(&string_dsp, space_source, n);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
+        /* the four first sources' gains as the one-core order committed them: before the planning, which may
+         * move them (Mother, CHAIN) */
+        const uint16_t send_string = apsis.string.send_q15, send_drift = apsis.drift.send_q15;
+        const uint16_t send_clock = apsis.clock.send_q15;
+        const uint16_t mix0 = apsis.mother.mix_q15[0], mix1 = apsis.mother.mix_q15[1], mix2 = apsis.mother.mix_q15[2];
+        const uint8_t mute = apsis.mother.mute_mask;
+        uint8_t spiral_rendered = 0u, bloom_rendered = 0u, c1_taken;
+        room_state = apsis.space;
+        c1_taken = (uint8_t)cpu1_run(job_strings, n);
+        if (!c1_taken) {
+            job_strings(n);
+            apsis_c1_probe[1]++;
         }
         block_part(1u);
         {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
-            apsis_drift_dsp_render(&drift_dsp, space_source, n);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.drift.send_q15, apsis.mother.mix_q15[1],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 1)));
-        }
-        block_part(2u);
-        {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             COST_BEGIN(clock_voices());
-            apsis_clock_dsp_render(&clock_dsp, space_source, n);
+            apsis_clock_dsp_render(&clock_dsp, buf_clock, n);
             COST_END(3u);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.clock.send_q15, apsis.mother.mix_q15[2],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 2)));
         }
         block_part(3u);
-        {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
-            COST_BEGIN(apsis_string_dsp_transient_physical_active(&string_transient_pool));
-            apsis_string_transient_render(&string_transient_pool, space_source, n);
-            COST_END(0u);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
-        }
-        block_part(4u);
         if (!spiral_audio_started && apsis.spiral.sound && apsis.spiral.route_count)
             spiral_audio_started = 1u;
         if (!bloom_audio_started &&
@@ -551,14 +569,11 @@ static void render_block(int32_t *out, uint32_t n)
                 PLAN_END(1); }
                 if (spiral_dsp.hit_trigger_count)
         {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
             COST_BEGIN(apsis_spiral_dsp_oscillator_active(&spiral_dsp));
-            apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
+            apsis_spiral_dsp_render(&spiral_dsp, buf_spiral, n);
             COST_END(1u);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
+            spiral_rendered = 1u;
             sound_ticks += fm1_ticks() - sound_t0;
         }
             }
@@ -572,14 +587,11 @@ static void render_block(int32_t *out, uint32_t n)
                 PLAN_END(2); }
                 if (bloom_dsp.trigger_count)
         {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
             COST_BEGIN(apsis_bloom_dsp_oscillator_active(&bloom_dsp));
-            apsis_bloom_dsp_render(&bloom_dsp, space_source, n);
+            apsis_bloom_dsp_render(&bloom_dsp, buf_bloom, n);
             COST_END(2u);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.bloom.send_q15, apsis.mother.mix_q15[4],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 4)));
+            bloom_rendered = 1u;
             sound_ticks += fm1_ticks() - sound_t0;
         }
             }
@@ -602,14 +614,11 @@ static void render_block(int32_t *out, uint32_t n)
             PLAN_END(1); }
             if (spiral_dsp.hit_trigger_count)
         {
-            int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
             COST_BEGIN(apsis_spiral_dsp_oscillator_active(&spiral_dsp));
-            apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
+            apsis_spiral_dsp_render(&spiral_dsp, buf_spiral, n);
             COST_END(1u);
-            apsis_space_target_commit_source(
-                &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
-                (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
+            spiral_rendered = 1u;
             sound_ticks += fm1_ticks() - sound_t0;
         }
         } else if (string_attractor_runtime.length ||
@@ -631,6 +640,28 @@ static void render_block(int32_t *out, uint32_t n)
             PLAN_END(0); }
         }
         block_part_planning();
+        if (c1_taken) {
+            if (cpu1_wait() == 0) {
+                apsis_c1_probe[0]++;
+            } else {                                     /* core 1 late: held from now on; this block's String
+                                                          * sources are lost (its buffers half written), not doubled */
+                uint32_t k;
+                for (k = 0u; k < n * 2u; ++k) buf_drone[k] = buf_drift[k] = buf_notes[k] = 0;
+                apsis_c1_probe[2]++;
+            }
+        }
+        block_part(2u);
+        apsis_space_target_commit_buffer(&space_target, buf_drone, out, n, send_string, mix0, (uint8_t)(mute & 1u));
+        apsis_space_target_commit_buffer(&space_target, buf_drift, out, n, send_drift, mix1, (uint8_t)(mute & 2u));
+        apsis_space_target_commit_buffer(&space_target, buf_clock, out, n, send_clock, mix2, (uint8_t)(mute & 4u));
+        apsis_space_target_commit_buffer(&space_target, buf_notes, out, n, send_string, mix0, (uint8_t)(mute & 1u));
+        if (spiral_rendered)
+            apsis_space_target_commit_buffer(&space_target, buf_spiral, out, n, apsis.spiral.send_q15,
+                                             apsis.mother.mix_q15[3], (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
+        if (bloom_rendered)
+            apsis_space_target_commit_buffer(&space_target, buf_bloom, out, n, apsis.bloom.send_q15,
+                                             apsis.mother.mix_q15[4], (uint8_t)(apsis.mother.mute_mask & (1u << 4)));
+        block_part(4u);
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string98_strum(&string_transient_pool, &apsis, &string_pitch_memory,
                                        &string_attractor_runtime.binding[attr_ix], apsis_runtime.cursor_sample);
@@ -694,7 +725,8 @@ static void render_block(int32_t *out, uint32_t n)
             }
         }
         block_part(6u);
-        apsis_space_target_render(&space_target, &apsis.space, out, n);
+        apsis_space_target_room_add(&space_target, out, n);   /* the room rendered beside this block, from the last one */
+        apsis_space_target_room_prepare(&space_target, n);   /* this block's sends, for the next block's room */
         if (apsis_string_motion_active)
             apsis_p10_motion_finish_block();
         block_part(7u);
@@ -711,7 +743,12 @@ static void render_block(int32_t *out, uint32_t n)
 static void app_audio(int32_t *out, uint32_t n)
 {
     uint32_t t0 = fm1_ticks(), us;
+    cpu1_screen_begin();                            /* core 1's first blocks: screened for misreads beside the render */
     render_block(out, n);
+    cpu1_screen_end();
+#ifndef DINGHY_HOST
+    apsis_c1_probe[3] = cpu1_job_worst / FM1_TICKS_PER_US;
+#endif
     us = (uint32_t)(fm1_ticks() - t0) / FM1_TICKS_PER_US;
     apsis_load_probe[0] = us;
     {
