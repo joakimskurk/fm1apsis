@@ -221,6 +221,37 @@ static uint32_t block_mark;
 
 static uint32_t sound_ticks;
 
+#ifdef APSIS_STRESS
+/* what one voice costs, measured while the stress build plays (docs/MARGIN_PLAN.md B): for String partials, Spiral
+ * oscillators, Bloom oscillators and Clock voices, the worst ns per voice per block over blocks with 4 or more of
+ * them, and how many there were then. [2k] ns, [2k + 1] voices. */
+static volatile uint32_t apsis_cost_probe[8];
+
+static void cost_note(uint32_t k, uint32_t ticks, uint32_t voices)
+{
+    uint32_t ns;
+    if (voices < 4u)
+        return;
+    ns = (uint32_t)((uint64_t)ticks * 1000u / FM1_TICKS_PER_US / voices);
+    if (ns > apsis_cost_probe[2u * k]) {
+        apsis_cost_probe[2u * k] = ns;
+        apsis_cost_probe[2u * k + 1u] = voices;
+    }
+}
+
+static uint32_t clock_voices(void)
+{
+    uint32_t i, v = 0u;
+    for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i) v += clock_dsp.voice[i].active;
+    return v;
+}
+#define COST_BEGIN(count) uint32_t cost_n = (count), cost_t0 = fm1_ticks()
+#define COST_END(k) cost_note((k), fm1_ticks() - cost_t0, cost_n)
+#else
+#define COST_BEGIN(count) do { } while (0)
+#define COST_END(k) do { } while (0)
+#endif
+
 static void block_part(uint32_t part)
 {
     uint32_t now = fm1_ticks();
@@ -463,7 +494,9 @@ static void render_block(int32_t *out, uint32_t n)
         block_part(2u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
+            COST_BEGIN(clock_voices());
             apsis_clock_dsp_render(&clock_dsp, space_source, n);
+            COST_END(3u);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.clock.send_q15, apsis.mother.mix_q15[2],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 2)));
@@ -471,7 +504,9 @@ static void render_block(int32_t *out, uint32_t n)
         block_part(3u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
+            COST_BEGIN(apsis_string_dsp_transient_physical_active(&string_transient_pool));
             apsis_string_transient_render(&string_transient_pool, space_source, n);
+            COST_END(0u);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
@@ -502,7 +537,9 @@ static void render_block(int32_t *out, uint32_t n)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
+            COST_BEGIN(apsis_spiral_dsp_oscillator_active(&spiral_dsp));
             apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
+            COST_END(1u);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
@@ -519,7 +556,9 @@ static void render_block(int32_t *out, uint32_t n)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
+            COST_BEGIN(apsis_bloom_dsp_oscillator_active(&bloom_dsp));
             apsis_bloom_dsp_render(&bloom_dsp, space_source, n);
+            COST_END(2u);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.bloom.send_q15, apsis.mother.mix_q15[4],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 4)));
@@ -543,7 +582,9 @@ static void render_block(int32_t *out, uint32_t n)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             uint32_t sound_t0 = fm1_ticks();
+            COST_BEGIN(apsis_spiral_dsp_oscillator_active(&spiral_dsp));
             apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
+            COST_END(1u);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 3)));

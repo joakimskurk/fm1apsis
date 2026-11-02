@@ -88,6 +88,13 @@ if "apsis_voice_probe" in syms:
     r["voices"] = {"string_logical": vp[0], "string_physical": vp[1], "bloom_petals": vp[2]}
     (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
     print(f"voices high water: String notes {vp[0]} logical / {vp[1]} physical, Bloom petals {vp[2]}")
+if "apsis_cost_probe" in syms:
+    c = words("apsis_cost_probe", 8)
+    r["voice_cost_ns"] = {k: {"ns_per_voice_block": c[2 * i], "voices": c[2 * i + 1]}
+                          for i, k in enumerate(["String partial", "Spiral oscillator", "Bloom oscillator", "Clock voice"])}
+    (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
+    print("one voice's worst cost per block (us, at that many voices): " + ", ".join(
+        f"{k} {v['ns_per_voice_block'] / 1000:.1f} ({v['voices']})" for k, v in r["voice_cost_ns"].items()))
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:
