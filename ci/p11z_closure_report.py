@@ -137,13 +137,28 @@ def main():
         if active_target.get(k) != v:
             raise SystemExit(f"FAIL: closure active target {k}={active_target.get(k)!r} != {v!r}")
 
-    # The active emulator script itself carries the complete lifecycle assertions.
-    # Freeze the top-level telemetry here as a second independent closure check.
-    for k, v in {
-        'runtime_queue_high_water': 30,
-        'runtime_queue_overflowed': 0,
-        'runtime_late_flags': 0,
-    }.items():
+    # Freeze the complete active Motion lifecycle using the schema emitted by
+    # emulator_motion_active.sh. The helper already asserts these values; this
+    # second independent closure check makes report generation fail on drift.
+    expected_active = {
+        'seen_flags': 'ff',
+        'final_flags': '14',
+        'left_points': 149,
+        'right_points': 149,
+        'record_start_sample': 220672,
+        'record_finish_sample': 441088,
+        'record_cycle_samples': 220416,
+        'manual_start_sample': 450560,
+        'manual_resume_sample': 466176,
+        'runtime_cursor': 481024,
+        'queue_high_water': 30,
+        'queue_overflowed': 0,
+        'late_flags': 0,
+        'wav_frames': 521984,
+        'wav_peak': 1171,
+        'wav_rms': 173,
+    }
+    for k, v in expected_active.items():
         if active.get(k) != v:
             raise SystemExit(f"FAIL: closure active {k}={active.get(k)!r} != {v!r}")
 
@@ -166,7 +181,7 @@ def main():
         'production_target': target,
         'idle': {k: idle[k] for k in expected_idle},
         'active_target': active_target,
-        'active_runtime': {k: active[k] for k in ('runtime_queue_high_water','runtime_queue_overflowed','runtime_late_flags')},
+        'active_runtime': {k: active[k] for k in expected_active},
         'phase12_hardware_only': [
             'physical app_audio ISR/callback cycle margin under worst-case combined load',
             'physical runtime stack high-water and guard margin',
@@ -201,7 +216,10 @@ def main():
         f"- idle PCM `{idle['wav_raw_sha256']}`",
         f"- idle cursor {idle['runtime_cursor_low32']:,}; queue {idle['runtime_queue_high_water']}/512; overflow {idle['runtime_queue_overflowed']}; late {idle['runtime_late_flags']}",
         f"- active target image/RAM/POOL **{active_target['image']:,} / {active_target['ram']:,} / {active_target['pool']:,} B**",
-        f"- active queue {active['runtime_queue_high_water']}/512; overflow {active['runtime_queue_overflowed']}; late {active['runtime_late_flags']}", '',
+        f"- active Motion seen `{active['seen_flags']}`, final `{active['final_flags']}`, points {active['left_points']}/{active['right_points']}",
+        f"- active record {active['record_start_sample']:,} → {active['record_finish_sample']:,}; cycle {active['record_cycle_samples']:,} samples",
+        f"- active override {active['manual_start_sample']:,}; resume {active['manual_resume_sample']:,}; cursor {active['runtime_cursor']:,}",
+        f"- active queue {active['queue_high_water']}/512; overflow {active['queue_overflowed']}; late {active['late_flags']}", '',
         '## Deferred to Phase 12 — physical FM-1 only', '',
     ]
     md.extend(f'- {x}' for x in report['phase12_hardware_only'])
