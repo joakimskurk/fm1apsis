@@ -1,8 +1,6 @@
-name: APSIS Phase 11Y FDN fixed output add-sub proof
+name: APSIS Phase 11Y frozen FDN output add-sub proof
 
 on:
-  push:
-    branches: [p11y-fdn-output-addsub-proof-staging]
   workflow_dispatch:
 
 jobs:
@@ -14,6 +12,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: ca46ac5a5d3db9b9f0e43adb061ba780fab39c9a
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
@@ -24,28 +23,20 @@ jobs:
           rm -rf "$P11Y_EVIDENCE"
           mkdir -p "$P11Y_EVIDENCE"
 
-      - name: Gate P11Y.1 - arithmetic and complete FDN equivalence
+      - name: Gate P11Y.1 - exact host equivalence proof
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ca46ac5a5d3db9b9f0e43adb061ba780fab39c9a'
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
-            tests/test_p11y_fdn_output_addsub_equivalence.c \
-            -o /tmp/test_p11y_addsub
+            tests/test_p11y_fdn_output_addsub_equivalence.c -o /tmp/test_p11y_addsub
           /tmp/test_p11y_addsub | tee "$P11Y_EVIDENCE/equivalence.log"
           grep -q 'P11Y arithmetic_cases=1000312' "$P11Y_EVIDENCE/equivalence.log"
-          grep -q 'P11Y fdn_blocks=6311' "$P11Y_EVIDENCE/equivalence.log"
+          grep -q 'P11Y fdn_blocks=6311 fdn_frames=386191' "$P11Y_EVIDENCE/equivalence.log"
           grep -q 'PASS: P11Y fixed add-sub output mix is bit-identical' "$P11Y_EVIDENCE/equivalence.log"
-
-      - name: Gate P11Y.2 - equivalence under ASAN/UBSAN
-        run: |
-          set -euo pipefail
-          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
-            -fsanitize=address,undefined -Iapsis \
-            tests/test_p11y_fdn_output_addsub_equivalence.c \
-            -o /tmp/test_p11y_addsub_san
-          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
-          UBSAN_OPTIONS=halt_on_error=1 \
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Iapsis \
+            tests/test_p11y_fdn_output_addsub_equivalence.c -o /tmp/test_p11y_addsub_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
             /tmp/test_p11y_addsub_san | tee "$P11Y_EVIDENCE/equivalence-san.log"
-          grep -q 'PASS: P11Y fixed add-sub output mix is bit-identical' "$P11Y_EVIDENCE/equivalence-san.log"
 
       - name: JieLi Linux toolchain
         run: |
@@ -54,7 +45,6 @@ jobs:
           TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
           ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
           echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
-
       - name: JieLi AC79 SDK
         run: |
           for i in 1 2 3; do
@@ -66,83 +56,53 @@ jobs:
           test -d ~/fw-AC79_AIoT_SDK
           echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
 
-      - name: Gate P11Y.3 - exact P11W baseline target
+      - name: Gate P11Y.2 - exact P11W baseline then ephemeral rejected candidate
         run: |
           set -euo pipefail
           bash ci/p11f_prepare.sh
           bash ci/apply_apsis_p10g.sh
           bash ci/build_apsis_target.sh
           cp build/target_report.json "$P11Y_EVIDENCE/baseline-target.json"
-          cp build/SHA256SUMS "$P11Y_EVIDENCE/baseline-SHA256SUMS"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected={'image':140472,'ram':87524,'pool':319176,
+                    'package_sha256':'f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168'}
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          PY
           ELF=work/apsis/build/dinghy.elf
           OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
           "$OBJDUMP" -t "$ELF" > "$P11Y_EVIDENCE/baseline-symbols.txt"
           "$OBJDUMP" -d "$ELF" > "$P11Y_EVIDENCE/baseline-disassembly.txt"
-          python3 - <<'PY'
-          import json
-          r=json.load(open('build/target_report.json'))
-          expected={'product':'FM-1_972','image':140472,'ram':87524,'pool':319176,
-                    'ram_headroom':10780,'pool_headroom':24888,'package_bytes':610110,
-                    'package_sha256':'f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168'}
-          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
-          print('PASS: exact P11W baseline target regenerated')
-          PY
-
-      - name: Gate P11Y.4 - ephemeral candidate real-target build
-        run: |
-          set -euo pipefail
-          python3 ci/p11y_apply_output_addsub_candidate.py \
-            --source work/apsis/firmware/src/apsis_space_dsp.c
+          python3 ci/p11y_apply_output_addsub_candidate.py --source work/apsis/firmware/src/apsis_space_dsp.c
           bash ci/build_apsis_target.sh
           cp build/target_report.json "$P11Y_EVIDENCE/candidate-target.json"
-          cp build/SHA256SUMS "$P11Y_EVIDENCE/candidate-SHA256SUMS"
-          ELF=work/apsis/build/dinghy.elf
-          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
           "$OBJDUMP" -t "$ELF" > "$P11Y_EVIDENCE/candidate-symbols.txt"
           "$OBJDUMP" -d "$ELF" > "$P11Y_EVIDENCE/candidate-disassembly.txt"
-          echo 'PASS: P11Y ephemeral add-sub candidate built as a real JieLi target'
-
-      - name: Gate P11Y.5 - exact real-target projection and decision evidence
-        run: |
-          set -euo pipefail
-          python3 - <<'PY' | tee "$P11Y_EVIDENCE/projection.log"
-          import json, sys
+          python3 - <<'PY'
+          import json,sys
           from pathlib import Path
-          sys.path.insert(0, 'ci')
+          sys.path.insert(0,'ci')
           import p11_workload_inventory as inv
           base=json.load(open('/tmp/p11y-evidence/baseline-target.json'))
           cand=json.load(open('/tmp/p11y-evidence/candidate-target.json'))
-          assert cand['product']=='FM-1_972', cand
-          assert cand['image'] <= cand['image_max'] and cand['ram'] <= cand['ram_max']
-          assert cand['pool'] == base['pool'], (base,cand)
-          assert cand['package_bytes'] == base['package_bytes'], (base,cand)
           def shape(prefix):
               syms=inv.parse_symbols(Path(f'/tmp/p11y-evidence/{prefix}-symbols.txt').read_text(errors='replace'))
               ins=inv.parse_disassembly(Path(f'/tmp/p11y-evidence/{prefix}-disassembly.txt').read_text(errors='replace'))
-              return {'render_bytes':syms.get('apsis_space_fdn_render',0),
-                      'render_lines':ins.get('apsis_space_fdn_render',0),
-                      'left_table_bytes':syms.get('SPACE_OUT_LEFT',0),
-                      'right_table_bytes':syms.get('SPACE_OUT_RIGHT',0)}
-          bs=shape('baseline'); cs=shape('candidate')
-          report={'baseline':base,'candidate':cand,
-                  'delta':{'image':cand['image']-base['image'],
-                           'ram':cand['ram']-base['ram'],
-                           'pool':cand['pool']-base['pool']},
-                  'baseline_shape':bs,'candidate_shape':cs,
-                  'shape_delta':{k:cs[k]-bs[k] for k in bs},
-                  'physical_timing_proven':False}
-          Path('/tmp/p11y-evidence/projection.json').write_text(json.dumps(report,indent=2)+'\n')
-          print(json.dumps(report,indent=2))
-          print('PASS: P11Y ephemeral target projection recorded')
+              return syms.get('apsis_space_fdn_render',0), ins.get('apsis_space_fdn_render',0)
+          assert cand['image'] == 140520, cand
+          assert cand['ram'] == 87524 and cand['pool'] == 319176, cand
+          assert cand['package_sha256'] == '01d9f3fbc225973b6f2dcb861a86c2ee62af49594a288ba43c7cd2fac4ba61d0', cand
+          assert shape('baseline') == (1094,364), shape('baseline')
+          assert shape('candidate') == (1154,385), shape('candidate')
+          print('PASS: P11Y rejected target projection exactly reproduced: +48 image, +60 render bytes, +21 render lines')
           PY
 
-      - name: Gate P11Y.6 - committed production remains exact P11W
+      - name: Gate P11Y.3 - committed production remains exact P11W
         run: |
-          set -euo pipefail
           test "$(git hash-object apsis/apsis_space_dsp.c)" = '3bcd294dd9fb610df888ddd0517da7de3bf4c086'
           test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ec221e22aeb6670ec628cbb0cc7c7eea91038554'
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
-          echo 'PASS: P11Y proof/projected candidate is ephemeral; committed production remains P11W'
 
       - name: Upload P11Y evidence
         if: always()
