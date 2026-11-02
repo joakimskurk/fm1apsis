@@ -63,6 +63,8 @@ jobs:
           mkdir -p build/profile && mv build/apsis.fwsc build/apsis.elf build/profile/
           DINGHY_DEFS=-DAPSIS_STRESS sh build.sh > /dev/null    # diagnostic: every source at its densest, load meter
           mkdir -p build/stress && mv build/apsis.fwsc build/apsis.elf build/stress/
+          DINGHY_DEFS="-DAPSIS_STRESS -fno-inline" sh build.sh > /dev/null
+          mkdir -p build/stress-profile && mv build/apsis.fwsc build/apsis.elf build/stress-profile/
           DINGHY_DEFS=-DAPSIS_LOADMETER sh build.sh > /dev/null # diagnostic: the normal app with the load meter
           mv build/apsis.fwsc build/apsis-loadmeter-${GITHUB_SHA::7}.fwsc
           if [ "$GITHUB_REF_TYPE" = tag ]; then sh build.sh --release "${GITHUB_REF_NAME#v}"; fi
@@ -79,6 +81,7 @@ jobs:
             build/apsis.elf
             build/profile/
             build/stress/
+            build/stress-profile/
             build/SHA256SUMS
             build-report.txt
             toolchain.txt
@@ -131,6 +134,12 @@ jobs:
         run: |
           EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain STRESS=1 \
             sh tests/emu.sh build/stress/apsis.fwsc build/stress/apsis.elf build/emu/stress
+      - name: Where the cycles go in the worst case (the -fno-inline stress build)
+        if: always()
+        run: |
+          EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain PROFILE=1 STRESS=1 \
+            sh tests/emu.sh build/stress-profile/apsis.fwsc build/stress-profile/apsis.elf build/emu/stress-profile || true
+          cat build/emu/stress-profile/profile.txt || true
       - name: Where the cycles go (the -fno-inline build, FM1_TPROF)
         if: always()
         run: |
