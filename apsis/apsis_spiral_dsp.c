@@ -126,22 +126,6 @@ static void spiral_biquad_lowpass(ApsisSpiralDspBiquad *b,
     b->x1 = b->x2 = b->y1 = b->y2 = 0;
 }
 
-static int32_t spiral_biquad_process(ApsisSpiralDspBiquad *b, int32_t x)
-{
-    int64_t acc;
-    int32_t y;
-    if (!b) return x;
-    acc = (int64_t)b->b0_q30 * x + (int64_t)b->b1_q30 * b->x1 +
-          (int64_t)b->b2_q30 * b->x2 - (int64_t)b->a1_q30 * b->y1 -
-          (int64_t)b->a2_q30 * b->y2;
-    y = spiral_filter_state(acc >> 30);
-    b->x2 = b->x1;
-    b->x1 = x;
-    b->y2 = b->y1;
-    b->y1 = y;
-    return y;
-}
-
 static uint32_t spiral_detune_q20(int8_t cents)
 {
     switch (cents) {
@@ -445,74 +429,121 @@ uint8_t apsis_spiral_dsp_trigger_binding(ApsisSpiralDsp *dsp,
     return accepted;
 }
 
-static uint16_t spiral_envelope(ApsisSpiralDspLeg *v)
+/* the leg's envelope, on locals: its gain for its next sample (age is the sample's age before it counts) */
+APSIS_INLINE uint16_t spiral_envelope_at(uint32_t age, uint32_t attack, uint32_t tail, uint32_t peak_q23,
+                                         uint32_t decay_mul_q31, uint32_t *gain_q23)
 {
-    uint32_t floor_q23 = SPIRAL_GAIN_FLOOR_Q15 << 8;
-    uint32_t peak_q23;
-    if (!v) return 0u;
-    peak_q23 = (uint32_t)v->peak_gain_q15 << 8;
-    if (v->age_samples < v->attack_samples && v->attack_samples) {
-        uint32_t t = (uint32_t)(((uint64_t)(v->age_samples + 1u) *
-                                 APSIS_Q15_ONE + v->attack_samples / 2u) /
-                                v->attack_samples);
-        uint32_t curve, g;
+    const uint32_t floor_q23 = SPIRAL_GAIN_FLOOR_Q15 << 8;
+    if (age < attack && attack) {
+        uint32_t t = (uint32_t)(((uint64_t)(age + 1u) * APSIS_Q15_ONE + attack / 2u) / attack);
+        uint32_t curve;
         if (t > APSIS_Q15_ONE) t = APSIS_Q15_ONE;
-        curve = (uint32_t)(((uint64_t)t * t + APSIS_Q15_ONE / 2u) /
-                           APSIS_Q15_ONE);
-        g = floor_q23 + (uint32_t)(((uint64_t)(peak_q23 - floor_q23) *
-                                    curve + APSIS_Q15_ONE / 2u) /
-                                   APSIS_Q15_ONE);
-        v->gain_q23 = g;
-    } else if (v->age_samples < v->tail_samples) {
-        v->gain_q23 = (uint32_t)(((uint64_t)v->gain_q23 *
-                                  v->decay_mul_q31 + (1ull << 30)) >> 31);
-        if (v->gain_q23 < floor_q23) v->gain_q23 = floor_q23;
+        curve = (uint32_t)(((uint64_t)t * t + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
+        *gain_q23 = floor_q23 + (uint32_t)(((uint64_t)(peak_q23 - floor_q23) * curve + APSIS_Q15_ONE / 2u) /
+                                           APSIS_Q15_ONE);
+    } else if (age < tail) {
+        *gain_q23 = (uint32_t)(((uint64_t)*gain_q23 * decay_mul_q31 + (1ull << 30)) >> 31);
+        if (*gain_q23 < floor_q23) *gain_q23 = floor_q23;
     } else {
-        v->gain_q23 = floor_q23;
+        *gain_q23 = floor_q23;
     }
-    return (uint16_t)(v->gain_q23 >> 8);
+    return (uint16_t)(*gain_q23 >> 8);
 }
+
+/* One leg over `frames` samples, added into mix (unsaturated; the caller saturates once per sample, as the old
+ * sample-outer loop did after summing every leg: integer sums do not depend on the order of the legs). The leg's
+ * state lives in locals for the block. oscs is a constant at each call. */
+APSIS_INLINE void spiral_leg_render(ApsisSpiralDspLeg *v, int32_t *mix, uint32_t frames, uint8_t oscs)
+{
+    uint32_t k = 0u, age = v->age_samples, gain_q23 = v->gain_q23;
+    const uint32_t life = v->life_samples, attack = v->attack_samples, tail = v->tail_samples;
+    const uint32_t peak_q23 = (uint32_t)v->peak_gain_q15 << 8, decay_mul = v->decay_mul_q31;
+    const int32_t mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
+    const int32_t b0 = v->filter.b0_q30, b1 = v->filter.b1_q30, b2 = v->filter.b2_q30;
+    const int32_t a1 = v->filter.a1_q30, a2 = v->filter.a2_q30;
+    int32_t x1 = v->filter.x1, x2 = v->filter.x2, y1 = v->filter.y1, y2 = v->filter.y2;
+    uint32_t ph0 = v->osc[0].phase, ph1 = v->osc[1].phase, ph2 = v->osc[2].phase;
+    const uint32_t in0 = v->osc[0].phase_inc, in1 = v->osc[1].phase_inc, in2 = v->osc[2].phase_inc;
+    const int32_t g0 = v->osc[0].gain_q15, g1 = v->osc[1].gain_q15, g2 = v->osc[2].gain_q15;
+    const uint8_t t0 = v->osc[0].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
+    const uint8_t t1 = v->osc[1].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
+    const uint8_t t2 = v->osc[2].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
+    uint8_t active = 1u;
+
+    if (v->start_delay_samples) {              /* a waiting sample only counts its delay down */
+        k = v->start_delay_samples < frames ? v->start_delay_samples : frames;
+        v->start_delay_samples -= k;
+    }
+    for (; k < frames; ++k) {
+        int32_t raw, x, y, voiced;
+        int64_t acc;
+        if (age >= life) {
+            active = 0u;
+            break;
+        }
+        /* |wave * gain| < 2^31 (wave <= 32767, gain <= 65535): the old int64 sum, in 32 bits */
+        raw = 0;
+        if (oscs > 0u) {
+            ph0 += in0;
+            raw = ((t0 ? spiral_triangle_q15(ph0) : apsis_sine_q15(ph0)) * g0) >> 15;
+        }
+        if (oscs > 1u) {
+            ph1 += in1;
+            raw += ((t1 ? spiral_triangle_q15(ph1) : apsis_sine_q15(ph1)) * g1) >> 15;
+        }
+        if (oscs > 2u) {
+            ph2 += in2;
+            raw += ((t2 ? spiral_triangle_q15(ph2) : apsis_sine_q15(ph2)) * g2) >> 15;
+        }
+        x = spiral_filter_state(raw);
+        acc = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
+        y = spiral_filter_state(acc >> 30);
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+        voiced = (int32_t)(((int64_t)y * spiral_envelope_at(age, attack, tail, peak_q23, decay_mul, &gain_q23)) >> 15);
+        mix[k * 2u] += (int32_t)(((int64_t)voiced * mix_l) >> 15);
+        mix[k * 2u + 1u] += (int32_t)(((int64_t)voiced * mix_r) >> 15);
+        ++age;
+        if (age >= life) {
+            active = 0u;
+            break;
+        }
+    }
+    v->age_samples = age;
+    v->gain_q23 = gain_q23;
+    v->filter.x1 = x1;
+    v->filter.x2 = x2;
+    v->filter.y1 = y1;
+    v->filter.y2 = y2;
+    v->osc[0].phase = ph0;
+    v->osc[1].phase = ph1;
+    v->osc[2].phase = ph2;
+    v->active = active;
+}
+
+#define SPIRAL_CHUNK 256u
+static int32_t spiral_mix[SPIRAL_CHUNK * 2u];
 
 void apsis_spiral_dsp_render(ApsisSpiralDsp *dsp, int32_t *out,
                              uint32_t frames)
 {
-    uint32_t n;
+    uint32_t base, n, c;
     uint16_t i;
     if (!dsp || !out) return;
-    for (n = 0u; n < frames; ++n) {
-        int64_t mix_l = 0, mix_r = 0;
+    for (base = 0u; base < frames; base += c) {
+        c = frames - base > SPIRAL_CHUNK ? SPIRAL_CHUNK : frames - base;
+        for (n = 0u; n < c * 2u; ++n) spiral_mix[n] = 0;
         for (i = 0u; i < APSIS_SPIRAL_DSP_LEG_CAP; ++i) {
             ApsisSpiralDspLeg *v = &dsp->leg[i];
-            int64_t raw = 0;
-            int32_t filtered, voiced;
-            uint16_t env;
-            uint8_t j;
             if (!v->active) continue;
-            if (v->start_delay_samples) {
-                --v->start_delay_samples;
-                continue;
-            }
-            if (v->age_samples >= v->life_samples) {
-                v->active = 0u;
-                continue;
-            }
-            for (j = 0u; j < v->osc_count; ++j) {
-                ApsisSpiralDspOsc *o = &v->osc[j];
-                int32_t wave;
-                o->phase += o->phase_inc;
-                wave = o->waveform == APSIS_SPIRAL_DSP_TRIANGLE
-                    ? spiral_triangle_q15(o->phase) : apsis_sine_q15(o->phase);
-                raw += ((int64_t)wave * o->gain_q15) >> 15;
-            }
-            filtered = spiral_biquad_process(&v->filter, spiral_filter_state(raw));
-            env = spiral_envelope(v);
-            voiced = (int32_t)(((int64_t)filtered * env) >> 15);
-            mix_l += ((int64_t)voiced * v->mix_left_q15) >> 15;
-            mix_r += ((int64_t)voiced * v->mix_right_q15) >> 15;
-            ++v->age_samples;
-            if (v->age_samples >= v->life_samples) v->active = 0u;
+            if (v->osc_count >= 3u) spiral_leg_render(v, spiral_mix, c, 3u);
+            else if (v->osc_count == 2u) spiral_leg_render(v, spiral_mix, c, 2u);
+            else if (v->osc_count == 1u) spiral_leg_render(v, spiral_mix, c, 1u);
+            else spiral_leg_render(v, spiral_mix, c, 0u);
         }
-        out[n * 2u] = spiral_sat_q15((int64_t)out[n * 2u] + mix_l);
-        out[n * 2u + 1u] = spiral_sat_q15((int64_t)out[n * 2u + 1u] + mix_r);
+        for (n = 0u; n < c * 2u; ++n)
+            out[base * 2u + n] = spiral_sat_q15((int64_t)out[base * 2u + n] + spiral_mix[n]);
     }
 }
