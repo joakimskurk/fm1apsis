@@ -229,7 +229,7 @@ static void pair_reset(Pair *p)
 static void pair_render(Pair *p, uint32_t frames, uint16_t decay,
                         uint16_t damping, uint32_t *rng)
 {
-    int32_t input[64], oa[128], ob[128];
+    int32_t input[64] = {0}, oa[128] = {0}, ob[128] = {0};
     uint32_t i;
     assert(frames <= 64u);
     for (i = 0u; i < frames; ++i)
