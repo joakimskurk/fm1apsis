@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11R are complete. P11R is the accepted production baseline after the measured, proved and production-validated FDN sine-endpoint cache; P11S is the next measurement-only phase.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11S are complete. P11R remains the accepted production baseline; P11S structurally classified the FDN Q15 multiply sites and authorizes P11T proof-only for the 24/40 signed-32-safe calls.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -681,9 +681,42 @@ Active Motion authority remains exact:
 
 P11R therefore replaces P11O as the accepted production baseline. It accepts +32 B image/RAM for the P11P-measured endpoint reuse and P11Q-proved smaller render code shape. It proves exact behavior and static target properties, not physical FM-1 cycle or ISR improvement.
 
-## Exact next phase — P11S FDN Q15 multiply operand-range census
+## P11S — FDN Q15 multiply operand-range census complete
 
-Return to measurement. P11H measured 40 FDN `space_mul_q15()` evaluations per room frame; the unchanged helper currently forms a signed 64-bit product. P11S must classify every call-site family, measure and structurally bound operand/product ranges, and preserve exact rounding semantics. Production remains P11R. Only a call-site set proven safe for a narrower exact representation may advance to a later proof phase.
+Measurement authority:
+- technical head `6ddfa625b371d9a93db3d0a5a635b48b7eb08046`
+- run `41383031271` — PASS
+- evidence artifact ID `13114240999`
+- evidence ZIP SHA-256 `2365e3fbcc4578479d438f42085562e77d16417dd9a8443bc419ba194c96bddc`
+- optimized + ASAN/UBSAN PASS
+- exact P11R real-target package regenerated unchanged
+- committed production Space remained byte-for-byte P11R
+- historical census workflow manual-only and pinned to the proven technical head
+
+Dynamic workload classification:
+- alpha: **10 calls/frame**
+- output scaling: **2 calls/frame**
+- stereo cross/self mix: **4 calls/frame**
+- Hadamard normalization: **8 calls/frame**
+- excitation: **8 calls/frame**
+- feedback gain: **8 calls/frame**
+- total: **40 calls/frame**
+
+Structural width result, including the frozen ±16,384 rounding term:
+- alpha: max absolute product **1,003,391,074** — signed-32 safe
+- output: **859,019,672** — signed-32 safe
+- cross: **1,900,354,932** — signed-32 safe
+- excitation: **425,184,592** — signed-32 safe
+- Hadamard normalization: **3,036,845,560** — signed-32 unsafe
+- feedback: **2,992,665,298** — signed-32 unsafe
+
+Therefore **24/40 dynamic calls per FDN room frame** are structurally eligible for a narrow-helper proof and **16/40 must remain wide**. The natural trajectories happened to keep all observed products inside signed 32-bit, but P11S explicitly rejects using that high-water fact to narrow Hadamard or feedback because their legal structural bounds exceed signed 32-bit.
+
+Frozen production authority remains P11R: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, package `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`, FDN render **1,098 B / 366** static instruction lines.
+
+## Exact next phase — P11T selective Q15 narrow-helper proof
+
+Production remains P11R. P11T may introduce a candidate only in proof/ephemeral target workspaces. The candidate may use signed-32 product arithmetic exclusively at alpha/output/cross/excitation call sites and must leave Hadamard normalization + feedback on the frozen wide helper. Prove exact helper arithmetic at structural boundaries and randomized values, complete-FDN stereo/state/storage equivalence across cold/warm/legal/random/reset trajectories, optimized + ASAN/UBSAN, full historical behavior, and exact real-target resource/code-shape delta before considering production validation.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 
