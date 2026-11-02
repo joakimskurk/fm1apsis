@@ -472,8 +472,49 @@ APSIS_INLINE void strx_run(int32_t *out, uint32_t run, uint32_t *phase_p, uint32
  * voice-outer equals the old sample-outer loop bit for bit. The state lives in locals for the block.
  * Decay without a steal (most of a note's life) goes by runs: the gain peak * ENV[env_phase >> 16] only changes
  * when the envelope index steps (every few hundred samples), so each run renders at one gain and the envelope
- * phase advances once at its end, by exactly the per-sample rule (minus the step, floored at 0). The attack and
- * a steal take the general per-sample path. */
+ * phase advances once at its end, by exactly the per-sample rule (minus the step, floored at 0). The attack goes
+ * by runs the same way (its index steps every ~11 samples), and so does a steal during the decay (strx_steal_run);
+ * only a steal inside the attack takes the general per-sample path. */
+/* `run` samples of a stolen oscillator during its decay: the envelope's gain is constant, the steal's fade moves
+ * every sample (a 14 ms exponential, its step in 32 bits: steal_gain * 53 < 2^22), exactly as the general path */
+APSIS_INLINE void strx_steal_run(int32_t *out, uint32_t run, uint32_t *phase_p, uint32_t inc, int32_t *lp_p,
+                                 uint16_t alpha, uint16_t gain, int32_t *steal_p, int32_t mix_l, int32_t mix_r,
+                                 int tri, int lp)
+{
+    uint32_t phase = *phase_p, k;
+    int32_t state = *lp_p, steal = *steal_p;
+    for (k = 0u; k < run; ++k) {
+        int32_t raw, voiced, delta;
+        phase += inc;
+        raw = tri ? strx_triangle_q15(phase) : apsis_sine_q15(phase);
+        if (lp) {
+            state += (int32_t)(((int64_t)(raw - state) * alpha) >> 15);
+            raw = state;
+        }
+        voiced = (raw * (int32_t)strx_gain_q15(gain, (uint16_t)steal)) >> 15;
+        out[k * 2u] += (voiced * mix_l) >> 15;
+        out[k * 2u + 1u] += (voiced * mix_r) >> 15;
+        delta = (-steal * (int32_t)STRX_STEAL_ALPHA_Q15) >> 15;
+        if (!delta && steal > 0) delta = -1;
+        steal += delta;
+        if (steal < 0) steal = 0;
+    }
+    *phase_p = phase;
+    *lp_p = state;
+    *steal_p = steal;
+}
+
+/* (the four specialised strx_run loops, for the voice's waveform and filter) */
+#define STRX_RUN(run) do {                                                                                  \
+        if (triangle) {                                                                                     \
+            if (alpha) strx_run(out + n * 2u, (run), &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 1);    \
+            else strx_run(out + n * 2u, (run), &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 0);          \
+        } else {                                                                                            \
+            if (alpha) strx_run(out + n * 2u, (run), &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 1);    \
+            else strx_run(out + n * 2u, (run), &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 0);          \
+        }                                                                                                   \
+    } while (0)
+
 static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint32_t frames)
 {
     uint32_t n = 0u;
@@ -508,17 +549,57 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
                 if (run > same) run = same;
             }
             if (run > left) run = left;
+            STRX_RUN(run);
+            n += run;
+            age += run;
+            adv = (uint32_t)((uint64_t)run * decay_step > 0xffffffffu ? 0xffffffffu : run * decay_step);
+            env_phase = env_phase > adv ? env_phase - adv : 0u;
+            if (age >= duration) active = 0u;
+            continue;
+        }
+        if (stage != 0u && stealing && steal_left) {
+            uint32_t run = frames - n, left = duration - age, adv;
+            if (idx && decay_step) {
+                uint32_t same = (env_phase - (idx << 16)) / decay_step + 1u;
+                if (run > same) run = same;
+            }
+            if (run > left) run = left;
+            if (run > steal_left) run = steal_left;
             if (triangle) {
-                if (alpha) strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 1);
-                else strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 0);
+                if (alpha) strx_steal_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, &steal_gain, mix_l, mix_r, 1, 1);
+                else strx_steal_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, &steal_gain, mix_l, mix_r, 1, 0);
             } else {
-                if (alpha) strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 1);
-                else strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 0);
+                if (alpha) strx_steal_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, &steal_gain, mix_l, mix_r, 0, 1);
+                else strx_steal_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, &steal_gain, mix_l, mix_r, 0, 0);
             }
             n += run;
             age += run;
             adv = (uint32_t)((uint64_t)run * decay_step > 0xffffffffu ? 0xffffffffu : run * decay_step);
             env_phase = env_phase > adv ? env_phase - adv : 0u;
+            steal_left = (uint16_t)(steal_left - run);
+            if (!steal_left || age >= duration) active = 0u;
+            continue;
+        }
+        if (stage == 0u && !stealing && attack_left) {
+            /* the attack by runs too: its index steps every ~11 samples (STRX_ATTACK_STEP_Q16); per sample it
+             * advanced by the step, capped at one, and the stage turned when attack_left reached 0 */
+            uint32_t run = frames - n, left = duration - age;
+            if (idx < 64u) {
+                uint32_t same = ((((idx + 1u) << 16) - env_phase) + STRX_ATTACK_STEP_Q16 - 1u) / STRX_ATTACK_STEP_Q16;
+                if (run > same) run = same;
+            }
+            if (run > left) run = left;
+            if (run > attack_left) run = attack_left;
+            STRX_RUN(run);
+            n += run;
+            age += run;
+            attack_left = (uint16_t)(attack_left - run);
+            env_phase = env_phase + run * STRX_ATTACK_STEP_Q16 >= STRX_ENV_PHASE_ONE
+                ? STRX_ENV_PHASE_ONE : env_phase + run * STRX_ATTACK_STEP_Q16;
+            if (!attack_left) {
+                stage = 1u;
+                env_phase = STRX_ENV_PHASE_ONE;
+            }
             if (age >= duration) active = 0u;
             continue;
         }

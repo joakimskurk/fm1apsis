@@ -26,6 +26,11 @@ PY
 }
 run default ""
 for s in tests/scripts/apsis_*.txt; do run "$(basename "$s" .txt)" "$s"; done
+# the stress build (every source densest: steals, attacks, every pool full) on the emulator's stress keys
+cc -O2 -Wall -Wno-unused-function -DDINGHY_HOST -DAPSIS_STRESS -DAPP_VER="\"dev\"" -Ifirmware/hal -Ifirmware/src \
+   -Ifirmware/gen -Iapsis -o build/host/apsis_stress_build firmware/src/app.c
+(cd build/host && ./apsis_stress_build stress ../../tests/demo/apsis_stress.txt > stress.log)
+echo "$(sha256sum build/host/stress.wav | cut -d' ' -f1)  stress" >> build/host/sound.sha256
 for p in build/host/*.ppm; do
     [ -f "$p" ] && python3 -c "import sys; from PIL import Image; Image.open(sys.argv[1]).resize((480, 480), Image.NEAREST).save(sys.argv[1][:-4] + '.png')" "$p" && rm "$p"
 done

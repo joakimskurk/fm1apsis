@@ -1029,12 +1029,82 @@ static void editors_follow(uint8_t next)
         apsis_controls_gravity_point_editor_reset(&apsis_gravity_point_editor);
 }
 
+#ifdef APSIS_BENCH
+/* a diagnostic build: what one String partial costs on each of its paths, at boot before the audio starts, in
+ * tenths of a CPU cycle (240 MHz) per partial per sample: [0] the block's fixed cost (us), [1] the decay mix
+ * (2 triangle + LP, 2 sine), [2] all sine, [3] all triangle + LP, [4] the attack and stagger, [5] the steal fade */
+static volatile uint32_t apsis_bench_probe[6];
+static int32_t bench_out[512];
+
+static uint32_t bench_render(uint32_t blocks)
+{
+    uint32_t t0 = fm1_ticks(), b, i;
+    for (b = 0u; b < blocks; ++b) {
+        apsis_string_transient_render(&string_transient_pool, bench_out, 256u);
+        for (i = 0u; i < 512u; ++i) bench_out[i] = 0;
+    }
+    return fm1_ticks() - t0;
+}
+
+static uint32_t bench_tenths(uint32_t ticks, uint32_t fixed, uint32_t blocks, uint32_t partials)
+{
+    ticks = ticks > fixed ? ticks - fixed : 0u;
+    return (uint32_t)((uint64_t)ticks * 100u / ((uint64_t)blocks * 256u * partials));   /* 10 cycles a tick */
+}
+
+static void bench_pluck(ApsisState *s)
+{
+    apsis_string_transient_pool_reset(&string_transient_pool);
+    (void)apsis_string_dsp_trigger_classic(&string_transient_pool, s, 220000u, APSIS_Q15_MILLI(500), 3000u, 0, 0u,
+                                           0u);
+}
+
+static void bench_set(uint8_t waveform, uint8_t lp)
+{
+    uint32_t i;
+    for (i = 0u; i < 4u; ++i) {
+        string_transient_pool.transient[i].waveform = waveform;
+        if (!lp) string_transient_pool.transient[i].lowpass_alpha_q15 = 0u;
+        else if (!string_transient_pool.transient[i].lowpass_alpha_q15)
+            string_transient_pool.transient[i].lowpass_alpha_q15 = 12000u;
+    }
+}
+
+static void bench_run(void)
+{
+    ApsisState s;
+    uint32_t fixed, i;
+    apsis_state_default(&s);
+    s.string.foundation = 0u;
+    apsis_string_transient_pool_reset(&string_transient_pool);
+    fixed = bench_render(16u);
+    apsis_bench_probe[0] = fixed / 16u / FM1_TICKS_PER_US;
+    bench_pluck(&s);                                  /* 4 partials: 2 triangle + LP, 2 sine */
+    apsis_bench_probe[4] = bench_tenths(bench_render(5u), fixed * 5u / 16u, 5u, 4u);
+    apsis_bench_probe[1] = bench_tenths(bench_render(16u), fixed, 16u, 4u);
+    bench_set(APSIS_STRING_DSP_WAVE_SINE, 0u);
+    apsis_bench_probe[2] = bench_tenths(bench_render(16u), fixed, 16u, 4u);
+    bench_set(APSIS_STRING_DSP_WAVE_TRIANGLE, 1u);
+    apsis_bench_probe[3] = bench_tenths(bench_render(16u), fixed, 16u, 4u);
+    for (i = 0u; i < 4u; ++i) {
+        string_transient_pool.transient[i].stealing = 1u;
+        string_transient_pool.transient[i].steal_left_samples = 4630u;
+        string_transient_pool.transient[i].steal_gain_q15 = APSIS_Q15_ONE;
+    }
+    apsis_bench_probe[5] = bench_tenths(bench_render(16u), fixed, 16u, 4u);
+    apsis_string_transient_pool_reset(&string_transient_pool);
+}
+#endif
+
 static void app_main(void)
 {
     ApsisFm1InputFrame in;
     uint32_t i;
 
     runtime_ready = 0u;
+#ifdef APSIS_BENCH
+    bench_run();
+#endif
     for (i = 0u; i < sizeof apsis_runtime_probe / sizeof apsis_runtime_probe[0]; ++i)
         apsis_runtime_probe[i] = 0u;
     apsis_runtime_probe[0] = 0x41505349u;      /* "APSI" */

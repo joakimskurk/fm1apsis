@@ -9,9 +9,13 @@
 set -e
 PKG=${1:?package}; ELF=${2:?elf}; OUT=${3:-build/emu}
 EMU=${EMU:?EMU must point at fm1-live}
-OBJDUMP=${OBJDUMP:-${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN or OBJDUMP}/common/bin/objdump}
 mkdir -p "$OUT" work                 # (fm1-live --shot writes work/panel.ppm)
-"$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
+if [ -n "${SYMBOLS:-}" ]; then        # (the symbol table made elsewhere: make emu runs objdump on the Mac)
+    [ "$SYMBOLS" = "$OUT/symbols.txt" ] || cp "$SYMBOLS" "$OUT/symbols.txt"
+else
+    OBJDUMP=${OBJDUMP:-${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN or OBJDUMP}/common/bin/objdump}
+    "$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
+fi
 ADDR=$(awk '$NF == "apsis_load_probe" { print $1 }' "$OUT/symbols.txt")
 [ -n "$ADDR" ] || { echo "apsis_load_probe not in $ELF"; exit 2; }
 
@@ -44,7 +48,7 @@ if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the perfor
     exit 0
 fi
 
-FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 20000 > "$OUT/emu.log" 2>&1 || {
+FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot ${EMU_MS:-20000} > "$OUT/emu.log" 2>&1 || {
     cat "$OUT/emu.log"; echo "FAIL: the emulator stopped"; exit 1; }
 cp work/panel.ppm "$OUT/panel.ppm" 2>/dev/null || true
 python3 - "$OUT" "${STRESS:-0}" <<'PY'
@@ -95,6 +99,14 @@ if "apsis_cost_probe" in syms:
     (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
     print("one voice's worst cost per block (us, at that many voices): " + ", ".join(
         f"{k} {v['ns_per_voice_block'] / 1000:.1f} ({v['voices']})" for k, v in r["voice_cost_ns"].items()))
+if "apsis_bench_probe" in syms:
+    b = words("apsis_bench_probe", 6)
+    r["string_partial_bench"] = {"fixed_us_per_block": b[0], "cycles_per_partial_sample": {
+        "decay mix": b[1] / 10, "sine": b[2] / 10, "triangle+LP": b[3] / 10, "attack+stagger": b[4] / 10,
+        "steal fade": b[5] / 10}}
+    (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
+    print(f"String partial bench: fixed {b[0]} us a block; cycles per partial per sample: decay mix {b[1] / 10}, "
+          f"sine {b[2] / 10}, triangle+LP {b[3] / 10}, attack+stagger {b[4] / 10}, steal fade {b[5] / 10}")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:
