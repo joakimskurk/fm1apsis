@@ -194,6 +194,8 @@ static volatile uint32_t apsis_worst_probe[BLOCK_PARTS];
 /* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
 static volatile uint32_t apsis_part_max_probe[BLOCK_PARTS];
 static volatile uint32_t apsis_over_probe[2];
+/* the finite voices' high water: String notes (logical, physical), Bloom petals, Clock voices */
+static volatile uint32_t apsis_voice_probe[4];
 static uint32_t block_part_us[BLOCK_PARTS];
 static uint32_t block_mark;
 
@@ -615,6 +617,9 @@ static void app_audio(int32_t *out, uint32_t n)
         }
         for (i = 0u; i < BLOCK_PARTS; ++i)
             if (block_part_us[i] > apsis_part_max_probe[i]) apsis_part_max_probe[i] = block_part_us[i];
+        apsis_voice_probe[0] = string_transient_pool.transient_logical_high_water;
+        apsis_voice_probe[1] = string_transient_pool.transient_physical_high_water;
+        if (apsis_bloom_dsp_active(&bloom_dsp) > apsis_voice_probe[2]) apsis_voice_probe[2] = apsis_bloom_dsp_active(&bloom_dsp);
         if (us > 4644u) apsis_over_probe[0]++;
         if (us >= 5805u) apsis_over_probe[1]++;
     }

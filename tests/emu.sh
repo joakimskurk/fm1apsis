@@ -61,6 +61,11 @@ print(f"audio load (FM1_STRICT, 20 s scripted): avg {r['avg_us']} us ({r['avg_pc
 print("worst block by part (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, parts)))
 print("each part's own worst (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, part_max)))
 print(f"blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
+if "apsis_voice_probe" in syms:
+    vp = words("apsis_voice_probe", 4)
+    r["voices"] = {"string_logical": vp[0], "string_physical": vp[1], "bloom_petals": vp[2]}
+    (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
+    print(f"voices high water: String notes {vp[0]} logical / {vp[1]} physical, Bloom petals {vp[2]}")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:
