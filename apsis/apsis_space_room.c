@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_space_room.h"
 
 #define ROOM_Q15_ONE 32767
@@ -90,7 +91,7 @@ static const uint16_t ROOM_COMP_GAIN_Q15[257] = {
 5744
 };
 
-static int32_t space_room_clamp_q15(int64_t v)
+APSIS_INLINE int32_t space_room_clamp_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
@@ -110,7 +111,7 @@ static int32_t space_room_round_shift(int64_t v, uint8_t bits)
     return -(int32_t)(((-v) + half) >> bits);
 }
 
-static int32_t space_room_mul_q15(int32_t a, int32_t b)
+APSIS_INLINE int32_t space_room_mul_q15(int32_t a, int32_t b)
 {
     if (a >= -65535 && a <= 65535 && b >= -32767 && b <= 32767) {
         int32_t p = a * b;
@@ -153,7 +154,7 @@ static uint16_t space_room_clamp_u16(uint16_t v, uint16_t lo, uint16_t hi)
     return v;
 }
 
-static int32_t space_room_smooth_i32(int32_t cur, int32_t target, uint16_t alpha)
+APSIS_INLINE int32_t space_room_smooth_i32(int32_t cur, int32_t target, uint16_t alpha)
 {
     int64_t delta = (int64_t)target - cur;
     int64_t step;
@@ -163,7 +164,7 @@ static int32_t space_room_smooth_i32(int32_t cur, int32_t target, uint16_t alpha
     return (int32_t)((int64_t)cur + step);
 }
 
-static uint32_t space_room_smooth_u32(uint32_t cur, uint32_t target, uint16_t alpha)
+APSIS_INLINE uint32_t space_room_smooth_u32(uint32_t cur, uint32_t target, uint16_t alpha)
 {
     int64_t delta = (int64_t)target - cur;
     int64_t step;
@@ -190,7 +191,7 @@ typedef struct {
     int32_t right;
 } SpaceRoomStereoPair;
 
-static SpaceRoomStereoPair space_room_stereo_read_pair(
+APSIS_INLINE SpaceRoomStereoPair space_room_stereo_read_pair(
     const int16_t *storage,
     uint32_t capacity_frames,
     uint32_t write_frame,
@@ -232,7 +233,7 @@ static SpaceRoomStereoPair space_room_stereo_read_pair(
     return out;
 }
 
-static void space_room_stereo_write(int16_t *storage,
+APSIS_INLINE void space_room_stereo_write(int16_t *storage,
                                     uint32_t capacity_frames,
                                     uint32_t *write_frame,
                                     uint32_t *fill_frames,
@@ -250,7 +251,7 @@ static void space_room_stereo_write(int16_t *storage,
     if (*fill_frames < capacity_frames) (*fill_frames)++;
 }
 
-static int32_t space_room_compressor(ApsisSpaceRoom *room, int32_t left,
+APSIS_INLINE int32_t space_room_compressor(ApsisSpaceRoom *room, int32_t left,
                                      int32_t right, uint8_t channel)
 {
     int32_t al, ar, peak, desired, alpha;
@@ -284,7 +285,7 @@ static const uint16_t ROOM_FAST_GUARD_LP_ALPHA[19] = {
     17147u,17368u,17586u,17801u,18012u
 };
 
-static uint16_t space_room_fast_guard_alpha(int32_t hz_q16)
+APSIS_INLINE uint16_t space_room_fast_guard_alpha(int32_t hz_q16)
 {
     uint32_t hz, index;
     if (hz_q16 <= 0) return ROOM_FAST_GUARD_LP_ALPHA[0];
@@ -296,7 +297,7 @@ static uint16_t space_room_fast_guard_alpha(int32_t hz_q16)
     return ROOM_FAST_GUARD_LP_ALPHA[index];
 }
 
-static int32_t space_room_fast_lp(ApsisSpaceBiquadState *state,
+APSIS_INLINE int32_t space_room_fast_lp(ApsisSpaceBiquadState *state,
                                   int32_t x_q15, uint16_t alpha_q15)
 {
     int32_t cur, delta, product, step;
@@ -314,7 +315,7 @@ static int32_t space_room_fast_lp(ApsisSpaceBiquadState *state,
     return cur;
 }
 
-static int32_t space_room_fast_hp(ApsisSpaceBiquadState *state,
+APSIS_INLINE int32_t space_room_fast_hp(ApsisSpaceBiquadState *state,
                                   int32_t x_q15, uint16_t low_alpha_q15)
 {
     int32_t low = space_room_fast_lp(state, x_q15, low_alpha_q15);
@@ -362,7 +363,7 @@ static void space_room_targets(ApsisSpaceRoom *room, const ApsisSpaceState *stat
     }
 }
 
-static void space_room_smooth_params(ApsisSpaceRoom *room)
+APSIS_INLINE void space_room_smooth_params(ApsisSpaceRoom *room)
 {
     if (!room || !room->params_initialized) return;
     room->wet_q15 = space_room_smooth_i32(room->wet_q15,

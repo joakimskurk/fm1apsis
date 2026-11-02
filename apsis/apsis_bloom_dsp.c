@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_bloom_dsp.h"
 #include "apsis_string_dsp.h"
@@ -10,12 +11,6 @@
 #define BLOOM_GAIN_MIN_SUSTAIN_Q15 4u
 #define BLOOM_FILTER_STATE_LIMIT 131071
 
-static const int16_t BLOOM_SINE_QUARTER[65] = {
-0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
 static void bloom_dsp_zero(void *ptr, uint32_t n)
 {
@@ -23,14 +18,14 @@ static void bloom_dsp_zero(void *ptr, uint32_t n)
     while (n--) *p++ = 0u;
 }
 
-static int32_t bloom_sat_q15(int64_t v)
+APSIS_INLINE int32_t bloom_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return (int32_t)v;
 }
 
-static int32_t bloom_filter_state(int64_t v)
+APSIS_INLINE int32_t bloom_filter_state(int64_t v)
 {
     if (v > BLOOM_FILTER_STATE_LIMIT) return BLOOM_FILTER_STATE_LIMIT;
     if (v < -BLOOM_FILTER_STATE_LIMIT) return -BLOOM_FILTER_STATE_LIMIT;
@@ -50,26 +45,9 @@ static uint16_t bloom_dsp_mul_q15(uint16_t a, uint16_t b)
 
 
 
-static int16_t bloom_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return BLOOM_SINE_QUARTER[o];
-    if (q == 1u) return BLOOM_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-BLOOM_SINE_QUARTER[o];
-    return (int16_t)-BLOOM_SINE_QUARTER[64u - o];
-}
 
-static int16_t bloom_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = bloom_sine_point(i);
-    int32_t b = bloom_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
 
-static int16_t bloom_triangle_q15(uint32_t phase)
+APSIS_INLINE int16_t bloom_triangle_q15(uint32_t phase)
 {
     uint16_t p = (uint16_t)(phase >> 16);
     if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
@@ -85,8 +63,8 @@ static uint16_t bloom_quarter_sine_q15(uint16_t x_q15)
     int32_t a, b;
     if (index >= 64u) return 32767u;
     rem = scaled - index * APSIS_Q15_ONE;
-    a = BLOOM_SINE_QUARTER[index];
-    b = BLOOM_SINE_QUARTER[index + 1u];
+    a = apsis_sine_table[index];
+    b = apsis_sine_table[index + 1u];
     return (uint16_t)(a + ((int32_t)(b - a) * (int32_t)rem +
                            (int32_t)APSIS_Q15_ONE / 2) /
                           (int32_t)APSIS_Q15_ONE);
@@ -113,13 +91,13 @@ static uint32_t bloom_phase_inc_from_millihz(uint32_t mhz)
 static int32_t bloom_sin_q30_for_hz(uint16_t hz)
 {
     uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)bloom_sine_q15(phase) * BLOOM_Q30_ONE) / 32767ll);
+    return (int32_t)(((int64_t)apsis_sine_q15(phase) * BLOOM_Q30_ONE) / 32767ll);
 }
 
 static int32_t bloom_cos_q30_for_hz(uint16_t hz)
 {
     uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)bloom_sine_q15(phase + 0x40000000u) *
+    return (int32_t)(((int64_t)apsis_sine_q15(phase + 0x40000000u) *
                       BLOOM_Q30_ONE) / 32767ll);
 }
 
@@ -148,7 +126,7 @@ static void bloom_biquad_lowpass(ApsisBloomDspBiquad *b,
     b->x1 = b->x2 = b->y1 = b->y2 = 0;
 }
 
-static int32_t bloom_biquad_process(ApsisBloomDspBiquad *b, int32_t x)
+APSIS_INLINE int32_t bloom_biquad_process(ApsisBloomDspBiquad *b, int32_t x)
 {
     int64_t acc;
     int32_t y;
@@ -371,7 +349,7 @@ static void bloom_env_prepare(ApsisBloomDspPetal *v)
     }
 }
 
-static void bloom_env_advance(ApsisBloomDspPetal *v)
+APSIS_INLINE void bloom_env_advance(ApsisBloomDspPetal *v)
 {
     if (!v) return;
     if (v->env_stage_left) {
@@ -524,7 +502,7 @@ static void bloom_petal_render(ApsisBloomDspPetal *v, int32_t *out, uint32_t fra
         for (j = 0u; j < v->osc_count; ++j) {
             ApsisBloomDspOsc *o = &v->osc[j];
             int32_t wave = o->waveform == APSIS_BLOOM_DSP_TRIANGLE
-                ? bloom_triangle_q15(o->phase) : bloom_sine_q15(o->phase);
+                ? bloom_triangle_q15(o->phase) : apsis_sine_q15(o->phase);
             sum += (int32_t)(((int64_t)wave * o->gain_q15) >> 15);
             o->phase += o->phase_inc;
         }

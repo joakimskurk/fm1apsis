@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_drift_dsp.h"
 #include "apsis_drift.h"
 #include "apsis_harmony.h"
@@ -9,12 +10,6 @@
 #define DRIFT_BASE_GAIN_Q15 APSIS_Q15_MILLI(13)
 #define DRIFT_PAN_MAX_Q15 APSIS_Q15_MILLI(340)
 
-static const int16_t DRIFT_SINE_QUARTER[65] = {
-0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
 static void drift_zero(void *ptr, uint32_t n)
 {
@@ -27,7 +22,7 @@ static uint16_t drift_mul_q15(uint16_t a, uint16_t b)
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
-static int32_t drift_smooth_i32(int32_t current, int32_t target)
+APSIS_INLINE int32_t drift_smooth_i32(int32_t current, int32_t target)
 {
     int64_t diff = (int64_t)target - current;
     int64_t delta;
@@ -37,7 +32,7 @@ static int32_t drift_smooth_i32(int32_t current, int32_t target)
     return (int32_t)((int64_t)current + delta);
 }
 
-static uint32_t drift_smooth_u32(uint32_t current, uint32_t target)
+APSIS_INLINE uint32_t drift_smooth_u32(uint32_t current, uint32_t target)
 {
     int64_t diff = (int64_t)target - current;
     int64_t delta;
@@ -47,31 +42,14 @@ static uint32_t drift_smooth_u32(uint32_t current, uint32_t target)
     return (uint32_t)((int64_t)current + delta);
 }
 
-static int32_t drift_sat_q15(int64_t v)
+APSIS_INLINE int32_t drift_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return (int32_t)v;
 }
 
-static int16_t drift_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return DRIFT_SINE_QUARTER[o];
-    if (q == 1u) return DRIFT_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-DRIFT_SINE_QUARTER[o];
-    return (int16_t)-DRIFT_SINE_QUARTER[64u - o];
-}
 
-static int16_t drift_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = drift_sine_point(i);
-    int32_t b = drift_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
 
 /* sin(x*pi/2), x in Q15 [0,1]. Used for WebAudio StereoPanner-style
  * equal-power gains. */
@@ -83,8 +61,8 @@ static uint16_t drift_quarter_sine_q15(uint16_t x_q15)
     int32_t a, b;
     if (index >= 64u) return 32767u;
     rem = scaled - index * APSIS_Q15_ONE;
-    a = DRIFT_SINE_QUARTER[index];
-    b = DRIFT_SINE_QUARTER[index + 1u];
+    a = apsis_sine_table[index];
+    b = apsis_sine_table[index + 1u];
     return (uint16_t)(a + ((int32_t)(b - a) * (int32_t)rem +
                            (int32_t)APSIS_Q15_ONE / 2) /
                           (int32_t)APSIS_Q15_ONE);
@@ -191,7 +169,7 @@ void apsis_drift_dsp_render(ApsisDriftDsp *dsp, int32_t *out, uint32_t frames)
             v->gain_q23 = drift_smooth_i32(v->gain_q23, v->target_gain_q23);
             v->mix_left_q15 = drift_smooth_i32(v->mix_left_q15, v->target_mix_left_q15);
             v->mix_right_q15 = drift_smooth_i32(v->mix_right_q15, v->target_mix_right_q15);
-            wave = drift_sine_q15(v->phase);
+            wave = apsis_sine_q15(v->phase);
             gain_q15 = (v->gain_q23 + 128) >> 8;
             sample = (int32_t)(((int64_t)wave * gain_q15) >> 15);
             sum_l += ((int64_t)sample * v->mix_left_q15) >> 15;

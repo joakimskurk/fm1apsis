@@ -2,11 +2,6 @@
 
 #define Q31_ROOT_CACHE 32u
 
-uint32_t apsis_mul_q31(uint32_t a, uint32_t b)
-{
-    return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
-}
-
 uint32_t apsis_pow_q31(uint32_t base, uint32_t exp)
 {
     uint32_t out = APSIS_Q31_ONE;

@@ -1,5 +1,6 @@
 /* The finite String notes: Study 98's classicStringNote (3-4 additive partials each, apsis_string98.c decides
  * which notes), one shared pool with one logical ceiling and one steal policy. */
+#include "apsis_sine.h"
 #include "apsis_string_dsp.h"
 
 #define ApsisStringDsp ApsisStringTransientPool
@@ -16,12 +17,6 @@
 #define STRX_BRIGHT_MIN_Q15 4915u      /* 0.15 */
 #define STRX_UPPER_PAN_SCALE_Q15 14745 /* 0.45 */
 
-static const int16_t STRX_SINE_QUARTER[65] = {
-    0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-    12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-    23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-    30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
 static const uint32_t STRX_SEMITONE_Q20[12] = {
     1048576u,1110928u,1176987u,1246974u,1321123u,1399681u,
@@ -92,7 +87,7 @@ static int32_t strx_clamp_i32(int32_t v, int32_t lo, int32_t hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
-static uint16_t strx_mul_q15(uint16_t a, uint16_t b)
+APSIS_INLINE uint16_t strx_mul_q15(uint16_t a, uint16_t b)
 {
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
@@ -422,26 +417,9 @@ uint8_t apsis_string_dsp_trigger_classic(ApsisStringDsp *dsp,
     return accepted;
 }
 
-static int16_t strx_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return STRX_SINE_QUARTER[o];
-    if (q == 1u) return STRX_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-STRX_SINE_QUARTER[o];
-    return (int16_t)-STRX_SINE_QUARTER[64u - o];
-}
 
-static int16_t strx_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = strx_sine_point(i);
-    int32_t b = strx_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
 
-static int16_t strx_triangle_q15(uint32_t phase)
+APSIS_INLINE int16_t strx_triangle_q15(uint32_t phase)
 {
     uint16_t p = (uint16_t)(phase >> 16);
     if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
@@ -449,21 +427,21 @@ static int16_t strx_triangle_q15(uint32_t phase)
     return (int16_t)(-32767 + (int32_t)(p - 49152u) * 2);
 }
 
-static int32_t strx_sat_q15(int64_t v)
+APSIS_INLINE int32_t strx_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return (int32_t)v;
 }
 
-static uint16_t strx_envelope(const ApsisStringTransientVoice *v)
+APSIS_INLINE uint16_t strx_envelope(const ApsisStringTransientVoice *v)
 {
     uint32_t idx = v->env_phase_q16 >> 16;
     if (idx > 64u) idx = 64u;
     return STRX_ENV_Q15[idx];
 }
 
-static void strx_advance_envelope(ApsisStringTransientVoice *v)
+APSIS_INLINE void strx_advance_envelope(ApsisStringTransientVoice *v)
 {
     if (v->envelope_stage == 0u) {
         if (v->attack_left_samples) --v->attack_left_samples;
@@ -483,7 +461,7 @@ static void strx_advance_envelope(ApsisStringTransientVoice *v)
     }
 }
 
-static void strx_advance_steal(ApsisStringTransientVoice *v)
+APSIS_INLINE void strx_advance_steal(ApsisStringTransientVoice *v)
 {
     int32_t delta;
     if (!v->stealing) return;
@@ -515,7 +493,7 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
         }
         v->phase += v->phase_inc;
         raw = v->waveform == APSIS_STRING_DSP_WAVE_TRIANGLE
-            ? strx_triangle_q15(v->phase) : strx_sine_q15(v->phase);
+            ? strx_triangle_q15(v->phase) : apsis_sine_q15(v->phase);
         if (v->lowpass_alpha_q15) {
             v->lowpass_q15 += (int32_t)(((int64_t)(raw - v->lowpass_q15) *
                                            v->lowpass_alpha_q15) >> 15);

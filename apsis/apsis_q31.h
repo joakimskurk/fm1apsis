@@ -5,7 +5,10 @@
 
 #define APSIS_Q31_ONE 0x7fffffffu
 
-uint32_t apsis_mul_q31(uint32_t a, uint32_t b);
+static inline __attribute__((always_inline)) uint32_t apsis_mul_q31(uint32_t a, uint32_t b)
+{
+    return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
+}
 uint32_t apsis_pow_q31(uint32_t base, uint32_t exp);
 
 /* The per-sample multiplier m with m^n = target (an exponential decay or glide over n samples), by 24 bisection

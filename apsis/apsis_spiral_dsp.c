@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_spiral_dsp.h"
 #include "apsis_string_dsp.h"
@@ -9,12 +10,6 @@
 #define SPIRAL_GAIN_MIN_PEAK_Q15 7u
 #define SPIRAL_FILTER_STATE_LIMIT 131071
 
-static const int16_t SPIRAL_SINE_QUARTER[65] = {
-0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
 static void spiral_dsp_zero(void *ptr, uint32_t n)
 {
@@ -49,24 +44,7 @@ static uint16_t spiral_mul_q15(uint16_t a, uint16_t b)
 
 
 
-static int16_t spiral_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return SPIRAL_SINE_QUARTER[o];
-    if (q == 1u) return SPIRAL_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-SPIRAL_SINE_QUARTER[o];
-    return (int16_t)-SPIRAL_SINE_QUARTER[64u - o];
-}
 
-static int16_t spiral_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = spiral_sine_point(i);
-    int32_t b = spiral_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
 
 static int16_t spiral_triangle_q15(uint32_t phase)
 {
@@ -84,8 +62,8 @@ static uint16_t spiral_quarter_sine_q15(uint16_t x_q15)
     int32_t a, b;
     if (index >= 64u) return 32767u;
     rem = scaled - index * APSIS_Q15_ONE;
-    a = SPIRAL_SINE_QUARTER[index];
-    b = SPIRAL_SINE_QUARTER[index + 1u];
+    a = apsis_sine_table[index];
+    b = apsis_sine_table[index + 1u];
     return (uint16_t)(a + ((int32_t)(b - a) * (int32_t)rem +
                            (int32_t)APSIS_Q15_ONE / 2) /
                           (int32_t)APSIS_Q15_ONE);
@@ -114,13 +92,13 @@ static int32_t spiral_sin_q30_for_hz(uint16_t hz)
     /* round(2^32 / 44100) = 97392. hz is <= 10500, so the product fits u32
      * and avoids another target DI-mode division. */
     uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)spiral_sine_q15(phase) * SPIRAL_Q30_ONE) / 32767ll);
+    return (int32_t)(((int64_t)apsis_sine_q15(phase) * SPIRAL_Q30_ONE) / 32767ll);
 }
 
 static int32_t spiral_cos_q30_for_hz(uint16_t hz)
 {
     uint32_t phase = (uint32_t)hz * 97392u;
-    return (int32_t)(((int64_t)spiral_sine_q15(phase + 0x40000000u) *
+    return (int32_t)(((int64_t)apsis_sine_q15(phase + 0x40000000u) *
                       SPIRAL_Q30_ONE) / 32767ll);
 }
 
@@ -523,7 +501,7 @@ void apsis_spiral_dsp_render(ApsisSpiralDsp *dsp, int32_t *out,
                 int32_t wave;
                 o->phase += o->phase_inc;
                 wave = o->waveform == APSIS_SPIRAL_DSP_TRIANGLE
-                    ? spiral_triangle_q15(o->phase) : spiral_sine_q15(o->phase);
+                    ? spiral_triangle_q15(o->phase) : apsis_sine_q15(o->phase);
                 raw += ((int64_t)wave * o->gain_q15) >> 15;
             }
             filtered = spiral_biquad_process(&v->filter, spiral_filter_state(raw));

@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_space_target.h"
 #include "apsis_fixed.h"
 
@@ -26,14 +27,14 @@ static int32_t apsis_space_target_source[APSIS_SPACE_TARGET_SAMPLES]
 static int32_t apsis_space_target_input[APSIS_SPACE_TARGET_SAMPLES]
     APSIS_SPACE_POOL;
 
-static int32_t apsis_space_target_clamp_q15(int32_t v)
+APSIS_INLINE int32_t apsis_space_target_clamp_q15(int32_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return v;
 }
 
-static int32_t apsis_space_target_mul_q15(int32_t sample, uint16_t gain)
+APSIS_INLINE int32_t apsis_space_target_mul_q15(int32_t sample, uint16_t gain)
 {
     if (!gain || !sample) return 0;
     if (gain >= APSIS_Q15_ONE) return sample;

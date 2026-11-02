@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_string_dsp.h"
 #include "apsis_harmony.h"
 #include "apsis_drift.h"
@@ -10,12 +11,6 @@
 #define TRANSPORT_RELEASE_ALPHA_Q15 17u
 #define TIMBRE_RELEASE_ALPHA_Q15 30u
 
-static const int16_t SDSP_SINE_QUARTER[65] = {
-0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 static const uint32_t SDSP_SEMITONE_Q20[12] = {
 1048576u,1110928u,1176987u,1246974u,1321123u,1399681u,
 1482910u,1571089u,1664511u,1763488u,1868350u,1979448u
@@ -112,36 +107,19 @@ static uint16_t sdsp_alpha_for_ms(uint32_t ms)
     a = (APSIS_Q15_ONE + samples / 2u) / samples;
     return (uint16_t)(a ? a : 1u);
 }
-static int16_t sdsp_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return SDSP_SINE_QUARTER[o];
-    if (q == 1u) return SDSP_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-SDSP_SINE_QUARTER[o];
-    return (int16_t)-SDSP_SINE_QUARTER[64u - o];
-}
-static int16_t sdsp_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = sdsp_sine_point(i);
-    int32_t b = sdsp_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
-static int16_t sdsp_triangle_q15(uint32_t phase)
+APSIS_INLINE int16_t sdsp_triangle_q15(uint32_t phase)
 {
     uint16_t p = (uint16_t)(phase >> 16);
     if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
     if (p < 49152u) return (int16_t)(32767 - (int32_t)(p - 16384u) * 2);
     return (int16_t)(-32767 + (int32_t)(p - 49152u) * 2);
 }
-static int16_t sdsp_waveform_q15(uint8_t waveform, uint32_t phase)
+APSIS_INLINE int16_t sdsp_waveform_q15(uint8_t waveform, uint32_t phase)
 {
     if (waveform == APSIS_STRING_DSP_WAVE_TRIANGLE) return sdsp_triangle_q15(phase);
-    return sdsp_sine_q15(phase);
+    return apsis_sine_q15(phase);
 }
-static uint32_t sdsp_smooth_u32(uint32_t current, uint32_t target, uint16_t alpha)
+APSIS_INLINE uint32_t sdsp_smooth_u32(uint32_t current, uint32_t target, uint16_t alpha)
 {
     int64_t diff = (int64_t)target - (int64_t)current;
     int64_t delta;
@@ -150,7 +128,7 @@ static uint32_t sdsp_smooth_u32(uint32_t current, uint32_t target, uint16_t alph
     if (!delta) delta = diff > 0 ? 1 : -1;
     return (uint32_t)((int64_t)current + delta);
 }
-static int32_t sdsp_smooth_i32(int32_t current, int32_t target, uint16_t alpha)
+APSIS_INLINE int32_t sdsp_smooth_i32(int32_t current, int32_t target, uint16_t alpha)
 {
     int64_t diff = (int64_t)target - current;
     int64_t delta;
@@ -159,7 +137,7 @@ static int32_t sdsp_smooth_i32(int32_t current, int32_t target, uint16_t alpha)
     if (!delta) delta = diff > 0 ? 1 : -1;
     return (int32_t)((int64_t)current + delta);
 }
-static int32_t sdsp_sat_q15(int64_t v)
+APSIS_INLINE int32_t sdsp_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
@@ -223,7 +201,7 @@ void apsis_string_dsp_targets(const ApsisState *s,
     }
 }
 
-static void sdsp_apply_timbre(ApsisStringDspVoice *v)
+APSIS_INLINE void sdsp_apply_timbre(ApsisStringDspVoice *v)
 {
     v->waveform = v->desired_waveform;
     v->lowpass_alpha_q15 = v->desired_lowpass_alpha_q15;

@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_clock_dsp.h"
 
@@ -7,12 +8,6 @@
 #define CLOCK_NOISE_SEED 0x126c10c5u
 #define CLOCK_LEVEL_MAX_Q15 APSIS_Q15_MILLI(1250)
 
-static const int16_t CLOCK_SINE_QUARTER[65] = {
-0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
 static const uint16_t CLOCK_START_HZ[4][3] = {
     {118u,118u,168u}, {245u,245u,350u}, {760u,760u,1080u}, {88u,88u,132u}
@@ -31,7 +26,7 @@ static void clock_zero(void *ptr, uint32_t n)
     while (n--) *p++ = 0u;
 }
 
-static int32_t clock_sat_q15(int64_t v)
+APSIS_INLINE int32_t clock_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
@@ -53,33 +48,16 @@ static uint32_t clock_mul_q15_u32(uint32_t a, uint32_t b)
     return (uint32_t)(((uint64_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
-static uint32_t clock_mul_q31(uint32_t a, uint32_t b)
+APSIS_INLINE uint32_t clock_mul_q31(uint32_t a, uint32_t b)
 {
     return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
 }
 
 
 
-static int16_t clock_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return CLOCK_SINE_QUARTER[o];
-    if (q == 1u) return CLOCK_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-CLOCK_SINE_QUARTER[o];
-    return (int16_t)-CLOCK_SINE_QUARTER[64u - o];
-}
 
-static int16_t clock_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = clock_sine_point(i);
-    int32_t b = clock_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
 
-static int16_t clock_triangle_q15(uint32_t phase)
+APSIS_INLINE int16_t clock_triangle_q15(uint32_t phase)
 {
     uint16_t p = (uint16_t)(phase >> 16);
     if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
@@ -95,8 +73,8 @@ static uint16_t clock_quarter_sine_q15(uint16_t x_q15)
     int32_t a, b;
     if (index >= 64u) return 32767u;
     rem = scaled - index * APSIS_Q15_ONE;
-    a = CLOCK_SINE_QUARTER[index];
-    b = CLOCK_SINE_QUARTER[index + 1u];
+    a = apsis_sine_table[index];
+    b = apsis_sine_table[index + 1u];
     return (uint16_t)(a + ((int32_t)(b - a) * (int32_t)rem +
                            (int32_t)APSIS_Q15_ONE / 2) /
                           (int32_t)APSIS_Q15_ONE);
@@ -129,13 +107,13 @@ static uint32_t clock_pitch_hz_milli(uint32_t hz, uint8_t pitch_centi)
 static int32_t clock_sin_q30_for_hz(uint16_t hz)
 {
     uint32_t phase = (uint32_t)(((uint64_t)hz << 32) / APSIS_CLOCK_DSP_RATE);
-    return (int32_t)(((int64_t)clock_sine_q15(phase) * CLOCK_Q30_ONE) / 32767ll);
+    return (int32_t)(((int64_t)apsis_sine_q15(phase) * CLOCK_Q30_ONE) / 32767ll);
 }
 
 static int32_t clock_cos_q30_for_hz(uint16_t hz)
 {
     uint32_t phase = (uint32_t)(((uint64_t)hz << 32) / APSIS_CLOCK_DSP_RATE);
-    return (int32_t)(((int64_t)clock_sine_q15(phase + 0x40000000u) * CLOCK_Q30_ONE) / 32767ll);
+    return (int32_t)(((int64_t)apsis_sine_q15(phase + 0x40000000u) * CLOCK_Q30_ONE) / 32767ll);
 }
 
 static int32_t clock_norm_q30(int64_t value_q30, int64_t a0_q30)
@@ -193,7 +171,7 @@ static void clock_biquad_bandpass(ApsisClockBiquad *b, uint16_t hz)
     clock_biquad_clear(b);
 }
 
-static int32_t clock_biquad_process(ApsisClockBiquad *b, int32_t x)
+APSIS_INLINE int32_t clock_biquad_process(ApsisClockBiquad *b, int32_t x)
 {
     int64_t acc;
     int32_t y;
@@ -209,7 +187,7 @@ static int32_t clock_biquad_process(ApsisClockBiquad *b, int32_t x)
     return y;
 }
 
-static uint32_t clock_noise_next(uint32_t *state)
+APSIS_INLINE uint32_t clock_noise_next(uint32_t *state)
 {
     uint32_t x = state && *state ? *state : CLOCK_NOISE_SEED;
     x ^= x << 13;
@@ -560,7 +538,7 @@ static void clock_voice_render(ApsisClockDspVoice *v, int32_t *out, uint32_t fra
         } else if (v->waveform == APSIS_CLOCK_DSP_SQUARE) {
             wave = (v->phase & 0x80000000u) ? -32767 : 32767;
         } else {
-            wave = clock_sine_q15(v->phase);
+            wave = apsis_sine_q15(v->phase);
         }
         if (v->filter_count > 0u) wave = clock_biquad_process(&v->filter[0], wave);
         if (v->filter_count > 1u) wave = clock_biquad_process(&v->filter[1], wave);

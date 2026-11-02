@@ -1,3 +1,4 @@
+#include "apsis_sine.h"
 #include "apsis_space_dsp.h"
 
 #define SPACE_Q30_ONE 1073741824u
@@ -34,21 +35,15 @@ static const uint16_t SPACE_DAMPING_ALPHA[47] = {
     14314u,14484u,14652u,14819u,14985u,15149u,15311u
 };
 
-static const int16_t SPACE_SINE_QUARTER[65] = {
-    0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
-    12539,13279,14010,14732,15446,16151,16846,17530,18204,18868,19519,20159,20787,21403,22005,22594,
-    23170,23731,24279,24811,25329,25832,26319,26790,27245,27683,28105,28510,28898,29268,29621,29956,
-    30273,30571,30852,31113,31356,31580,31785,31971,32137,32285,32412,32521,32609,32678,32728,32757,32767
-};
 
-static int32_t space_clamp_q15(int64_t v)
+APSIS_INLINE int32_t space_clamp_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return (int32_t)v;
 }
 
-static int32_t space_mul_q15(int32_t a, int32_t b)
+APSIS_INLINE int32_t space_mul_q15(int32_t a, int32_t b)
 {
     if (a >= -65535 && a <= 65535 && b >= -32767 && b <= 32767) {
         int32_t p = a * b;
@@ -64,15 +59,6 @@ static int32_t space_mul_q15(int32_t a, int32_t b)
     }
 }
 
-static int16_t space_sine_point(uint8_t index)
-{
-    uint8_t q = index >> 6;
-    uint8_t o = index & 63u;
-    if (q == 0u) return SPACE_SINE_QUARTER[o];
-    if (q == 1u) return SPACE_SINE_QUARTER[64u - o];
-    if (q == 2u) return (int16_t)-SPACE_SINE_QUARTER[o];
-    return (int16_t)-SPACE_SINE_QUARTER[64u - o];
-}
 
 static uint16_t space_damping_alpha(uint16_t hz)
 {
@@ -108,7 +94,7 @@ static uint16_t space_feedback_gain(uint16_t delay_samples, uint16_t decay_ms)
     return (uint16_t)(g_q30 > 32767u ? 32767u : g_q30);
 }
 
-static int32_t space_line_read(const ApsisSpaceFdn *fdn,
+APSIS_INLINE int32_t space_line_read(const ApsisSpaceFdn *fdn,
                                const ApsisSpaceFdnLine *line,
                                int32_t modulation_q8)
 {
@@ -180,8 +166,8 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
         line->damping_state_q15 = 0;
         {
             uint8_t sine_i = (uint8_t)(line->lfo_phase >> 24);
-            int32_t sine_a = space_sine_point(sine_i);
-            int32_t sine_b = space_sine_point((uint8_t)(sine_i + 1u));
+            int32_t sine_a = apsis_sine_point(sine_i);
+            int32_t sine_b = apsis_sine_point((uint8_t)(sine_i + 1u));
             line->lfo_sine_a_q15 = (int16_t)sine_a;
             line->lfo_sine_delta_q15 = (int16_t)(sine_b - sine_a);
         }
@@ -223,8 +209,8 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
             line->lfo_phase += line->lfo_phase_inc;
             sine_i = (uint8_t)(line->lfo_phase >> 24);
             if ((uint8_t)(old_phase >> 24) != sine_i) {
-                int32_t next_a = space_sine_point(sine_i);
-                int32_t next_b = space_sine_point((uint8_t)(sine_i + 1u));
+                int32_t next_a = apsis_sine_point(sine_i);
+                int32_t next_b = apsis_sine_point((uint8_t)(sine_i + 1u));
                 line->lfo_sine_a_q15 = (int16_t)next_a;
                 line->lfo_sine_delta_q15 = (int16_t)(next_b - next_a);
             }
