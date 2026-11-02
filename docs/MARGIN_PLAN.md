@@ -52,10 +52,18 @@ petals with grow. All of these settings can be reached from the panel.
 The average was 302 % and the worst block 483 %. Only 970 of about 3445 blocks were rendered, so the audio
 collapses.
 
-This settles the order of the work. The voice budget (B) has to cover **Bloom petals** as well as String
-notes, because they are the largest sound cost. The planning spike (C) is the largest single cost, so it must be
-found and moved before anything else. The room (D) is a small part of the worst case; it matters for the steady
-average.
+**Correction (82e2096, the probes now say when each worst happens).** The 17.8 ms "planning" was the **first
+blocks after boot**: the tables fill and the first plans are made once (22.7 ms in the stress build, 3.3 ms in the
+normal one). These blocks are now measured apart. Once it is playing, the stress build's own worsts are Spiral +
+Bloom sound 15.3 ms, String notes 10.2 ms, planning 2.1 ms, Clock 1.4 ms, room 1.1 ms; the bound is 560 %.
+
+That gives the order of the work:
+
+1. **B, the voice budget, comes first.** It must cover String notes, Spiral and Bloom. A profile of the stress
+   build puts 34 % of all CPU in the String's partials and about 22 % in Spiral, which has a biquad per voice.
+2. **Boot:** warm the tables and the first plan before the audio starts, so the first blocks don't click.
+3. **C** is smaller than it looked (planning 0.8 ms normal, 2.1 ms stress) but still belongs in the main loop.
+4. **The room (D)** is a small part of the worst case; it matters for the steady average.
 
 
 Margin means a **bound by construction**: no input, however dense, can make the audio interrupt exceed its
