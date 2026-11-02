@@ -68,6 +68,7 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_mother.h"
 #include "apsis_transport.h"
 #include "apsis_runtime.h"
+#include "apsis_q31.c"
 #include "apsis_state.c"
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"

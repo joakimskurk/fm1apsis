@@ -1,3 +1,4 @@
+#include "apsis_q31.h"
 #include "apsis_bloom_dsp.h"
 #include "apsis_string_dsp.h"
 
@@ -46,37 +47,8 @@ static uint16_t bloom_dsp_mul_q15(uint16_t a, uint16_t b)
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
-static uint32_t bloom_mul_q31(uint32_t a, uint32_t b)
-{
-    return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
-}
 
-static uint32_t bloom_pow_q31(uint32_t base, uint32_t exp)
-{
-    uint32_t out = BLOOM_Q31_ONE;
-    while (exp) {
-        if (exp & 1u) out = bloom_mul_q31(out, base);
-        exp >>= 1u;
-        if (exp) base = bloom_mul_q31(base, base);
-    }
-    return out;
-}
 
-static uint32_t bloom_nth_root_q31(uint32_t target, uint32_t n)
-{
-    uint32_t lo, hi, k;
-    if (!n || target >= BLOOM_Q31_ONE) return BLOOM_Q31_ONE;
-    if (!target) return 0u;
-    lo = target;
-    hi = BLOOM_Q31_ONE;
-    for (k = 0u; k < 24u; ++k) {
-        uint32_t mid = lo + ((hi - lo) >> 1u);
-        uint32_t p = bloom_pow_q31(mid, n);
-        if (p > target) hi = mid;
-        else lo = mid;
-    }
-    return lo + ((hi - lo) >> 1u);
-}
 
 static int16_t bloom_sine_point(uint8_t index)
 {
@@ -395,7 +367,7 @@ static void bloom_env_prepare(ApsisBloomDspPetal *v)
         v->env_linear_rem_q23 = 0u;
         ratio = v->env_gain_q23
             ? (uint32_t)(((uint64_t)target << 31) / v->env_gain_q23) : 0u;
-        v->env_decay_mul_q31 = bloom_nth_root_q31(ratio, len);
+        v->env_decay_mul_q31 = apsis_nth_root_q31(ratio, len);
     }
 }
 

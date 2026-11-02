@@ -1,3 +1,4 @@
+#include "apsis_q31.h"
 #include "apsis_clock_dsp.h"
 
 #define CLOCK_Q31_ONE 0x7fffffffu
@@ -57,32 +58,7 @@ static uint32_t clock_mul_q31(uint32_t a, uint32_t b)
     return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
 }
 
-static uint32_t clock_pow_q31(uint32_t base, uint32_t exp)
-{
-    uint32_t out = CLOCK_Q31_ONE;
-    while (exp) {
-        if (exp & 1u) out = clock_mul_q31(out, base);
-        exp >>= 1u;
-        if (exp) base = clock_mul_q31(base, base);
-    }
-    return out;
-}
 
-static uint32_t clock_nth_root_q31(uint32_t target, uint32_t n)
-{
-    uint32_t lo, hi, k;
-    if (!n || target >= CLOCK_Q31_ONE) return CLOCK_Q31_ONE;
-    if (!target) return 0u;
-    lo = target;
-    hi = CLOCK_Q31_ONE;
-    for (k = 0u; k < 24u; ++k) {
-        uint32_t mid = lo + ((hi - lo) >> 1u);
-        uint32_t p = clock_pow_q31(mid, n);
-        if (p > target) hi = mid;
-        else lo = mid;
-    }
-    return lo + ((hi - lo) >> 1u);
-}
 
 static int16_t clock_sine_point(uint8_t index)
 {
@@ -278,7 +254,7 @@ static uint32_t clock_decay_mul(uint32_t peak_q23, uint32_t decay_samples)
     uint32_t target;
     if (!decay_samples || peak_q23 <= floor_q23) return 0u;
     target = (uint32_t)(((uint64_t)floor_q23 << 31) / peak_q23);
-    return clock_nth_root_q31(target, decay_samples);
+    return apsis_nth_root_q31(target, decay_samples);
 }
 
 static uint32_t clock_pitch_mul(uint32_t start_inc, uint32_t end_inc, uint32_t samples)
@@ -286,7 +262,7 @@ static uint32_t clock_pitch_mul(uint32_t start_inc, uint32_t end_inc, uint32_t s
     uint32_t target;
     if (!samples || !start_inc || end_inc >= start_inc) return CLOCK_Q31_ONE;
     target = (uint32_t)(((uint64_t)end_inc << 31) / start_inc);
-    return clock_nth_root_q31(target, samples);
+    return apsis_nth_root_q31(target, samples);
 }
 
 static void clock_voice_common(ApsisClockDspVoice *v,

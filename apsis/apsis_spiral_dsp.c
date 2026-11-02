@@ -1,3 +1,4 @@
+#include "apsis_q31.h"
 #include "apsis_spiral_dsp.h"
 #include "apsis_string_dsp.h"
 
@@ -45,37 +46,8 @@ static uint16_t spiral_mul_q15(uint16_t a, uint16_t b)
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
 
-static uint32_t spiral_mul_q31(uint32_t a, uint32_t b)
-{
-    return (uint32_t)(((uint64_t)a * b + (1ull << 30)) >> 31);
-}
 
-static uint32_t spiral_pow_q31(uint32_t base, uint32_t exp)
-{
-    uint32_t out = SPIRAL_Q31_ONE;
-    while (exp) {
-        if (exp & 1u) out = spiral_mul_q31(out, base);
-        exp >>= 1u;
-        if (exp) base = spiral_mul_q31(base, base);
-    }
-    return out;
-}
 
-static uint32_t spiral_nth_root_q31(uint32_t target, uint32_t n)
-{
-    uint32_t lo, hi, k;
-    if (!n || target >= SPIRAL_Q31_ONE) return SPIRAL_Q31_ONE;
-    if (!target) return 0u;
-    lo = target;
-    hi = SPIRAL_Q31_ONE;
-    for (k = 0u; k < 24u; ++k) {
-        uint32_t mid = lo + ((hi - lo) >> 1u);
-        uint32_t p = spiral_pow_q31(mid, n);
-        if (p > target) hi = mid;
-        else lo = mid;
-    }
-    return lo + ((hi - lo) >> 1u);
-}
 
 static int16_t spiral_sine_point(uint8_t index)
 {
@@ -285,7 +257,7 @@ static uint32_t spiral_decay_mul(uint32_t peak_q23, uint32_t samples)
     uint32_t target;
     if (!samples || peak_q23 <= floor_q23) return SPIRAL_Q31_ONE;
     target = (uint32_t)(((uint64_t)floor_q23 << 31) / peak_q23);
-    return spiral_nth_root_q31(target, samples);
+    return apsis_nth_root_q31(target, samples);
 }
 
 static void spiral_add_osc(ApsisSpiralDspLeg *v, uint8_t waveform,
