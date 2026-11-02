@@ -1,12 +1,6 @@
 name: APSIS Phase 11T selective FDN Q15 narrow-helper proof
 
 on:
-  push:
-    branches: [p11t-fdn-selective-q15-narrow-proof-staging]
-    paths:
-      - tests/test_p11t_fdn_selective_q15_narrow_equivalence.c
-      - ci/p11t_apply_selective_q15_candidate.py
-      - .github/workflows/p11t-fdn-selective-q15-proof.yml
   workflow_dispatch:
 
 jobs:
@@ -17,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: a1907d5389de36ba094d86e2a74a6af729327651
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -29,6 +24,7 @@ jobs:
           set -euo pipefail
           rm -rf "$P11T_EVIDENCE"
           mkdir -p "$P11T_EVIDENCE"
+          test "$(git rev-parse HEAD)" = 'a1907d5389de36ba094d86e2a74a6af729327651'
           test "$(git hash-object apsis/apsis_space_dsp.c)" = 'e970aeaff9264c37188c7d3fbcad2960bad03a69'
           test "$(git hash-object apsis/apsis_space_dsp.h)" = 'e5d93117d6bab1552532c6a7f6bd9af6758cab9f'
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
