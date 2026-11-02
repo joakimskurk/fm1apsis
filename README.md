@@ -32,10 +32,9 @@ tests/emu.sh        fm1-emu under FM1_STRICT: the audio interrupt's load      te
 ## Build and test
 
 ```sh
-sh tests/apsis/run.sh          # APSIS's tests, plain and ASan/UBSan (Linux or macOS)
-sh tests/sound.sh              # the firmware on the computer: WAV + screens, against tests/sound.sha256 (Linux)
-sh tools/get_toolchain.sh      # once: JieLi's Linux toolchain; and the AC79 SDK (see docs/dinghy)
-sh build.sh                    # build/apsis.fwsc
+make test        # APSIS's tests, clang, plain + ASan/UBSan (seconds, native on the Mac)
+make linux       # gcc, clang MSan and the firmware's pinned sound in host mode (Docker)
+make fw          # build/apsis.fwsc: JieLi toolchain in ~/.jieli (tools/get_toolchain.sh), AC79 SDK in ~/fw-AC79_AIoT_SDK
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of it, builds the package and measures it on the emulator; a tag `vX.Y`
