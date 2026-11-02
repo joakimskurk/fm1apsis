@@ -128,7 +128,7 @@ jobs:
         run: sh tools/get_toolchain.sh
       - name: APSIS under FM1_STRICT
         run: EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain sh tests/emu.sh build/apsis.fwsc build/apsis.elf build/emu
-      - name: The worst case (the APSIS_STRESS build, STRESS=1), a gate: no drop-out after boot, the two-core bound under the block
+      - name: "The worst case (the APSIS_STRESS build, STRESS=1), a gate - no drop-out after boot, the two-core bound under the block"
         if: always()
         run: |
           EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain STRESS=1 \
