@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11X are complete. P11W remains the accepted production baseline. P11X measured explicit target sign multiplies in the FDN output mix and authorizes P11Y proof-only.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11Y are complete. P11W remains the accepted production baseline. P11Y proved fixed add/sub output mixing exact but rejected it on real-target regression; P11Z is the final pre-hardware closure/readiness matrix.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -876,9 +876,33 @@ Exact target authority:
 
 P11X authorizes only a P11Y proof candidate: replace the frozen sign products with explicit add/sub using exactly the same sign pattern. No production change is authorized.
 
-## Exact next phase — P11Y fixed output add/sub proof
+## P11Y — fixed FDN output add/sub proof complete; candidate rejected
 
-Production remains P11W. Prove arithmetic and complete FDN behavior bit-identical, normal + ASAN/UBSAN, then patch only an ephemeral generated target and compare exact resource/package/render shape. Reject any regressive target candidate absent physical timing evidence. Physical ISR timing, stack high-water, LCD/audio contention, NOR timing and DAC/listening quality remain Phase-12 hardware work.
+Authority:
+- technical head `ca46ac5a5d3db9b9f0e43adb061ba780fab39c9a`
+- run `41397297203` — all gates PASS
+- evidence artifact ID `13119718531`
+- evidence ZIP SHA-256 `dde978fd3a521dac64c3c5cb1a66e417b39a3a70508be2569481e765c228f1ec`
+- committed production Space remains exact P11W
+
+Equivalence proof:
+- **1,000,312** fixed-sign arithmetic cases exact
+- complete FDN **6,311 blocks / 386,191 frames** exact
+- cold/warm steady, legal sweep, adversarial extremes, random frames/parameters and resets covered
+- stereo output, complete FDN state and full delay storage bit-identical after every block
+- optimized + ASAN/UBSAN PASS
+
+Exact real-target projection:
+- P11W baseline: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, render **1,094 B / 364** lines, package `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- fixed add/sub candidate: image **140,520 B (+48 B)**, RAM **87,524 B**, POOL **319,176 B**
+- candidate render **1,154 B / 385** = **+60 B / +21 lines**
+- candidate package SHA-256 `01d9f3fbc225973b6f2dcb861a86c2ee62af49594a288ba43c7cd2fac4ba61d0`
+
+Decision: reject production validation. The candidate is mathematically/behaviorally exact, but every changed static target proxy regresses and there is no RAM/POOL saving. Physical timing is unavailable, so the 16 removed semantic sign multiplies/frame do not justify the larger target. P11W remains production authority.
+
+## Exact next phase — P11Z Phase-11 closure/readiness matrix
+
+No production optimization is authorized. Regenerate and stress the accepted P11W stack as one final software/real-target/pinned-emulator checkpoint: complete host/sanitizer behavior, bounded-capacity/high-water authorities, exact production target/package, exact idle PCM/runtime and exact active Motion lifecycle. Freeze one closure head and move all remaining physical ISR/stack/LCD/NOR/DAC/listening checks to Phase 12.
 
 ## Do not regress
 
