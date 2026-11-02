@@ -136,15 +136,35 @@ cost, more after the cost work).
   late are counted in a probe, never computed in the interrupt.
 - This is the same rule Dinghy's RULES.md gives: the interrupt renders, the loop thinks.
 
-### D. The room on core 1
+### D. The second core: two jobs a block (redesigned 2026-11-02, from the measured parts)
 
-- Core 0 writes the room send of block k into a buffer. Core 1 renders the wet room for block k while core 0
-  renders block k+1, and core 0 mixes the wet block in one block later. The extra 5.8 ms reads as pre-delay in a
-  room, where it is inaudible.
-- Built on fm1-dock's cpu1.c: core 1 is started and screened at boot. If it fails, the room falls back to core 0
-  in a cheaper form (fewer FDN lines, about 600 us), and the bound is checked for that case too.
-- To verify first: that fm1-emu models core 1 well enough to measure this (its profile already reports "core 0").
-  If not, the fallback is what the emulator gates.
+The way the FM-1 firmwares already do it (Melodee, X0X, SLOOP, fm1-dock; fm1-dock's `fm1_cpu1.h`, GPL-3.0 like
+ours, with its attribution chain):
+
+- Core 1 waits in RAM (`.c1_text`).
+- Inside the audio interrupt, core 0 hands it one job (a function and an argument), does its own share at the
+  same time, and waits for the job before it goes on.
+- There is no added latency: both halves belong to the same block.
+- If core 1 does not answer within 8 ms, it is held for good and core 0 does the job itself. That is the
+  one-core fallback for the units whose core 1 is flaky (fm1-emu `--flaky-core1` tests it).
+
+The plan in two phases, with the stress build's worsts after the voice budget (us):
+
+| phase | core 0 | core 1 |
+| --- | --- | --- |
+| A, from the block's start | updates + Clock triggers 487, planning 955, triggers 581 = 2023 | String drone 513, Drift 424, the room on the previous block's sends 1128 = 2065 |
+| B, once the notes are set up | String notes 1652 + half of the rest | Spiral + Bloom 1659, Clock 1181, shared out to balance |
+| per block | A 2065 + B ~2250 = **~4.3 ms (74 %)** | |
+
+The room moves one block late, which adds 5.8 ms of pre-delay to a 72 ms pre-delay and is inaudible; it is
+checked by listening. Everything else stays sample-exact.
+
+To take over from fm1-dock:
+- `fm1_cpu1.h` and its entry (`fm1_cpu1.S`)
+- the `.c1_text` section and core 1's stacks in the linker script
+- core 1's stop and the PC-limit guard (`fm1_sys.h`, `fm1_guard.h`)
+
+PLATFORM.md lists them as differences from Dinghy.
 
 ### E. The steady costs
 
