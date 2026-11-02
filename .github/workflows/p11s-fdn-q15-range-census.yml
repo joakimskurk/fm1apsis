@@ -1,12 +1,6 @@
 name: APSIS Phase 11S FDN Q15 operand-range census
 
 on:
-  push:
-    branches: [p11s-fdn-q15-range-census-staging]
-    paths:
-      - tests/test_p11s_fdn_q15_range_census.c
-      - ci/p11s_make_instrumented_space.py
-      - .github/workflows/p11s-fdn-q15-range-census.yml
   workflow_dispatch:
 
 jobs:
@@ -17,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: 6ddfa625b371d9a93db3d0a5a635b48b7eb08046
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -28,6 +23,7 @@ jobs:
           set -euo pipefail
           rm -rf "$P11S_EVIDENCE"
           mkdir -p "$P11S_EVIDENCE"
+          test "$(git rev-parse HEAD)" = '6ddfa625b371d9a93db3d0a5a635b48b7eb08046'
           test "$(git hash-object apsis/apsis_space_dsp.c)" = 'e970aeaff9264c37188c7d3fbcad2960bad03a69'
           test "$(git hash-object apsis/apsis_space_dsp.h)" = 'e5d93117d6bab1552532c6a7f6bd9af6758cab9f'
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
