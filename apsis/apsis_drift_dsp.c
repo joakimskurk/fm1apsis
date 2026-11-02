@@ -164,7 +164,16 @@ void apsis_drift_dsp_render(ApsisDriftDsp *dsp, int32_t *out, uint32_t frames)
         const int32_t target_gain = v->target_gain_q23, target_l = v->target_mix_left_q15,
                       target_r = v->target_mix_right_q15;
         if (!v->pitch_initialized) continue;
-        for (f = 0u; f < frames; ++f) {
+        if (inc == target_inc && gain == target_gain && mix_l == target_l && mix_r == target_r) {
+            /* settled: the smoothers would return their current values */
+            const int32_t g = (gain + 128) >> 8;
+            for (f = 0u; f < frames; ++f) {
+                int32_t sample = (int32_t)(((int64_t)apsis_sine_q15(phase) * g) >> 15);
+                out[f * 2u] += (int32_t)(((int64_t)sample * mix_l) >> 15);
+                out[f * 2u + 1u] += (int32_t)(((int64_t)sample * mix_r) >> 15);
+                phase += inc;
+            }
+        } else for (f = 0u; f < frames; ++f) {
             int32_t wave, sample;
             inc = drift_smooth_u32(inc, target_inc);
             gain = drift_smooth_i32(gain, target_gain);
