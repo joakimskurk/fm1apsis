@@ -19,4 +19,10 @@ static inline int32_t apsis_mul_q15_round(int32_t a, int32_t b)
                   : -(int32_t)apsis_div32767((uint32_t)-p + 16383u);
 }
 
+/* clamp to +-32767 (the buses' Q15 range) */
+static inline int32_t apsis_sat_q15(int32_t v)
+{
+    return v > 32767 ? 32767 : v < -32767 ? -32767 : v;
+}
+
 #endif

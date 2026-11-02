@@ -1,5 +1,6 @@
 /* The finite String notes: Study 98's classicStringNote (3-4 additive partials each, apsis_string98.c decides
  * which notes), one shared pool with one logical ceiling and one steal policy. */
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_string_dsp.h"
 
@@ -68,7 +69,7 @@ static const uint16_t STRX_PAN_Q15[33][2] = {
 
 /* Exponential-style 0.002 -> 1 attack curve. Decay uses the same table in
  * reverse. Index zero is forced to exact digital silence for click safety. */
-static const uint16_t STRX_ENV_Q15[65] = {
+static uint16_t STRX_ENV_Q15[65] = {   /* (RAM: read every sample) */
     0u,72u,80u,88u,97u,106u,117u,129u,143u,157u,173u,191u,210u,232u,255u,281u,
     310u,341u,376u,415u,457u,504u,555u,612u,674u,743u,818u,902u,994u,1095u,1207u,
     1330u,1465u,1615u,1779u,1961u,2161u,2381u,2624u,2892u,3187u,3512u,3870u,4264u,
@@ -90,6 +91,12 @@ static int32_t strx_clamp_i32(int32_t v, int32_t lo, int32_t hi)
 APSIS_INLINE uint16_t strx_mul_q15(uint16_t a, uint16_t b)
 {
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
+}
+
+/* strx_mul_q15 for the sample loop, where both are Q15 gains <= 32767: the same value without a divide */
+APSIS_INLINE uint16_t strx_gain_q15(uint16_t a, uint16_t b)
+{
+    return (uint16_t)apsis_div32767((uint32_t)a * b + APSIS_Q15_ONE / 2u);
 }
 
 static int32_t strx_div100_round(int32_t v)
@@ -427,7 +434,7 @@ APSIS_INLINE int16_t strx_triangle_q15(uint32_t phase)
     return (int16_t)(-32767 + (int32_t)(p - 49152u) * 2);
 }
 
-APSIS_INLINE int32_t strx_sat_q15(int64_t v)
+APSIS_INLINE int32_t strx_sat_q15(int32_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
@@ -502,9 +509,9 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
             filtered = raw;
         }
         env = strx_envelope(v);
-        gain = strx_mul_q15(v->peak_gain_q15, env);
+        gain = strx_gain_q15(v->peak_gain_q15, env);
         if (v->stealing)
-            gain = strx_mul_q15(gain, (uint16_t)v->steal_gain_q15);
+            gain = strx_gain_q15(gain, (uint16_t)v->steal_gain_q15);
         voiced = (filtered * (int32_t)gain) >> 15;              /* |filtered|, gain <= 32767 */
         out[n * 2u] += (voiced * (int32_t)v->mix_left_q15) >> 15;      /* 32767 * 65535 < 2^31 */
         out[n * 2u + 1u] += (voiced * (int32_t)v->mix_right_q15) >> 15;

@@ -18,15 +18,15 @@ static const uint32_t SPACE_LFO_INC[APSIS_SPACE_FDN_LINES] = {
     6915u, 8083u, 9447u, 10616u, 12369u, 13537u, 15290u, 17628u
 };
 
-static const int8_t SPACE_OUT_LEFT[APSIS_SPACE_FDN_LINES] = {
+static int8_t SPACE_OUT_LEFT[APSIS_SPACE_FDN_LINES] = {
     1, 1, -1, 1, -1, 1, 1, -1
 };
-static const int8_t SPACE_OUT_RIGHT[APSIS_SPACE_FDN_LINES] = {
+static int8_t SPACE_OUT_RIGHT[APSIS_SPACE_FDN_LINES] = {
     1, -1, 1, 1, 1, -1, 1, -1
 };
 
 /* 1-exp(-2*pi*(hz*.65)/44100), Q15, 2200..6800 Hz in 100 Hz steps. */
-static const uint16_t SPACE_DAMPING_ALPHA[47] = {
+static uint16_t SPACE_DAMPING_ALPHA[47] = {
     6040u,6286u,6530u,6772u,7012u,7249u,7484u,7717u,
     7948u,8177u,8404u,8628u,8851u,9071u,9290u,9506u,
     9721u,9933u,10144u,10352u,10559u,10763u,10966u,11167u,

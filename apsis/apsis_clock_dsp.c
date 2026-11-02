@@ -1,3 +1,4 @@
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_clock_dsp.h"
@@ -585,5 +586,5 @@ void apsis_clock_dsp_render(ApsisClockDsp *dsp, int32_t *out, uint32_t frames)
     for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i)
         if (dsp->voice[i].active) clock_voice_render(&dsp->voice[i], out, frames);
     for (i = 0u; i < frames * 2u; ++i)
-        out[i] = clock_sat_q15(out[i]);
+        out[i] = apsis_sat_q15(out[i]);
 }

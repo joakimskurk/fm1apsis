@@ -1,3 +1,4 @@
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_bloom_dsp.h"
@@ -18,12 +19,6 @@ static void bloom_dsp_zero(void *ptr, uint32_t n)
     while (n--) *p++ = 0u;
 }
 
-APSIS_INLINE int32_t bloom_sat_q15(int64_t v)
-{
-    if (v > 32767) return 32767;
-    if (v < -32767) return -32767;
-    return (int32_t)v;
-}
 
 APSIS_INLINE int32_t bloom_filter_state(int64_t v)
 {
@@ -525,7 +520,7 @@ void apsis_bloom_dsp_render(ApsisBloomDsp *dsp, int32_t *out,
     for (i = 0u; i < APSIS_BLOOM_DSP_PETAL_CAP; ++i)
         if (dsp->petal[i].active) bloom_petal_render(&dsp->petal[i], out, frames);
     for (i = 0u; i < frames * 2u; ++i)
-        out[i] = bloom_sat_q15(out[i]);
+        out[i] = apsis_sat_q15(out[i]);
 }
 
 uint16_t apsis_bloom_dsp_active(const ApsisBloomDsp *dsp)

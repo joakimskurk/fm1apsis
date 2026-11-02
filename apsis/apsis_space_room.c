@@ -17,10 +17,10 @@
 #define ROOM_TAIL_DAMP_MAX_HZ 6800u
 
 /* Study-126 early reflections in Q16 frames at 44.1 kHz. */
-static const uint32_t ROOM_EARLY_DELAY_Q16[APSIS_SPACE_EARLY_TAPS] = {
+static uint32_t ROOM_EARLY_DELAY_Q16[APSIS_SPACE_EARLY_TAPS] = {
     60692890u, 124275917u, 205199770u, 315024998u
 };
-static const int16_t ROOM_EARLY_GAIN_Q15[APSIS_SPACE_EARLY_TAPS] = {
+static int16_t ROOM_EARLY_GAIN_Q15[APSIS_SPACE_EARLY_TAPS] = {
     3277, 2458, 1704, 1180
 };
 
@@ -71,7 +71,7 @@ static const SpaceRoomBiquadCoeff ROOM_GUARD_LP[19] = {
 /* Static soft-knee compressor transfer for threshold -22 dB, knee 16 dB,
  * ratio 3.2:1. It approximates the WebAudio guard's safety transfer while the
  * 1.5-ms/110-ms gain smoothing below preserves its attack/release role. */
-static const uint16_t ROOM_COMP_GAIN_Q15[257] = {
+static uint16_t ROOM_COMP_GAIN_Q15[257] = {
 32767,32767,32767,32767,32767,32767,32767,32767,32767,32698,32495,32197,31833,31424,30983,30522,
 30048,29568,29086,28605,28128,27657,27192,26734,26286,25846,25416,24995,24583,24182,23789,23406,
 23032,22668,22312,21965,21626,21295,20973,20658,20351,20052,19759,19473,19194,18922,18656,18396,
@@ -279,7 +279,7 @@ APSIS_INLINE int32_t space_room_compressor(ApsisSpaceRoom *room, int32_t left,
 #define ROOM_FAST_TAIL_HP_LP_ALPHA_Q15 875u
 #define ROOM_FAST_ECHO_LP_ALPHA_Q15 14755u
 
-static const uint16_t ROOM_FAST_GUARD_LP_ALPHA[19] = {
+static uint16_t ROOM_FAST_GUARD_LP_ALPHA[19] = {
     13699u,13969u,14235u,14497u,14755u,15010u,15261u,
     15509u,15753u,15994u,16231u,16465u,16696u,16923u,
     17147u,17368u,17586u,17801u,18012u
