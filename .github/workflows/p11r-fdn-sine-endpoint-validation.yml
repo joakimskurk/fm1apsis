@@ -1,0 +1,170 @@
+name: APSIS Phase 11R production FDN sine endpoint-cache validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  p11r-production:
+    runs-on: ubuntu-24.04
+    env:
+      P11R_EVIDENCE: /tmp/p11r-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: fe8f9dc44a43ce427dab234934573b96108fe842
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11R_EVIDENCE"
+          mkdir -p "$P11R_EVIDENCE"
+          test "$(git rev-parse HEAD)" = 'fe8f9dc44a43ce427dab234934573b96108fe842'
+          git rev-parse HEAD | tee "$P11R_EVIDENCE/head.txt"
+
+      - name: Gate P11R.1 - actual production cache equals frozen P11O authority
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11r_fdn_sine_endpoint_cache_production_equivalence.c \
+            -o /tmp/test_p11r_fdn_sine_endpoint_cache
+          /tmp/test_p11r_fdn_sine_endpoint_cache \
+            | tee "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'P11R sizeof_line=28 sizeof_fdn=264' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'P11R top16 interpolation authority cases=65536' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'P11R transition authority cases=262144 incl_255_to_0=true' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'P11R cold blocks=256 frames=16384' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'P11R warm blocks=1024 frames=65536' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'random_blocks=4096' "$P11R_EVIDENCE/production-equivalence.log"
+          grep -q 'PASS: P11R production FDN sine endpoint cache is bit-identical' "$P11R_EVIDENCE/production-equivalence.log"
+
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            tests/test_p11r_fdn_sine_endpoint_cache_production_equivalence.c \
+            -o /tmp/test_p11r_fdn_sine_endpoint_cache_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11r_fdn_sine_endpoint_cache_san \
+            | tee "$P11R_EVIDENCE/production-equivalence-san.log"
+          grep -q 'PASS: P11R production FDN sine endpoint cache is bit-identical' "$P11R_EVIDENCE/production-equivalence-san.log"
+
+      - name: Gate P11R.2 - complete frozen historical host and sanitizer behavior
+        run: bash ci/p11f_prepare.sh
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11R.3 - exact real target matches P11Q projection
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11R_EVIDENCE/production-target.json"
+          cp build/SHA256SUMS "$P11R_EVIDENCE/production-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11R_EVIDENCE/production-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11R_EVIDENCE/production-disassembly.txt"
+          python3 - <<'PY' | tee "$P11R_EVIDENCE/production-target-check.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972','image':140472,'ram':87524,'pool':319176,
+              'ram_headroom':10780,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          symbols=inv.parse_symbols(Path('/tmp/p11r-evidence/production-symbols.txt').read_text(errors='replace'))
+          insns=inv.parse_disassembly(Path('/tmp/p11r-evidence/production-disassembly.txt').read_text(errors='replace'))
+          assert symbols.get('apsis_space_fdn_render') == 1098, symbols.get('apsis_space_fdn_render')
+          assert insns.get('apsis_space_fdn_render') == 366, insns.get('apsis_space_fdn_render')
+          assert symbols.get('space_sine_point') == 48, symbols.get('space_sine_point')
+          assert insns.get('space_sine_point') == 14, insns.get('space_sine_point')
+          print('PASS: P11R actual target exactly matches P11Q proved projection', r)
+          PY
+
+      - name: Gate P11R.4 - exact frozen idle emulator behavior
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11R_EVIDENCE/idle.log"
+          cp work/emu-smoke/report.json "$P11R_EVIDENCE/idle-report.json"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('work/emu-smoke/report.json'))
+          assert r['wav_raw_sha256'] == 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93', r
+          assert r['runtime_cursor_low32'] == 123392, r
+          assert r['runtime_queue_high_water'] == 28, r
+          assert r['runtime_queue_overflowed'] == 0, r
+          assert r['runtime_late_flags'] == 0, r
+          assert r['runtime_late_trace_hash'] == '811c9dc5', r
+          print('PASS: P11R exact frozen idle PCM/runtime')
+          PY
+
+      - name: Gate P11R.5 - active Motion lifecycle and target measurement
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11R_EVIDENCE/active-target.json"
+          cp build/SHA256SUMS "$P11R_EVIDENCE/active-SHA256SUMS"
+          python3 - <<'PY' | tee "$P11R_EVIDENCE/active-target-check.log"
+          import json
+          r=json.load(open('build/target_report.json'))
+          assert r['product'] == 'FM-1_972', r
+          assert r['ram'] == 87572, r
+          assert r['pool'] == 319176, r
+          assert r['ram_headroom'] == 10732, r
+          assert r['pool_headroom'] == 24888, r
+          assert r['package_bytes'] == 610110, r
+          print('P11R active target measured', r)
+          PY
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11R_EVIDENCE/active-motion.log"
+          cp work/emu-motion-active/report.json "$P11R_EVIDENCE/active-motion-report.json"
+          cp work/emu-motion-active/apsis-motion.wav "$P11R_EVIDENCE/active-motion.wav"
+
+      - name: Gate P11R.6 - production diff stays exact and narrow
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = 'e970aeaff9264c37188c7d3fbcad2960bad03a69'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'e5d93117d6bab1552532c6a7f6bd9af6758cab9f'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          grep -q 'int16_t lfo_sine_a_q15;' apsis/apsis_space_dsp.h
+          grep -q 'int16_t lfo_sine_b_q15;' apsis/apsis_space_dsp.h
+          grep -q 'old_phase = line->lfo_phase' apsis/apsis_space_dsp.c
+          ! grep -q 'static int16_t space_sine_q15' apsis/apsis_space_dsp.c
+          echo 'PASS: P11R changes only the exact proved sine endpoint-cache production path'
+
+      - name: Upload P11R evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11r-fdn-sine-endpoint-cache-evidence
+          path: /tmp/p11r-evidence
+          if-no-files-found: error

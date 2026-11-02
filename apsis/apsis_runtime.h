@@ -19,7 +19,10 @@
 #define APSIS_RUNTIME_MOTHER_COMMIT_LEAD_MS 26u
 #define APSIS_RUNTIME_CHAIN_APPLY_LEAD_MS 24u
 #define APSIS_RUNTIME_SPIRAL_SLOTS 64u
-#define APSIS_RUNTIME_BLOOM_SLOTS 64u
+/* P11F: P11E proved a tight legal maximum of 44 simultaneous Bloom slots.
+ * Keep four complete slots of structural reserve while removing duplicated
+ * runtime/audio-snapshot capacity that can never become reachable. */
+#define APSIS_RUNTIME_BLOOM_SLOTS 48u
 
 typedef struct {
     uint8_t active;

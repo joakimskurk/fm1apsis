@@ -1,0 +1,41 @@
+name: APSIS Phase 11B Motion storage proof
+
+# Historical proof gate. The authoritative green proof is run 41308160497 on
+# commit 0b9c197fc922eb76b37a5de3ac6f64a3ab3e511c. P11C changes the Motion
+# representation, so later heads must not reinterpret this pre-implementation
+# falsification test. Manual reruns check out the exact proven commit.
+on:
+  workflow_dispatch:
+
+jobs:
+  p11b-proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: 0b9c197fc922eb76b37a5de3ac6f64a3ab3e511c
+      - name: Gate P11B.1 - per-lane pitch-context equivalence proof
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_p11_motion_storage_proof.c \
+            -o /tmp/test_p11_motion_storage_proof
+          /tmp/test_p11_motion_storage_proof | tee /tmp/p11b-proof.txt
+      - name: Gate P11B.2 - proof under ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_p11_motion_storage_proof.c \
+            -o /tmp/test_p11_motion_storage_proof_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11_motion_storage_proof_san
+      - name: Upload P11B proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11b-motion-storage-proof
+          path: /tmp/p11b-proof.txt
+          if-no-files-found: error

@@ -1,0 +1,169 @@
+name: APSIS Phase 11W production FDN sine A+delta validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  p11w-production:
+    runs-on: ubuntu-24.04
+    env:
+      P11W_EVIDENCE: /tmp/p11w-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ac39372d8181c7fb27c9c25b55e825a5db53e10c
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11W_EVIDENCE"
+          mkdir -p "$P11W_EVIDENCE"
+
+      - name: Gate P11W.1 - committed production is byte-identical to proved P11V candidate
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ac39372d8181c7fb27c9c25b55e825a5db53e10c'
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '3bcd294dd9fb610df888ddd0517da7de3bf4c086'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ec221e22aeb6670ec628cbb0cc7c7eea91038554'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          mkdir -p /tmp/p11w-authority/apsis
+          git show fe8f9dc44a43ce427dab234934573b96108fe842:apsis/apsis_space_dsp.c > /tmp/p11w-authority/apsis/apsis_space_dsp.c
+          git show fe8f9dc44a43ce427dab234934573b96108fe842:apsis/apsis_space_dsp.h > /tmp/p11w-authority/apsis/apsis_space_dsp.h
+          (cd /tmp/p11w-authority && python3 "$GITHUB_WORKSPACE/ci/p11v_apply_sine_delta_candidate.py") \
+            | tee "$P11W_EVIDENCE/authority-regeneration.log"
+          cmp /tmp/p11w-authority/apsis/apsis_space_dsp.c apsis/apsis_space_dsp.c
+          cmp /tmp/p11w-authority/apsis/apsis_space_dsp.h apsis/apsis_space_dsp.h
+          echo 'PASS: committed P11W production source is byte-identical to exhaustive P11V candidate' \
+            | tee "$P11W_EVIDENCE/production-authority.log"
+
+      - name: Gate P11W.2 - complete historical host and sanitizer behavior
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh | tee "$P11W_EVIDENCE/historical-prepare.log"
+          cat > /tmp/p11w_size.c <<'EOF'
+          #include <stdio.h>
+          #include "apsis_space_dsp.h"
+          int main(void) {
+              printf("P11W sizeof_line=%zu sizeof_fdn=%zu\n",
+                     sizeof(ApsisSpaceFdnLine), sizeof(ApsisSpaceFdn));
+              return 0;
+          }
+          EOF
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis /tmp/p11w_size.c -o /tmp/p11w_size
+          /tmp/p11w_size | tee "$P11W_EVIDENCE/state-size.log"
+          grep -q 'P11W sizeof_line=28 sizeof_fdn=264' "$P11W_EVIDENCE/state-size.log"
+          echo 'PASS: P11W full historical behavior and state shape remain green'
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11W.3 - real JieLi target exactly matches proved P11V projection
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11W_EVIDENCE/production-target.json"
+          cp build/SHA256SUMS "$P11W_EVIDENCE/production-SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11W_EVIDENCE/production-symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11W_EVIDENCE/production-disassembly.txt"
+          python3 - <<'PY' | tee "$P11W_EVIDENCE/production-target-check.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972','image':140472,'ram':87524,'pool':319176,
+              'ram_headroom':10780,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          symbols=inv.parse_symbols(Path('/tmp/p11w-evidence/production-symbols.txt').read_text(errors='replace'))
+          insns=inv.parse_disassembly(Path('/tmp/p11w-evidence/production-disassembly.txt').read_text(errors='replace'))
+          assert symbols.get('apsis_space_fdn_render') == 1094, symbols.get('apsis_space_fdn_render')
+          assert insns.get('apsis_space_fdn_render') == 364, insns.get('apsis_space_fdn_render')
+          print('PASS: P11W actual production target exactly matches P11V projection', r)
+          PY
+
+      - name: Gate P11W.4 - exact frozen idle emulator behavior
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11W_EVIDENCE/idle.log"
+          cp work/emu-smoke/report.json "$P11W_EVIDENCE/idle-report.json"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('work/emu-smoke/report.json'))
+          assert r['wav_raw_sha256'] == 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93', r
+          assert r['runtime_cursor_low32'] == 123392, r
+          assert r['runtime_queue_high_water'] == 28, r
+          assert r['runtime_queue_overflowed'] == 0, r
+          assert r['runtime_late_flags'] == 0, r
+          assert r['runtime_late_trace_hash'] == '811c9dc5', r
+          print('PASS: P11W exact frozen idle PCM/runtime')
+          PY
+
+      - name: Gate P11W.5 - exact frozen active Motion lifecycle
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11W_EVIDENCE/active-target.json"
+          cp build/SHA256SUMS "$P11W_EVIDENCE/active-SHA256SUMS"
+          python3 - <<'PY' | tee "$P11W_EVIDENCE/active-target-check.log"
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972','image':137736,'ram':87572,'pool':319176,
+              'ram_headroom':10732,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'4685179ba074dfa090fc3a0603830d50c40cddae8dca97755f144cd0a885af63',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          print('PASS: P11W active target exactly frozen', r)
+          PY
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11W_EVIDENCE/active-motion.log"
+          cp work/emu-motion-active/report.json "$P11W_EVIDENCE/active-motion-report.json"
+          cp work/emu-motion-active/apsis-motion.wav "$P11W_EVIDENCE/active-motion.wav"
+
+      - name: Gate P11W.6 - production diff remains exactly scoped
+        run: |
+          set -euo pipefail
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '3bcd294dd9fb610df888ddd0517da7de3bf4c086'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ec221e22aeb6670ec628cbb0cc7c7eea91038554'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          grep -q 'lfo_sine_delta_q15' apsis/apsis_space_dsp.h
+          ! grep -q 'lfo_sine_b_q15' apsis/apsis_space_dsp.h
+          echo 'PASS: P11W production authority is exactly the proved A+delta representation change'
+
+      - name: Upload P11W evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11w-fdn-sine-delta-production-evidence
+          path: /tmp/p11w-evidence
+          if-no-files-found: error

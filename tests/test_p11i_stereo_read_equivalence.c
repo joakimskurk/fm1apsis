@@ -1,0 +1,211 @@
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Include the production implementation so its current static pair reader is
+ * directly testable in this translation unit. The reference below is the exact
+ * pre-P11I single-channel authority frozen by run 41343196262. */
+#include "../apsis/apsis_space_room.c"
+
+static int32_t p11i_reference_stereo_read(const int16_t *storage,
+                                          uint32_t capacity_frames,
+                                          uint32_t write_frame,
+                                          uint32_t fill_frames,
+                                          uint32_t delay_q16,
+                                          uint8_t channel)
+{
+    uint32_t needed, span_q16, write_q16, read_q16, i0, i1, frac;
+    int32_t a, b;
+    int64_t mixed;
+    if (!storage || !capacity_frames || channel > 1u) return 0;
+    needed = (delay_q16 + 65535u) >> 16;
+    if (!needed || fill_frames < needed) return 0;
+    span_q16 = capacity_frames << 16;
+    write_q16 = write_frame << 16;
+    if (write_q16 >= delay_q16) read_q16 = write_q16 - delay_q16;
+    else read_q16 = span_q16 - (delay_q16 - write_q16);
+    if (read_q16 >= span_q16) read_q16 -= span_q16;
+    i0 = read_q16 >> 16;
+    frac = read_q16 & 65535u;
+    i1 = i0 + 1u;
+    if (i1 >= capacity_frames) i1 = 0u;
+    a = storage[i0 * 2u + channel];
+    if (!frac) return a;
+    b = storage[i1 * 2u + channel];
+    mixed = (int64_t)a * (65536u - frac) + (int64_t)b * frac;
+    return (int32_t)(mixed >> 16);
+}
+
+static void check_case(const int16_t *storage,
+                       uint32_t capacity_frames,
+                       uint32_t write_frame,
+                       uint32_t fill_frames,
+                       uint32_t delay_q16,
+                       uint64_t *cases)
+{
+    const int32_t ref_left = p11i_reference_stereo_read(
+        storage, capacity_frames, write_frame, fill_frames, delay_q16, 0u);
+    const int32_t ref_right = p11i_reference_stereo_read(
+        storage, capacity_frames, write_frame, fill_frames, delay_q16, 1u);
+    const SpaceRoomStereoPair got = space_room_stereo_read_pair(
+        storage, capacity_frames, write_frame, fill_frames, delay_q16);
+
+    if (got.left != ref_left || got.right != ref_right) {
+        fprintf(stderr,
+                "FAIL cap=%u write=%u fill=%u delay=%u ref=%d/%d got=%d/%d\n",
+                capacity_frames, write_frame, fill_frames, delay_q16,
+                ref_left, ref_right, got.left, got.right);
+        abort();
+    }
+    (*cases)++;
+}
+
+static uint32_t lcg_next(uint32_t *state)
+{
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static void fill_pattern(int16_t *storage, uint32_t capacity_frames, uint32_t seed)
+{
+    uint32_t i;
+    uint32_t s = seed;
+    for (i = 0u; i < capacity_frames * 2u; ++i)
+        storage[i] = (int16_t)(lcg_next(&s) >> 16);
+    if (capacity_frames) {
+        storage[0] = INT16_MIN;
+        storage[1] = INT16_MAX;
+        storage[(capacity_frames - 1u) * 2u] = INT16_MAX;
+        storage[(capacity_frames - 1u) * 2u + 1u] = INT16_MIN;
+    }
+}
+
+static void check_write_boundary(const int16_t *storage,
+                                 uint32_t cap,
+                                 uint32_t write,
+                                 uint32_t fill,
+                                 uint64_t *cases)
+{
+    if (write) {
+        const uint32_t q = write << 16;
+        check_case(storage, cap, write, fill, q - 1u, cases);
+        check_case(storage, cap, write, fill, q, cases);
+        check_case(storage, cap, write, fill, q + 1u, cases);
+    } else {
+        check_case(storage, cap, write, fill, 1u, cases);
+        check_case(storage, cap, write, fill, 65535u, cases);
+        check_case(storage, cap, write, fill, 65536u, cases);
+    }
+}
+
+static void exhaustive_small_matrix(uint64_t *cases)
+{
+    static const uint32_t capacities[] = {1u, 2u, 3u, 4u, 7u, 16u};
+    static const uint32_t fracs[] = {
+        0u, 1u, 2u, 32767u, 32768u, 32769u, 65534u, 65535u
+    };
+    uint32_t c;
+
+    for (c = 0u; c < sizeof(capacities) / sizeof(capacities[0]); ++c) {
+        const uint32_t cap = capacities[c];
+        int16_t *storage = (int16_t *)malloc(sizeof(int16_t) * cap * 2u);
+        uint32_t write, fill, whole, f;
+        assert(storage != NULL);
+        fill_pattern(storage, cap, 0x13579bdfu ^ cap);
+
+        for (write = 0u; write < cap; ++write) {
+            for (fill = 0u; fill <= cap; ++fill) {
+                for (whole = 0u; whole <= cap + 1u; ++whole) {
+                    for (f = 0u; f < sizeof(fracs) / sizeof(fracs[0]); ++f) {
+                        const uint64_t q = ((uint64_t)whole << 16) + fracs[f];
+                        if (q <= UINT32_MAX)
+                            check_case(storage, cap, write, fill, (uint32_t)q, cases);
+                    }
+                }
+                check_write_boundary(storage, cap, write, fill, cases);
+            }
+        }
+        free(storage);
+    }
+}
+
+static void large_boundary_matrix(uint64_t *cases)
+{
+    static const uint32_t capacities[] = {63u, 257u, 512u};
+    static const uint32_t fracs[] = {
+        0u, 1u, 2u, 32767u, 32768u, 32769u, 65534u, 65535u
+    };
+    uint32_t c;
+
+    for (c = 0u; c < sizeof(capacities) / sizeof(capacities[0]); ++c) {
+        const uint32_t cap = capacities[c];
+        const uint32_t writes[] = {0u, 1u, cap / 2u, cap - 2u, cap - 1u};
+        const uint32_t fills[] = {0u, 1u, cap / 2u, cap - 1u, cap};
+        const uint32_t wholes[] = {0u, 1u, 2u, cap / 2u, cap - 1u, cap, cap + 1u};
+        int16_t *storage = (int16_t *)malloc(sizeof(int16_t) * cap * 2u);
+        uint32_t wi, fi, di, fr;
+        assert(storage != NULL);
+        fill_pattern(storage, cap, 0x2468ace0u ^ cap);
+
+        for (wi = 0u; wi < sizeof(writes) / sizeof(writes[0]); ++wi) {
+            const uint32_t write = writes[wi];
+            for (fi = 0u; fi < sizeof(fills) / sizeof(fills[0]); ++fi) {
+                const uint32_t fill = fills[fi];
+                for (di = 0u; di < sizeof(wholes) / sizeof(wholes[0]); ++di) {
+                    for (fr = 0u; fr < sizeof(fracs) / sizeof(fracs[0]); ++fr) {
+                        const uint32_t delay = (wholes[di] << 16) | fracs[fr];
+                        check_case(storage, cap, write, fill, delay, cases);
+                    }
+                }
+                check_write_boundary(storage, cap, write, fill, cases);
+            }
+        }
+        free(storage);
+    }
+}
+
+static void deterministic_random_matrix(uint64_t *cases)
+{
+    enum { MAX_CAP = 512, TRIALS = 100000 };
+    int16_t *storage = (int16_t *)malloc(sizeof(int16_t) * MAX_CAP * 2u);
+    uint32_t s = 0x41505349u;
+    uint32_t t;
+    assert(storage != NULL);
+    fill_pattern(storage, MAX_CAP, s);
+
+    for (t = 0u; t < TRIALS; ++t) {
+        const uint32_t cap = 1u + (lcg_next(&s) % MAX_CAP);
+        const uint32_t write = lcg_next(&s) % cap;
+        const uint32_t fill = lcg_next(&s) % (cap + 1u);
+        const uint32_t whole = lcg_next(&s) % (cap + 2u);
+        const uint32_t frac = lcg_next(&s) & 65535u;
+        const uint32_t delay = (whole << 16) | frac;
+
+        if ((t & 255u) == 0u)
+            fill_pattern(storage, MAX_CAP, lcg_next(&s));
+        storage[(lcg_next(&s) % cap) * 2u] = (int16_t)(lcg_next(&s) >> 16);
+        storage[(lcg_next(&s) % cap) * 2u + 1u] = (int16_t)(lcg_next(&s) >> 16);
+        check_case(storage, cap, write, fill, delay, cases);
+    }
+    free(storage);
+}
+
+int main(void)
+{
+    int16_t one_frame[2] = {INT16_MIN, INT16_MAX};
+    uint64_t cases = 0u;
+
+    check_case(NULL, 0u, 0u, 0u, 0u, &cases);
+    check_case(NULL, 0u, 0u, 0u, 1u, &cases);
+    check_case(one_frame, 0u, 0u, 0u, 65536u, &cases);
+
+    exhaustive_small_matrix(&cases);
+    large_boundary_matrix(&cases);
+    deterministic_random_matrix(&cases);
+
+    printf("P11I stereo-read equivalence cases=%llu\n", (unsigned long long)cases);
+    puts("PASS: P11I production stereo-pair reader is bit-identical to frozen single-channel authority");
+    return 0;
+}

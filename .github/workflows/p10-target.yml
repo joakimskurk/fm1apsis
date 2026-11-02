@@ -60,14 +60,19 @@ jobs:
               raise SystemExit(f"FAIL: P10 product {t.get('product')!r}")
           if t.get('ram', 0) > t.get('ram_max', 0):
               raise SystemExit(f"FAIL: P10 RAM {t.get('ram')}/{t.get('ram_max')}")
-          # Two 1200-point lanes: sizeof(point)=8, sizeof(lane)=9604,
-          # so the new dedicated NOLOAD section adds exactly 19,208 bytes.
-          expected_pool = 309532 + 19208
-          if t.get('pool') != expected_pool:
-              raise SystemExit(f"FAIL: P10 Motion POOL {t.get('pool')} != {expected_pool}")
+          # Phase 10 established the 328,740-byte POOL envelope: base 309,532
+          # plus the original 19,208-byte Motion store. Later phases may make
+          # that store smaller, but a historical regression gate must never
+          # permit POOL to grow beyond the Phase-10 envelope.
+          phase10_pool_ceiling = 309532 + 19208
+          if t.get('pool', 0) > phase10_pool_ceiling:
+              raise SystemExit(
+                  f"FAIL: P10 Motion POOL {t.get('pool')} exceeds Phase-10 ceiling "
+                  f"{phase10_pool_ceiling}"
+              )
           if t.get('pool', 0) > t.get('pool_max', 0):
               raise SystemExit(f"FAIL: P10 POOL {t.get('pool')}/{t.get('pool_max')}")
-          print(f"PASS: P10D2 target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
+          print(f"PASS: P10D2 target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')} ceiling={phase10_pool_ceiling}")
           PY
 
       - name: Gate P10D2.4 - inactive Motion preserves frozen Phase 9 audio/runtime

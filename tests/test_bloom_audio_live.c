@@ -64,7 +64,7 @@ static void test_native_runtime_is_bit_identical(void)
                                                 &bloom_audio, 0);
     }
 
-    assert(sizeof(ApsisRuntime) == 21928u);
+    assert(sizeof(ApsisRuntime) == 21032u);
     assert(memcmp(&ra, &rb, sizeof(ra)) == 0);
     assert(memcmp(&a, &b, sizeof(a)) == 0);
     assert(memcmp(&ka, &kb, sizeof(ka)) == 0);

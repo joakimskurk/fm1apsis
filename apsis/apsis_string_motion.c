@@ -156,17 +156,25 @@ static const ApsisStringMotionLane *p10_motion_lane_const(const ApsisStringMotio
     return side == APSIS_SIDE_LEFT ? &store->left : &store->right;
 }
 
+static void p10_motion_cache_invalidate(ApsisStringMotionRuntime *runtime,
+                                        uint8_t target)
+{
+    if (!runtime) return;
+    if (p10_motion_target_has(target, APSIS_SIDE_LEFT))
+        runtime->left_cache_hi = APSIS_STRING_MOTION_CACHE_INVALID;
+    if (p10_motion_target_has(target, APSIS_SIDE_RIGHT))
+        runtime->right_cache_hi = APSIS_STRING_MOTION_CACHE_INVALID;
+}
+
 static uint8_t p10_motion_lane_append(ApsisStringMotionLane *lane,
                                       uint16_t phase_q16,
-                                      uint16_t split_q15,
-                                      int32_t pitch_milli)
+                                      uint16_t split_q15)
 {
     ApsisStringMotionPoint *p;
     if (!lane) return 0u;
     if (lane->count) {
         p = &lane->point[lane->count - 1u];
-        if (p->phase_q16 == phase_q16 && p->split_q15 == split_q15 &&
-            p->pitch_milli == pitch_milli)
+        if (p->phase_q16 == phase_q16 && p->split_q15 == split_q15)
             return 0u;
     }
     if (lane->count >= APSIS_STRING_MOTION_POINTS_MAX) {
@@ -176,63 +184,57 @@ static uint8_t p10_motion_lane_append(ApsisStringMotionLane *lane,
         p = &lane->point[APSIS_STRING_MOTION_POINTS_MAX - 1u];
         p->phase_q16 = phase_q16;
         p->split_q15 = split_q15;
-        p->pitch_milli = pitch_milli;
         return 1u;
     }
     p = &lane->point[lane->count++];
     p->phase_q16 = phase_q16;
     p->split_q15 = split_q15;
-    p->pitch_milli = pitch_milli;
     return 1u;
 }
 
-static uint16_t p10_motion_split_sample(const ApsisStringMotionLane *lane,
-                                        uint16_t phase_q16,
-                                        uint16_t fallback)
+/* One linear segment lookup now supplies both split and pitch. Phase 10 used
+ * separate split/pitch searches, so P11C halves that scan work. Derived endpoint
+ * pitches are cached per lane and recomputed only when the selected segment
+ * changes; expensive quantization/tuning is therefore not added to every audio
+ * callback by the compact store. */
+static void p10_motion_lane_sample(const ApsisStringMotionLane *lane,
+                                   uint8_t side,
+                                   uint16_t phase_q16,
+                                   uint8_t continuous,
+                                   uint16_t fallback_split,
+                                   int32_t fallback_pitch,
+                                   uint16_t *cache_hi,
+                                   int32_t *cache_a_pitch,
+                                   int32_t *cache_b_pitch,
+                                   uint16_t *out_split,
+                                   int32_t *out_pitch)
 {
     uint16_t hi, i;
     const ApsisStringMotionPoint *a, *b;
     uint32_t span, pos;
-    int32_t delta;
-    if (!lane || !lane->count) return fallback;
-    if (lane->count == 1u) return lane->point[0].split_q15;
-    hi = lane->count;
-    for (i = 0u; i < lane->count; ++i) {
-        if (lane->point[i].phase_q16 >= phase_q16) { hi = i; break; }
-    }
-    if (hi == lane->count) {
-        a = &lane->point[lane->count - 1u];
-        b = &lane->point[0];
-        span = (uint32_t)(65535u - a->phase_q16) + b->phase_q16;
-        pos = (uint32_t)(phase_q16 - a->phase_q16);
-    } else if (hi == 0u) {
-        a = &lane->point[lane->count - 1u];
-        b = &lane->point[0];
-        span = (uint32_t)(65535u - a->phase_q16) + b->phase_q16;
-        pos = (uint32_t)phase_q16 + (65535u - a->phase_q16);
-    } else {
-        a = &lane->point[hi - 1u];
-        b = &lane->point[hi];
-        span = (uint32_t)b->phase_q16 - a->phase_q16;
-        pos = (uint32_t)phase_q16 - a->phase_q16;
-    }
-    if (!span) return b->split_q15;
-    delta = (int32_t)b->split_q15 - a->split_q15;
-    return (uint16_t)((int32_t)a->split_q15 +
-        (int32_t)(((int64_t)delta * pos + (int32_t)span / 2) / (int32_t)span));
-}
+    int32_t split_delta;
+    int64_t pitch_delta;
 
-static int32_t p10_motion_pitch_sample(const ApsisStringMotionLane *lane,
-                                       uint16_t phase_q16,
-                                       uint8_t continuous,
-                                       int32_t fallback)
-{
-    uint16_t hi, i;
-    const ApsisStringMotionPoint *a, *b;
-    uint32_t span, pos;
-    int64_t delta;
-    if (!lane || !lane->count) return fallback;
-    if (lane->count == 1u) return lane->point[0].pitch_milli;
+    if (!out_split || !out_pitch) return;
+    if (!lane || !lane->count) {
+        *out_split = fallback_split;
+        *out_pitch = fallback_pitch;
+        return;
+    }
+
+    if (lane->count == 1u) {
+        a = &lane->point[0];
+        if (*cache_hi != 0u) {
+            *cache_a_pitch = apsis_string_motion_pitch_for_split(&lane->pitch, side,
+                                                                  a->split_q15);
+            *cache_b_pitch = *cache_a_pitch;
+            *cache_hi = 0u;
+        }
+        *out_split = a->split_q15;
+        *out_pitch = *cache_a_pitch;
+        return;
+    }
+
     hi = lane->count;
     for (i = 0u; i < lane->count; ++i) {
         if (lane->point[i].phase_q16 >= phase_q16) { hi = i; break; }
@@ -253,10 +255,33 @@ static int32_t p10_motion_pitch_sample(const ApsisStringMotionLane *lane,
         span = (uint32_t)b->phase_q16 - a->phase_q16;
         pos = (uint32_t)phase_q16 - a->phase_q16;
     }
-    if (!continuous) return a->pitch_milli;
-    if (!span) return b->pitch_milli;
-    delta = (int64_t)b->pitch_milli - a->pitch_milli;
-    return a->pitch_milli + (int32_t)((delta * pos + (int32_t)span / 2) / (int32_t)span);
+
+    if (*cache_hi != hi) {
+        *cache_a_pitch = apsis_string_motion_pitch_for_split(&lane->pitch, side,
+                                                              a->split_q15);
+        *cache_b_pitch = apsis_string_motion_pitch_for_split(&lane->pitch, side,
+                                                              b->split_q15);
+        *cache_hi = hi;
+    }
+
+    if (!span) {
+        *out_split = b->split_q15;
+    } else {
+        split_delta = (int32_t)b->split_q15 - a->split_q15;
+        *out_split = (uint16_t)((int32_t)a->split_q15 +
+            (int32_t)(((int64_t)split_delta * pos + (int32_t)span / 2) /
+                      (int32_t)span));
+    }
+
+    if (!continuous) {
+        *out_pitch = *cache_a_pitch;
+    } else if (!span) {
+        *out_pitch = *cache_b_pitch;
+    } else {
+        pitch_delta = (int64_t)(*cache_b_pitch) - *cache_a_pitch;
+        *out_pitch = *cache_a_pitch +
+            (int32_t)((pitch_delta * pos + (int32_t)span / 2) / (int32_t)span);
+    }
 }
 
 void apsis_string_motion_reset(ApsisStringMotionStore *store,
@@ -266,6 +291,8 @@ void apsis_string_motion_reset(ApsisStringMotionStore *store,
     if (runtime) {
         p10_motion_zero(runtime, (uint32_t)sizeof(*runtime));
         runtime->record_target = APSIS_STRING_MOTION_TARGET_BOTH;
+        runtime->left_cache_hi = APSIS_STRING_MOTION_CACHE_INVALID;
+        runtime->right_cache_hi = APSIS_STRING_MOTION_CACHE_INVALID;
     }
 }
 
@@ -409,8 +436,15 @@ static void p10_motion_begin(ApsisStringMotionStore *store,
     state->string.motion_loop_pitch_continuous = state->string.quantize ? 0u : 1u;
     state->string.motion_loop_play = 0u;
     runtime->manual_override = 0u;
-    if (p10_motion_target_has(target, APSIS_SIDE_LEFT)) store->left.count = 0u;
-    if (p10_motion_target_has(target, APSIS_SIDE_RIGHT)) store->right.count = 0u;
+    if (p10_motion_target_has(target, APSIS_SIDE_LEFT)) {
+        store->left.pitch = runtime->pitch;
+        store->left.count = 0u;
+    }
+    if (p10_motion_target_has(target, APSIS_SIDE_RIGHT)) {
+        store->right.pitch = runtime->pitch;
+        store->right.count = 0u;
+    }
+    p10_motion_cache_invalidate(runtime, target);
     (void)apsis_string_motion_capture(store, runtime, state, when_sample, 1u);
 }
 
@@ -503,18 +537,12 @@ uint8_t apsis_string_motion_capture(ApsisStringMotionStore *store,
                                  total, now_sample, 1u);
     runtime->owned_left_q15 = state->string.left_split_q15;
     runtime->owned_right_q15 = state->string.right_split_q15;
-    if (p10_motion_target_has(runtime->record_target, APSIS_SIDE_LEFT)) {
-        changed |= p10_motion_lane_append(
-            &store->left, phase, state->string.left_split_q15,
-            apsis_string_motion_pitch_for_split(&runtime->pitch, APSIS_SIDE_LEFT,
-                                                state->string.left_split_q15));
-    }
-    if (p10_motion_target_has(runtime->record_target, APSIS_SIDE_RIGHT)) {
-        changed |= p10_motion_lane_append(
-            &store->right, phase, state->string.right_split_q15,
-            apsis_string_motion_pitch_for_split(&runtime->pitch, APSIS_SIDE_RIGHT,
-                                                state->string.right_split_q15));
-    }
+    if (p10_motion_target_has(runtime->record_target, APSIS_SIDE_LEFT))
+        changed |= p10_motion_lane_append(&store->left, phase,
+                                          state->string.left_split_q15);
+    if (p10_motion_target_has(runtime->record_target, APSIS_SIDE_RIGHT))
+        changed |= p10_motion_lane_append(&store->right, phase,
+                                          state->string.right_split_q15);
     return changed;
 }
 
@@ -537,7 +565,7 @@ void apsis_string_motion_manual_override(ApsisStringMotionRuntime *runtime,
 }
 
 uint8_t apsis_string_motion_playback(const ApsisStringMotionStore *store,
-                                     const ApsisStringMotionRuntime *runtime,
+                                     ApsisStringMotionRuntime *runtime,
                                      const ApsisState *state,
                                      uint64_t now_sample,
                                      ApsisStringMotionPlayback *out)
@@ -558,15 +586,18 @@ uint8_t apsis_string_motion_playback(const ApsisStringMotionStore *store,
     right_fallback = apsis_string_motion_pitch_for_split(&runtime->pitch, APSIS_SIDE_RIGHT,
                                                          state->string.right_split_q15);
     out->phase_q16 = phase;
-    out->left_split_q15 = p10_motion_split_sample(
-        p10_motion_lane_const(store, APSIS_SIDE_LEFT), phase, state->string.left_split_q15);
-    out->right_split_q15 = p10_motion_split_sample(
-        p10_motion_lane_const(store, APSIS_SIDE_RIGHT), phase, state->string.right_split_q15);
-    out->left_pitch_milli = p10_motion_pitch_sample(
-        p10_motion_lane_const(store, APSIS_SIDE_LEFT), phase,
-        state->string.motion_loop_pitch_continuous, left_fallback);
-    out->right_pitch_milli = p10_motion_pitch_sample(
-        p10_motion_lane_const(store, APSIS_SIDE_RIGHT), phase,
-        state->string.motion_loop_pitch_continuous, right_fallback);
+
+    p10_motion_lane_sample(
+        p10_motion_lane_const(store, APSIS_SIDE_LEFT), APSIS_SIDE_LEFT, phase,
+        state->string.motion_loop_pitch_continuous, state->string.left_split_q15,
+        left_fallback, &runtime->left_cache_hi,
+        &runtime->left_cache_a_pitch_milli, &runtime->left_cache_b_pitch_milli,
+        &out->left_split_q15, &out->left_pitch_milli);
+    p10_motion_lane_sample(
+        p10_motion_lane_const(store, APSIS_SIDE_RIGHT), APSIS_SIDE_RIGHT, phase,
+        state->string.motion_loop_pitch_continuous, state->string.right_split_q15,
+        right_fallback, &runtime->right_cache_hi,
+        &runtime->right_cache_a_pitch_milli, &runtime->right_cache_b_pitch_milli,
+        &out->right_split_q15, &out->right_pitch_milli);
     return 1u;
 }

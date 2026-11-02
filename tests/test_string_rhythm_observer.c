@@ -123,7 +123,7 @@ static void test_at_most_one_per_audio_block(void)
 
 int main(void)
 {
-    assert(sizeof(ApsisRuntime) == 21928u);
+    assert(sizeof(ApsisRuntime) == 21032u);
     test_exact_default_events();
     test_at_most_one_per_audio_block();
     puts("PASS: M4b shared-timeline String Rhythm observation without private scheduling");

@@ -1,0 +1,150 @@
+name: APSIS Phase 11H Cathedral dynamic workload census
+
+# Historical read-only workload gate. Authoritative green run 41341918347 on
+# ca20dd8608ae685349d483f68d72ce4022b90402. Manual reruns always check out
+# that proven technical head so later optimisation cannot reinterpret P11H.
+on:
+  workflow_dispatch:
+
+jobs:
+  p11h-cathedral-workload:
+    runs-on: ubuntu-24.04
+    env:
+      P11H_EVIDENCE: /tmp/p11h-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ca20dd8608ae685349d483f68d72ce4022b90402
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: Initialize evidence
+        run: |
+          rm -rf "$P11H_EVIDENCE"
+          mkdir -p "$P11H_EVIDENCE"
+
+      - name: Gate P11H.1 - frozen P11F host and sanitizer behavior
+        run: bash ci/p11f_prepare.sh
+
+      - name: Gate P11H.2 - deterministic dynamic Cathedral workload census
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/p11h-src
+          python3 ci/p11h_instrument_sources.py --out /tmp/p11h-src
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iapsis -Itests \
+            /tmp/p11h-src/apsis_space_dsp.c \
+            /tmp/p11h-src/apsis_space_room.c \
+            /tmp/p11h-src/apsis_space_target.c \
+            /tmp/p11h-src/apsis_transport.c \
+            tests/test_p11h_cathedral_workload.c \
+            -o /tmp/test_p11h_cathedral_workload
+          /tmp/test_p11h_cathedral_workload | tee "$P11H_EVIDENCE/cathedral_workload.log"
+          grep -q 'PASS: P11H deterministic dynamic workload census' \
+            "$P11H_EVIDENCE/cathedral_workload.log"
+          grep -q 'room_frames=16384' "$P11H_EVIDENCE/cathedral_workload.log"
+          grep -q 'schedule_calls=18' "$P11H_EVIDENCE/cathedral_workload.log"
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11H.3 - production target remains byte-exact P11F
+        run: |
+          set -euo pipefail
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11H_EVIDENCE/production-target.json"
+          cp build/SHA256SUMS "$P11H_EVIDENCE/production-SHA256SUMS"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 140408,
+              'image_max': 581564,
+              'ram': 87476,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'ram_headroom': 10828,
+              'pool_headroom': 24888,
+              'package_bytes': 610110,
+              'package_sha256': 'e0d0b826f0c2d5b8f1af781a9259b5d78dce9062939661ac7acad17bfefb78e5',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          print('PASS: P11H instrumentation is absent from exact production target')
+          PY
+
+      - name: Gate P11H.4 - exact frozen idle emulator behavior
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11H_EVIDENCE/idle.log"
+          cp work/emu-smoke/report.json "$P11H_EVIDENCE/idle-report.json"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('work/emu-smoke/report.json'))
+          assert r['wav_raw_sha256'] == 'c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93', r
+          assert r['runtime_cursor_low32'] == 123392, r
+          assert r['runtime_queue_high_water'] == 28, r
+          assert r['runtime_queue_overflowed'] == 0, r
+          assert r['runtime_late_flags'] == 0, r
+          assert r['runtime_late_trace_hash'] == '811c9dc5', r
+          print('PASS: P11H exact frozen idle PCM/runtime')
+          PY
+
+      - name: Gate P11H.5 - exact frozen active Motion lifecycle
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11H_EVIDENCE/active-target.json"
+          cp build/SHA256SUMS "$P11H_EVIDENCE/active-SHA256SUMS"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 137672,
+              'ram': 87524,
+              'pool': 319176,
+              'package_sha256': '6dc05756b22dfbf7a825b1877207209a2cd667f8f0223fa56f5603a933ffe86c',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          PY
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee "$P11H_EVIDENCE/active-motion.log"
+          cp work/emu-motion-active/report.json "$P11H_EVIDENCE/active-motion-report.json"
+          cp work/emu-motion-active/apsis-motion.wav "$P11H_EVIDENCE/active-motion.wav"
+
+      - name: Upload P11H evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11h-cathedral-workload-evidence
+          path: /tmp/p11h-evidence
+          if-no-files-found: error

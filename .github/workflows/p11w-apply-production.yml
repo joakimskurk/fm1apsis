@@ -1,0 +1,30 @@
+name: APSIS Phase 11W frozen production-patch verifier
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ac39372d8181c7fb27c9c25b55e825a5db53e10c
+      - name: Verify exact P11V candidate is already committed
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ac39372d8181c7fb27c9c25b55e825a5db53e10c'
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '3bcd294dd9fb610df888ddd0517da7de3bf4c086'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ec221e22aeb6670ec628cbb0cc7c7eea91038554'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          mkdir -p /tmp/p11w-authority/apsis
+          git show fe8f9dc44a43ce427dab234934573b96108fe842:apsis/apsis_space_dsp.c > /tmp/p11w-authority/apsis/apsis_space_dsp.c
+          git show fe8f9dc44a43ce427dab234934573b96108fe842:apsis/apsis_space_dsp.h > /tmp/p11w-authority/apsis/apsis_space_dsp.h
+          (cd /tmp/p11w-authority && python3 "$GITHUB_WORKSPACE/ci/p11v_apply_sine_delta_candidate.py")
+          cmp /tmp/p11w-authority/apsis/apsis_space_dsp.c apsis/apsis_space_dsp.c
+          cmp /tmp/p11w-authority/apsis/apsis_space_dsp.h apsis/apsis_space_dsp.h
+          echo 'PASS: frozen P11W technical head already contains exactly the proved P11V A+delta production patch'

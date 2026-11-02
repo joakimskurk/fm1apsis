@@ -66,15 +66,6 @@ static int16_t space_sine_point(uint8_t index)
     return (int16_t)-SPACE_SINE_QUARTER[64u - o];
 }
 
-static int16_t space_sine_q15(uint32_t phase)
-{
-    uint8_t i = (uint8_t)(phase >> 24);
-    uint8_t frac = (uint8_t)(phase >> 16);
-    int32_t a = space_sine_point(i);
-    int32_t b = space_sine_point((uint8_t)(i + 1u));
-    return (int16_t)(a + (((b - a) * frac) >> 8));
-}
-
 static uint16_t space_damping_alpha(uint16_t hz)
 {
     uint32_t index, frac, a, b;
@@ -119,14 +110,14 @@ static int32_t space_line_read(const ApsisSpaceFdn *fdn,
     const int16_t *base;
     if (!fdn || !line || !fdn->storage_bound) return 0;
     delay_q8 = (int32_t)line->base_delay * 256 + modulation_q8;
-    if (delay_q8 < 256) delay_q8 = 256;
-    needed = (uint32_t)(delay_q8 + 255) >> 8;
-    if (line->fill_count < needed) return 0;
+    if (line->fill_count < line->capacity) {
+        needed = (uint32_t)(delay_q8 + 255) >> 8;
+        if (line->fill_count < needed) return 0;
+    }
 
     span_q8 = (int32_t)line->capacity * 256;
     read_q8 = (int32_t)line->write_pos * 256 - delay_q8;
     if (read_q8 < 0) read_q8 += span_q8;
-    if (read_q8 >= span_q8) read_q8 -= span_q8;
     i0 = (uint32_t)read_q8 >> 8;
     frac = (uint32_t)read_q8 & 255u;
     i1 = i0 + 1u;
@@ -167,6 +158,8 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
     if (!fdn) return;
     fdn->post_left_q15 = 0;
     fdn->post_right_q15 = 0;
+    fdn->feedback_decay_ms = 0u;
+    fdn->feedback_cache_valid = 0u;
     for (i = 0u; i < APSIS_SPACE_FDN_LINES; ++i) {
         ApsisSpaceFdnLine *line = &fdn->line[i];
         line->offset = offset;
@@ -177,6 +170,13 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
         line->lfo_phase = (uint32_t)i * 0x20000000u;
         line->lfo_phase_inc = SPACE_LFO_INC[i];
         line->damping_state_q15 = 0;
+        {
+            uint8_t sine_i = (uint8_t)(line->lfo_phase >> 24);
+            int32_t sine_a = space_sine_point(sine_i);
+            int32_t sine_b = space_sine_point((uint8_t)(sine_i + 1u));
+            line->lfo_sine_a_q15 = (int16_t)sine_a;
+            line->lfo_sine_delta_q15 = (int16_t)(sine_b - sine_a);
+        }
         offset += line->capacity;
     }
     if (offset != APSIS_SPACE_FDN_STORAGE_SAMPLES) fdn->storage_bound = 0u;
@@ -189,14 +189,17 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
                             uint16_t decay_ms,
                             uint16_t damping_hz)
 {
-    uint16_t feedback_q15[APSIS_SPACE_FDN_LINES];
     uint16_t alpha;
     uint32_t frame;
     uint8_t k;
     if (!fdn || !fdn->storage_bound || !out_stereo) return;
     alpha = space_damping_alpha(damping_hz);
-    for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k)
-        feedback_q15[k] = space_feedback_gain(fdn->line[k].base_delay, decay_ms);
+    if (!fdn->feedback_cache_valid || fdn->feedback_decay_ms != decay_ms) {
+        for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k)
+            fdn->feedback_q15[k] = space_feedback_gain(fdn->line[k].base_delay, decay_ms);
+        fdn->feedback_decay_ms = decay_ms;
+        fdn->feedback_cache_valid = 1u;
+    }
 
     for (frame = 0u; frame < frames; ++frame) {
         int32_t mixed[APSIS_SPACE_FDN_LINES];
@@ -205,9 +208,23 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
 
         for (k = 0u; k < APSIS_SPACE_FDN_LINES; ++k) {
             ApsisSpaceFdnLine *line = &fdn->line[k];
+            uint32_t old_phase = line->lfo_phase;
             int32_t mod_q8, delayed;
+            int32_t sine_a, sine_delta;
+            uint8_t sine_i, sine_frac;
             line->lfo_phase += line->lfo_phase_inc;
-            mod_q8 = ((int32_t)space_sine_q15(line->lfo_phase) * SPACE_MOD_DEPTH_Q8) >> 15;
+            sine_i = (uint8_t)(line->lfo_phase >> 24);
+            if ((uint8_t)(old_phase >> 24) != sine_i) {
+                int32_t next_a = space_sine_point(sine_i);
+                int32_t next_b = space_sine_point((uint8_t)(sine_i + 1u));
+                line->lfo_sine_a_q15 = (int16_t)next_a;
+                line->lfo_sine_delta_q15 = (int16_t)(next_b - next_a);
+            }
+            sine_frac = (uint8_t)(line->lfo_phase >> 16);
+            sine_a = line->lfo_sine_a_q15;
+            sine_delta = line->lfo_sine_delta_q15;
+            mod_q8 = (int32_t)(int16_t)(sine_a + ((sine_delta * sine_frac) >> 8));
+            mod_q8 = (mod_q8 * SPACE_MOD_DEPTH_Q8) >> 15;
             delayed = space_line_read(fdn, line, mod_q8);
             line->damping_state_q15 += space_mul_q15(
                 delayed - line->damping_state_q15, alpha);
@@ -235,7 +252,7 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
             int32_t feedback = space_mul_q15(mixed[k], SPACE_HAD_NORM_Q15);
             int32_t excitation = space_mul_q15(input, (k & 1u) ? -SPACE_INPUT_Q15 : SPACE_INPUT_Q15);
             int32_t write_value;
-            feedback = space_mul_q15(feedback, feedback_q15[k]);
+            feedback = space_mul_q15(feedback, fdn->feedback_q15[k]);
             write_value = space_clamp_q15((int64_t)excitation + feedback);
             base[line->write_pos] = (int16_t)write_value;
             line->write_pos++;

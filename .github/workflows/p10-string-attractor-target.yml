@@ -60,14 +60,18 @@ jobs:
               raise SystemExit(f"FAIL: P10E product {t.get('product')!r}")
           if t.get('ram', 0) > t.get('ram_max', 0):
               raise SystemExit(f"FAIL: P10E RAM {t.get('ram')}/{t.get('ram_max')}")
-          # P10E is a control/session layer. The only Phase-10 POOL growth remains
-          # the already-frozen 19,208-byte P10D2 Motion store.
-          expected_pool = 309532 + 19208
-          if t.get('pool') != expected_pool:
-              raise SystemExit(f"FAIL: P10E POOL {t.get('pool')} != {expected_pool}")
+          # P10E adds no POOL beyond the Phase-10 Motion envelope. Later
+          # optimisation phases may shrink that envelope, so this historical
+          # gate enforces the original ceiling instead of stale equality.
+          phase10_pool_ceiling = 309532 + 19208
+          if t.get('pool', 0) > phase10_pool_ceiling:
+              raise SystemExit(
+                  f"FAIL: P10E POOL {t.get('pool')} exceeds Phase-10 ceiling "
+                  f"{phase10_pool_ceiling}"
+              )
           if t.get('pool', 0) > t.get('pool_max', 0):
               raise SystemExit(f"FAIL: P10E POOL {t.get('pool')}/{t.get('pool_max')}")
-          print(f"PASS: P10E target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
+          print(f"PASS: P10E target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')} ceiling={phase10_pool_ceiling}")
           PY
 
       - name: Gate P10E.7 - idle editor preserves frozen Phase 9 audio/runtime

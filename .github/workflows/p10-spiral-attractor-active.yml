@@ -60,12 +60,15 @@ jobs:
               raise SystemExit(f"FAIL: P10F active product {t.get('product')!r}")
           if t.get('ram', 0) > t.get('ram_max', 0):
               raise SystemExit(f"FAIL: P10F active RAM {t.get('ram')}/{t.get('ram_max')}")
-          expected_pool = 309532 + 19208
-          if t.get('pool') != expected_pool:
-              raise SystemExit(f"FAIL: P10F active POOL {t.get('pool')} != {expected_pool}")
+          phase10_pool_ceiling = 309532 + 19208
+          if t.get('pool', 0) > phase10_pool_ceiling:
+              raise SystemExit(
+                  f"FAIL: P10F active POOL {t.get('pool')} exceeds Phase-10 ceiling "
+                  f"{phase10_pool_ceiling}"
+              )
           if t.get('pool', 0) > t.get('pool_max', 0):
               raise SystemExit(f"FAIL: P10F active POOL {t.get('pool')}/{t.get('pool_max')}")
-          print(f"PASS: P10F active telemetry target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')}")
+          print(f"PASS: P10F active telemetry target fits image={t.get('image')}/{t.get('image_max')} RAM={t.get('ram')}/{t.get('ram_max')} POOL={t.get('pool')}/{t.get('pool_max')} ceiling={phase10_pool_ceiling}")
           PY
 
       - name: Gate P10F.11 - physical editor lifecycle in pinned emulator

@@ -1,0 +1,124 @@
+name: APSIS Phase 11P FDN LFO sine workload census
+
+on:
+  workflow_dispatch:
+
+jobs:
+  p11p-census:
+    runs-on: ubuntu-24.04
+    env:
+      P11P_EVIDENCE: /tmp/p11p-evidence
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 2afb819dd865385f7547811b6422e7a281c80b7e
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+      - name: Initialize evidence and prove production source is frozen
+        run: |
+          set -euo pipefail
+          rm -rf "$P11P_EVIDENCE"
+          mkdir -p "$P11P_EVIDENCE"
+          test "$(git rev-parse HEAD)" = '2afb819dd865385f7547811b6422e7a281c80b7e'
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = 'de554864167e410f69260a3d3720698b4ae456a7'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = '71afae3c4c52bbd735121597dfa7ad6cea4f32f5'
+          test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
+          git rev-parse HEAD | tee "$P11P_EVIDENCE/head.txt"
+          echo 'PASS: P11P historical census pinned to proven technical head; production Space blobs are exact P11O' \
+            | tee "$P11P_EVIDENCE/source-freeze.log"
+
+      - name: Gate P11P.1 - natural and exhaustive sine/LFO census
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11p_fdn_lfo_sine_census.c \
+            -o /tmp/test_p11p_fdn_lfo_sine_census
+          /tmp/test_p11p_fdn_lfo_sine_census | tee "$P11P_EVIDENCE/census.log"
+          grep -q 'P11P cold calls=131072 point_lookups=262144 frac_zero=535 frac_nonzero=130537 boundary_crossings=0 endpoint_refreshes=96 endpoint_reuses=130976 avoided_point_evals_if_cached=261952 distinct_index=96 distinct_frac=256' "$P11P_EVIDENCE/census.log"
+          grep -q 'P11P warm calls=524288 point_lookups=1048576 frac_zero=2050 frac_nonzero=522238 boundary_crossings=6944 endpoint_refreshes=367 endpoint_reuses=523921 avoided_point_evals_if_cached=1047842 distinct_index=255 distinct_frac=256' "$P11P_EVIDENCE/census.log"
+          grep -q 'P11P combined calls=655360 endpoint_refreshes=463 endpoint_reuses=654897 avoided_point_evals_if_cached=1309794' "$P11P_EVIDENCE/census.log"
+          grep -q 'P11P exhaustive calls=65536 point_lookups=131072 frac_zero=256 frac_nonzero=65280 boundary_crossings=1024 distinct_index=256 distinct_frac=256 equal_pairs=0' "$P11P_EVIDENCE/census.log"
+          grep -q 'PASS: P11P FDN LFO/sine workload census' "$P11P_EVIDENCE/census.log"
+
+      - name: Gate P11P.2 - sanitizer census
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            tests/test_p11p_fdn_lfo_sine_census.c \
+            -o /tmp/test_p11p_fdn_lfo_sine_census_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11p_fdn_lfo_sine_census_san \
+            | tee "$P11P_EVIDENCE/census-san.log"
+          grep -q 'PASS: P11P FDN LFO/sine workload census' "$P11P_EVIDENCE/census-san.log"
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11P.3 - frozen P11O real-target authority and code shape
+        run: |
+          set -euo pipefail
+          bash ci/p11f_prepare.sh
+          bash ci/apply_apsis_p10g.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json "$P11P_EVIDENCE/target-report.json"
+          cp build/SHA256SUMS "$P11P_EVIDENCE/SHA256SUMS"
+          ELF=work/apsis/build/dinghy.elf
+          OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
+          "$OBJDUMP" -t "$ELF" > "$P11P_EVIDENCE/symbols.txt"
+          "$OBJDUMP" -d "$ELF" > "$P11P_EVIDENCE/disassembly.txt"
+          python3 - <<'PY' | tee "$P11P_EVIDENCE/target-code-shape.log"
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          import p11_workload_inventory as inv
+          r=json.load(open('build/target_report.json'))
+          expected={
+              'product':'FM-1_972','image':140440,'ram':87492,'pool':319176,
+              'ram_headroom':10812,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          symbols=inv.parse_symbols(Path('/tmp/p11p-evidence/symbols.txt').read_text(errors='replace'))
+          insns=inv.parse_disassembly(Path('/tmp/p11p-evidence/disassembly.txt').read_text(errors='replace'))
+          assert symbols.get('apsis_space_fdn_render') == 1114, symbols.get('apsis_space_fdn_render')
+          assert insns.get('apsis_space_fdn_render') == 374, insns.get('apsis_space_fdn_render')
+          assert symbols.get('space_sine_q15') is None
+          assert insns.get('space_sine_q15') is None
+          assert symbols.get('space_sine_point') == 48, symbols.get('space_sine_point')
+          assert insns.get('space_sine_point') == 14, insns.get('space_sine_point')
+          print('P11P target render_bytes=1114 render_static_insns=374')
+          print('P11P target space_sine_q15 fully_inlined=true')
+          print('P11P target space_sine_point_symbol_bytes=48')
+          print('P11P target space_sine_point_static_insns=14')
+          print('PASS: P11P frozen P11O target/package and code shape')
+          PY
+
+      - name: Upload P11P evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11p-fdn-lfo-sine-census-evidence
+          path: /tmp/p11p-evidence
+          if-no-files-found: error

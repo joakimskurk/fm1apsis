@@ -1,0 +1,44 @@
+name: APSIS Phase 11K FDN feedback-cache equivalence proof
+
+on:
+  workflow_dispatch:
+
+jobs:
+  p11k-proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ffb436dd87247af23c37e7e533cfd87fc2d161d0
+      - name: Gate P11K.1 - cached render equals always-recomputed authority
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'ffb436dd87247af23c37e7e533cfd87fc2d161d0'
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            tests/test_p11k_fdn_feedback_cache_equivalence.c \
+            -o /tmp/test_p11k_fdn_feedback_cache_equivalence
+          /tmp/test_p11k_fdn_feedback_cache_equivalence | tee /tmp/p11k-proof.log
+          grep -q 'PASS: P11K cached FDN feedback gains are bit-identical' /tmp/p11k-proof.log
+          grep -q 'projected_cache_size_host=20' /tmp/p11k-proof.log
+          grep -q 'steady blocks=256 frames=16384 recompute_blocks=1 gain_evals=8' /tmp/p11k-proof.log
+          grep -q 'sweep changes=192 recompute_blocks=193 gain_evals=1544' /tmp/p11k-proof.log
+          grep -q 'adversarial recompute_blocks=256 gain_evals=2048' /tmp/p11k-proof.log
+          grep -q 'all_keys blocks=16002 recompute_blocks=8001 gain_evals=64008' /tmp/p11k-proof.log
+      - name: Gate P11K.2 - equivalence under ASAN and UBSAN
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            tests/test_p11k_fdn_feedback_cache_equivalence.c \
+            -o /tmp/test_p11k_fdn_feedback_cache_equivalence_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11k_fdn_feedback_cache_equivalence_san | tee /tmp/p11k-proof-san.log
+          grep -q 'PASS: P11K cached FDN feedback gains are bit-identical' /tmp/p11k-proof-san.log
+      - name: Gate P11K.3 - production FDN sources remain exact P11I/P11J authority
+        run: |
+          set -euo pipefail
+          test "$(git hash-object apsis/apsis_space_dsp.c)" = '72210e122b68bff77c56805618b2703d363a25ef'
+          test "$(git hash-object apsis/apsis_space_dsp.h)" = 'ae843d3289a8ff839cfe061861311a5620ab839a'
+          echo 'PASS: P11K proof has not modified production FDN source or state layout'

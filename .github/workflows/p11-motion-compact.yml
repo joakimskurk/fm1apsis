@@ -1,0 +1,165 @@
+name: APSIS Phase 11C compact Motion store
+
+# Historical optimisation gate. Authoritative exact-head green run 41318100472
+# on 7ce6993065186aa66c89bc723ba3edfa95448596. Manual reruns check out that
+# exact evidence-retention head so later P11 work cannot redefine P11C.
+on:
+  workflow_dispatch:
+
+jobs:
+  p11c-compact-motion:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: 7ce6993065186aa66c89bc723ba3edfa95448596
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Python packages
+        run: python3 -m pip install Pillow
+
+      - name: Gate P11C.1 - compact Motion source contract
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_string_motion.c -o /tmp/test_string_motion
+          /tmp/test_string_motion
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_p11_motion_compact.c -o /tmp/test_p11_motion_compact
+          /tmp/test_p11_motion_compact
+
+      - name: Gate P11C.2 - source contract under ASAN/UBSAN
+        run: |
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_string_motion.c -o /tmp/test_string_motion_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_string_motion_san
+          cc -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_motion.c \
+            tests/test_p11_motion_compact.c -o /tmp/test_p11_motion_compact_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+            /tmp/test_p11_motion_compact_san
+
+      - name: Gate P11C.3 - persistent DSP override remains unchanged
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iapsis \
+            apsis/apsis_state.c apsis/apsis_harmony.c apsis/apsis_gravity.c \
+            apsis/apsis_string.c apsis/apsis_string_dsp.c apsis/apsis_drift.c \
+            apsis/apsis_string_motion.c apsis/apsis_string_motion_dsp.c \
+            tests/test_string_motion_dsp.c -o /tmp/test_string_motion_dsp
+          /tmp/test_string_motion_dsp
+
+      - name: JieLi Linux toolchain
+        run: |
+          mkdir -p ~/.jieli
+          curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+          TC="$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)"
+          ln -sfn "$(basename "$TC")" ~/.jieli/toolchain
+          echo "JIELI_TOOLCHAIN=$HOME/.jieli/toolchain" >> "$GITHUB_ENV"
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+              https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK
+            sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+          echo "AC79_SDK=$HOME/fw-AC79_AIoT_SDK" >> "$GITHUB_ENV"
+
+      - name: Gate P11C.4 - pinned historical regressions
+        run: bash ci/prepare_dinghy.sh
+
+      - name: Gate P11C.5 - final stacked Phase-10 target with compact Motion
+        run: bash ci/apply_apsis_p10g.sh
+
+      - name: Gate P11C.6 - real JieLi build and exact production resource gain
+        run: |
+          bash ci/build_apsis_target.sh
+          rm -rf /tmp/p11c-evidence
+          mkdir -p /tmp/p11c-evidence
+          cp build/target_report.json /tmp/p11c-evidence/p11c-production-target.json
+          cp build/SHA256SUMS /tmp/p11c-evidence/p11c-production-SHA256SUMS
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 140408,
+              'image_max': 581564,
+              'ram': 89716,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'package_bytes': 610110,
+              'package_sha256': 'e10c01525a808a4dea18d6b3f8777307bf4acf180c2cf958bebc4e1546b0d0be',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert r['pool_headroom'] == 24888, r
+          assert r['ram_headroom'] == 8588, r
+          print('P11C production resources', r)
+          PY
+
+      - name: Gate P11C.7 - exact frozen inactive emulator baseline
+        run: |
+          set -euo pipefail
+          APSIS_EMU_DYNAMIC_HOME=1 \
+          APSIS_EMU_EXPECT_CURSOR=123392 \
+            bash ci/emulator_smoke.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee /tmp/p11c-evidence/p11c-idle.log
+          cp work/emu-smoke/report.json /tmp/p11c-evidence/p11c-idle-report.json
+
+      - name: Gate P11C.8 - regenerate exact active Motion telemetry target
+        run: |
+          bash ci/prepare_dinghy.sh
+          bash ci/apply_apsis_p10d3_probe.sh
+          bash ci/build_apsis_target.sh
+          cp build/target_report.json /tmp/p11c-evidence/p11c-active-target.json
+          cp build/SHA256SUMS /tmp/p11c-evidence/p11c-active-SHA256SUMS
+          python3 - <<'PY'
+          import json
+          r=json.load(open('build/target_report.json'))
+          expected = {
+              'product': 'FM-1_972',
+              'image': 137672,
+              'image_max': 581564,
+              'ram': 89764,
+              'ram_max': 98304,
+              'pool': 319176,
+              'pool_max': 344064,
+              'package_bytes': 610110,
+              'package_sha256': 'd6e2d264d13d82c9cf93bce96f1d3b6666c6429cd5894fcf92db884b412bcb0e',
+          }
+          for k,v in expected.items():
+              assert r[k] == v, (k, r[k], v, r)
+          assert r['pool_headroom'] == 24888, r
+          assert r['ram_headroom'] == 8540, r
+          print('P11C active resources', r)
+          PY
+
+      - name: Gate P11C.9 - frozen active Motion lifecycle
+        run: |
+          set -euo pipefail
+          bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
+            | tee /tmp/p11c-evidence/p11c-active.log
+          cp work/emu-motion-active/report.json /tmp/p11c-evidence/p11c-active-report.json
+          cp work/emu-motion-active/apsis-motion.wav /tmp/p11c-evidence/p11c-active.wav
+
+      - name: Upload complete P11C evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p11c-compact-motion-evidence
+          path: /tmp/p11c-evidence
+          if-no-files-found: warn
