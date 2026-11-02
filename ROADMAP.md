@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11S are complete; P11R remains the accepted production baseline and P11T is authorized as proof-only for the structurally safe Q15 multiply sites.**
+Status: **[~] active on `p11-optimization`. P11A–P11T are complete; P11R remains the accepted production baseline. The P11T selective narrow-Q15 candidate is rejected for production; P11U returns to measurement-only residual FDN inventory.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -487,6 +487,41 @@ Status: **[x] complete, frozen measurement phase. Production Space remains exact
 
 Decision: authorize P11T **proof only** for a selective 32-bit exact Q15 helper at alpha/output/cross/excitation sites only. Hadamard normalization and feedback must stay on the wide helper. Preserve exact rounding/right-shift semantics; production remains P11R until proof, historical behavior and ephemeral target projection all pass.
 
+### P11T — selective FDN Q15 narrow-helper proof
+
+Status: **[x] complete, exact proof + ephemeral target projection frozen; candidate rejected for production. Production remains P11R.**
+
+- [x] narrow helper restricted to the P11S-safe alpha/output/cross/excitation families = **24/40 dynamic calls per room frame**
+- [x] Hadamard normalization + feedback remain on the frozen wide helper = **16/40 calls per frame**
+- [x] helper boundary matrix: alpha **35**, output **7**, cross **14**, excitation **14** cases
+- [x] **1,000,000** deterministic randomized helper comparisons, all bit-identical
+- [x] complete-FDN comparison **6,311 blocks / 340,682 frames** across cold, warm, legal sweep, randomized/reset and adversarial full-scale trajectories
+- [x] complete stereo output, state and delay storage bit-identical after every block
+- [x] optimized + ASAN/UBSAN proof PASS
+- [x] complete historical host + sanitizer behavior PASS with ephemeral candidate
+- [x] exact P11R target regenerated before projection: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, render **1,098 B / 366** static instruction lines
+- [x] candidate target image **140,552 B** (**+80 B**), RAM **87,524 B** (**0 B**), POOL **319,176 B** (**0 B**)
+- [x] candidate FDN render **1,166 B / 410** static instruction lines = **+68 B / +44 lines**
+- [x] candidate package SHA-256 `e466515629a7be86f49de2db5bc9eb81d887025c32fafc235b2834e4a57df15c`
+- [x] authoritative run `41383730919` on technical head `a1907d5389de36ba094d86e2a74a6af729327651`
+- [x] evidence artifact ID `13114376798`; ZIP SHA-256 `cfbf81487f4d5c7ffd6c6093baed7ae8a0f04a779bb8a43d82e73ff786169ed4`
+- [x] committed production Space remained exact P11R throughout
+
+Decision: **reject production validation for the P11T candidate.** The candidate is exact, but every changed static target proxy moves in the wrong direction: +80 B image, +68 B render size, +44 render instruction lines, with no RAM/POOL saving. Physical cycle timing is unavailable, so speculative 32-bit execution-speed benefit cannot override the measured target regression. Do not create a production-validation phase for this candidate.
+
+### P11U — post-P11R residual FDN workload/code-shape inventory
+
+Status: **[ ] next. Measurement only; no production patch authorized.**
+
+- [ ] re-rank the remaining per-room-frame FDN work after the accepted P11L/P11O/P11R optimizations
+- [ ] quantify residual dynamic families without assuming another arithmetic rewrite: line reads/writes, sine refresh/interpolation, damping/output/cross multiplies, Hadamard transform, wide normalization/feedback multiplies and clamp/write work
+- [ ] pair dynamic counts with the exact P11R JieLi symbol/disassembly shape and out-of-line call structure
+- [ ] identify which work is already structurally irreducible or previously vetoed, including the P11S/P11T wide/narrow result
+- [ ] keep production Space byte-identical to P11R and regenerate the exact P11R package
+- [ ] authorize a later proof candidate only if the residual inventory exposes a narrow repeated computation with a plausible non-regressive target shape
+
+P11U deliberately resets candidate selection after the rejected P11T projection. It is a residual workload inventory, not a mandate to continue optimizing Q15 arithmetic.
+
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
 - [ ] UI redraw/DMA optimization only if later measurement justifies it
@@ -509,4 +544,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11S measurement state to `p11-optimization`, then create one P11T proof branch. Prove a selective signed-32 Q15 helper only for alpha/output/cross/excitation (24/40 calls per FDN room frame), keep Hadamard normalization + feedback on the frozen wide helper, and use an ephemeral real-target projection before any production authorization.
+Promote frozen P11T proof/rejection state to `p11-optimization`, then create one P11U measurement branch. Re-inventory the residual P11R FDN hot path and exact JieLi code shape without changing production DSP; only a newly measured, non-vetoed repeated-work candidate may advance to proof.
