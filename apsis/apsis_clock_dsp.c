@@ -312,6 +312,9 @@ static void clock_voice_common(ApsisClockDspVoice *v,
     v->pitch_mul_q31 = clock_pitch_mul(v->phase_inc, v->end_phase_inc, pitch_ramp_samples);
     v->peak_gain_q23 = (uint32_t)peak_gain_q15 << 8;
     v->gain_q23 = 0u;
+    v->attack_step_q23 = v->peak_gain_q23 / v->attack_samples;
+    v->attack_step_rem = v->peak_gain_q23 % v->attack_samples;
+    v->attack_rem = 0u;
     decay_samples = decay_end_samples > v->attack_samples
         ? decay_end_samples - v->attack_samples : 1u;
     v->decay_mul_q31 = clock_decay_mul(v->peak_gain_q23, decay_samples);
@@ -555,69 +558,78 @@ uint8_t apsis_clock_dsp_trigger_event(ApsisClockDsp *dsp, const ApsisState *s,
     }
 }
 
-void apsis_clock_dsp_render(ApsisClockDsp *dsp, int32_t *out, uint32_t frames)
+/* One voice over the whole block, added into out unsaturated; the caller saturates once (voices touch only their
+ * own state: bit for bit the old sample-outer loop). The attack ramp peak * (n + 1) / attack advances by a
+ * quotient and a remainder instead of a 64-bit divide a sample: the same floor, exactly. */
+static void clock_voice_render(ApsisClockDspVoice *v, int32_t *out, uint32_t frames)
 {
     uint32_t f;
-    if (!dsp || !out || !frames) return;
     for (f = 0u; f < frames; ++f) {
-        int64_t sum_l = 0, sum_r = 0;
-        uint8_t i;
-        for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i) {
-            ApsisClockDspVoice *v = &dsp->voice[i];
-            int32_t wave, sample;
-            uint32_t gain;
-            if (!v->active) continue;
-            if (v->delay_samples) {
-                v->delay_samples--;
-                continue;
-            }
-            if (v->age_samples >= v->life_samples) {
-                v->active = 0u;
-                continue;
-            }
-
-            if (v->waveform == APSIS_CLOCK_DSP_NOISE) {
-                wave = (int16_t)(clock_noise_next(&v->noise_state) >> 16);
-            } else if (v->waveform == APSIS_CLOCK_DSP_TRIANGLE) {
-                wave = clock_triangle_q15(v->phase);
-            } else if (v->waveform == APSIS_CLOCK_DSP_SQUARE) {
-                wave = (v->phase & 0x80000000u) ? -32767 : 32767;
-            } else {
-                wave = clock_sine_q15(v->phase);
-            }
-            if (v->filter_count > 0u) wave = clock_biquad_process(&v->filter[0], wave);
-            if (v->filter_count > 1u) wave = clock_biquad_process(&v->filter[1], wave);
-
-            if (v->age_samples < v->attack_samples) {
-                gain = (uint32_t)(((uint64_t)v->peak_gain_q23 *
-                                   (v->age_samples + 1u)) / v->attack_samples);
-                v->gain_q23 = gain;
-            } else if (v->age_samples == v->attack_samples) {
-                v->gain_q23 = v->peak_gain_q23;
-                gain = v->gain_q23;
-            } else if (v->age_samples < v->decay_end_samples) {
-                v->gain_q23 = clock_mul_q31(v->gain_q23, v->decay_mul_q31);
-                gain = v->gain_q23;
-            } else {
-                gain = 0u;
-            }
-
-            sample = (int32_t)(((int64_t)wave * (int64_t)gain) >> 23);
-            sum_l += ((int64_t)sample * v->mix_left_q15) >> 15;
-            sum_r += ((int64_t)sample * v->mix_right_q15) >> 15;
-
-            if (v->waveform != APSIS_CLOCK_DSP_NOISE) {
-                v->phase += v->phase_inc;
-                if (v->pitch_ramp_samples && v->age_samples < v->pitch_ramp_samples) {
-                    v->phase_inc = clock_mul_q31(v->phase_inc, v->pitch_mul_q31);
-                    if (v->age_samples + 1u >= v->pitch_ramp_samples)
-                        v->phase_inc = v->end_phase_inc;
-                }
-            }
-            v->age_samples++;
-            if (v->age_samples >= v->life_samples) v->active = 0u;
+        int32_t wave, sample;
+        uint32_t gain;
+        if (!v->active) return;
+        if (v->delay_samples) {
+            v->delay_samples--;
+            continue;
         }
-        out[f * 2u] = clock_sat_q15((int64_t)out[f * 2u] + sum_l);
-        out[f * 2u + 1u] = clock_sat_q15((int64_t)out[f * 2u + 1u] + sum_r);
+        if (v->age_samples >= v->life_samples) {
+            v->active = 0u;
+            return;
+        }
+
+        if (v->waveform == APSIS_CLOCK_DSP_NOISE) {
+            wave = (int16_t)(clock_noise_next(&v->noise_state) >> 16);
+        } else if (v->waveform == APSIS_CLOCK_DSP_TRIANGLE) {
+            wave = clock_triangle_q15(v->phase);
+        } else if (v->waveform == APSIS_CLOCK_DSP_SQUARE) {
+            wave = (v->phase & 0x80000000u) ? -32767 : 32767;
+        } else {
+            wave = clock_sine_q15(v->phase);
+        }
+        if (v->filter_count > 0u) wave = clock_biquad_process(&v->filter[0], wave);
+        if (v->filter_count > 1u) wave = clock_biquad_process(&v->filter[1], wave);
+
+        if (v->age_samples < v->attack_samples) {
+            v->gain_q23 += v->attack_step_q23;
+            v->attack_rem += v->attack_step_rem;
+            if (v->attack_rem >= v->attack_samples) {
+                v->gain_q23++;
+                v->attack_rem -= v->attack_samples;
+            }
+            gain = v->gain_q23;
+        } else if (v->age_samples == v->attack_samples) {
+            v->gain_q23 = v->peak_gain_q23;
+            gain = v->gain_q23;
+        } else if (v->age_samples < v->decay_end_samples) {
+            v->gain_q23 = clock_mul_q31(v->gain_q23, v->decay_mul_q31);
+            gain = v->gain_q23;
+        } else {
+            gain = 0u;
+        }
+
+        sample = (int32_t)(((int64_t)wave * (int64_t)gain) >> 23);
+        out[f * 2u] += (int32_t)(((int64_t)sample * v->mix_left_q15) >> 15);
+        out[f * 2u + 1u] += (int32_t)(((int64_t)sample * v->mix_right_q15) >> 15);
+
+        if (v->waveform != APSIS_CLOCK_DSP_NOISE) {
+            v->phase += v->phase_inc;
+            if (v->pitch_ramp_samples && v->age_samples < v->pitch_ramp_samples) {
+                v->phase_inc = clock_mul_q31(v->phase_inc, v->pitch_mul_q31);
+                if (v->age_samples + 1u >= v->pitch_ramp_samples)
+                    v->phase_inc = v->end_phase_inc;
+            }
+        }
+        v->age_samples++;
+        if (v->age_samples >= v->life_samples) v->active = 0u;
     }
+}
+
+void apsis_clock_dsp_render(ApsisClockDsp *dsp, int32_t *out, uint32_t frames)
+{
+    uint32_t i;
+    if (!dsp || !out || !frames) return;
+    for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i)
+        if (dsp->voice[i].active) clock_voice_render(&dsp->voice[i], out, frames);
+    for (i = 0u; i < frames * 2u; ++i)
+        out[i] = clock_sat_q15(out[i]);
 }

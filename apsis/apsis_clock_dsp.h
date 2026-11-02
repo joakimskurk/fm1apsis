@@ -43,6 +43,9 @@ typedef struct {
     uint32_t pitch_mul_q31;
     uint32_t peak_gain_q23;
     uint32_t gain_q23;
+    uint32_t attack_step_q23;   /* the attack ramp peak * (n + 1) / attack, kept as quotient + remainder */
+    uint32_t attack_step_rem;
+    uint32_t attack_rem;
     uint32_t decay_mul_q31;
     uint16_t mix_left_q15;
     uint16_t mix_right_q15;
