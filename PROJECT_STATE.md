@@ -4,53 +4,40 @@ Last updated: 2026-11-02
 
 ## Where we are
 
-**v2 restructure** (branch `v2`): the firmware is now real source on Dinghy 0.4 instead of Dinghy 0.3 plus a
-chain of fifteen CI patch scripts. Phases 0-11 (`docs/history/`) built the musical core, the sources, the room,
-persistence, the surfaces and the controls; v2 keeps all of that and replaces how it is assembled, tested and
-measured.
+**v2.1, branch `v2.1-cpu`:** the String is Study 98's (one string), and the audio fits on the emulator's cycle
+model. Not merged to `main` yet (`v2` holds the v2.0 restructure; `v2.1-cpu` is built on it).
 
-Done in v2 so far:
-- Dinghy 0.4 imported as source (`PLATFORM.md`); no HAL, loader or linker-script changes
-- the P11W production sources (the ones the old chain generated) are `apsis/`; the runtime's macro-renamed onion
-  layers are one `apsis_runtime.c`, dead layer code removed
-- `firmware/src/app.c`: the audio graph unchanged; input on Dinghy 0.4's own edges (no HAL activity-bit patch);
-  continuous strip-by-strip screen redraw (the old one redrew only on surface change, so knobs showed nothing);
-  no placeholder boot screen; LEDs written on change; an audio-load probe
-- the project journal on Dinghy's blob sectors 0/1 (same addresses as before), flash behind three primitives so
-  it also runs in host mode
-- tests: 62 APSIS host tests against the shipping sources (plain + ASan/UBSan); the Phase-11 optimisation proofs
-  that tested intermediate candidates are removed; `test_space_room` now tests the room that ships
-- **sound unchanged:** the whole firmware in Dinghy host mode is bit-identical to the old P11W app on two scripts
-  (`tests/sound.sha256`, see TESTING.md)
-- one CI workflow: host tests, host-mode sound, JieLi build + Dinghy's platform tests, fm1-emu FM1_STRICT load
+- v2.0 (branch `v2`): APSIS as real source on Dinghy 0.4, one CI pipeline, sound bit-identical to P11W
+- the String follows Study 98 (`apsis_string98.c`, DECISIONS.md): one string, every note a classicStringNote;
+  Study 126's Dual String is gone from the sound and the default
+- audio CPU, all bit-exact except the deliberate String change: voice-outer rendering everywhere, the voices'
+  state in locals, one sine table in RAM, call-free inner loops, divide-free Q15 scaling (`apsis_fixed.h`), one
+  memoised Q31 root (`apsis_q31.c`), String notes decaying in constant-gain runs
 
-## Measured (CI, 2026-11-02, commit 92dbd5e)
+## Measured (CI, 2026-11-02, commit 5918797)
 
-- real JieLi build: image 114,320 / 581,564 B, RAM 87,796 / 98,304 B, POOL 319,176 / 344,064 B, `FM-1_970`;
-  Dinghy's platform tests pass; package `apsis-92dbd5e.fwsc` SHA-256
-  `f243a0e153ac9273185cca3794e131b2c85c65422e3ad184b2cc34d88e5d3c3d`
-- host: 62 tests pass with gcc (plain, ASan/UBSan) and clang (plain, MSan); sound pinned
-- **fm1-emu FM1_STRICT, 20 s performance: the audio interrupt averages 10.9 ms per 5.8 ms block (188 %),
-  worst 12.1 ms (209 %); only 1556 of ~3445 blocks are rendered; 97 % of instructions run in interrupts, so
-  the panel and screen starve too.** This is the old P11W audio graph, unchanged; it cannot keep real time on
-  the emulator's cycle model. The user's interactive emulator (not strict) hides this.
-- where (the -fno-inline build, 6-8 s, Bloom sounding): Bloom DSP ~15 %, String transients ~20 %, the room
-  ~10 %, Clock/String/Drift a few % each
+- fm1-emu FM1_STRICT, 20 s performance (`tests/emu.sh`): **avg 44.0 %, worst block 69.8 %**, 0 blocks over 80 %
+  (P11W was avg 188 %, worst 209 %, half the blocks lost). The worst block: String notes 1.78 ms, room 1.0 ms,
+  String drone 0.65 ms, Drift 0.34 ms (`load.json` in the CI artifact)
+- real JieLi build: image ~115 KB / 581,564 B, RAM ~88.9 KB / 98,304 B, POOL 319,176 / 344,064 B, `FM-1_970`;
+  `make fw` locally is byte-identical to CI
+- package `apsis-5918797.fwsc` SHA-256 `9345d352dee4ee5600544388b42c2f12919e5ce9bcc3c9dc0710a6bec8dba5c4`
+- 60 APSIS host tests pass (gcc, clang, ASan/UBSan, MSan); sound pinned (`tests/sound.sha256`)
 
 ## Known problems
 
-- **CPU:** see above; the emulator job is red until the audio fits (v2.1)
-- **level:** with the transport running the output is around -40 dBFS RMS / -23 dBFS peak before MASTER;
-  compare with the browser and fix the gain staging
-- **surfaces:** the renderers are static (they ignore `animation_tick`) and simple
-- the room runs at 11.025 kHz to save CPU
+- **level:** -34 dBFS RMS default before MASTER; compare with the browser
+- **surfaces:** the renderers are static and simple; the Dual remnants (left side, anchors) still show in places
+- Study 98's hybrid and bowed String characters are not ported; the Dual code in controls/Motion is unreachable
+  but not yet removed
+- the room still runs at 11.025 kHz; there is headroom now to revisit it
+- the worst block is over half the budget (RULES.md asks for under half: USB and the key scan interrupt too)
 
 ## Next action
 
-v2.1, make the audio fit: per-voice cost of Bloom and String transients (algorithm first: per-sample work that
-can be per-block, voice caps against the browser's), hot DSP in RAM (`.ram_text`) against flash-cache misses,
-then the second core (fm1-dock's screened, fall-back-to-one-core layer) for the room or a source group. Gate:
-`tests/emu.sh` green with worst < 100 %, target < 70 %.
+1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
+2. Merge `v2` and `v2.1-cpu` to `main` (ask first).
+3. Then: the room (1.0 ms) and the String drone (0.65 ms) to get the worst block under 50 %; gain staging.
 
 ## Authority
 

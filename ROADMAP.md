@@ -10,10 +10,14 @@
 - [~] emulator load gate: red (188 % avg), see v2.1
 - [ ] first `.fwsc` from v2 to the user's emulator testing
 
-## v2.1 — measured CPU budget
-- [ ] FM1_STRICT load per source and for the room (`fm1-live` FM1_TPROF for where the cycles go)
+## v2.1 — measured CPU budget, the String from Study 98
+- [x] FM1_STRICT load per part, per function (FM1_TPROF) and the voices' high water
+- [x] a load budget in CI that fails the build (a block over 100 %)
+- [x] the String from Study 98: one string
+- [x] worst block under 70 % (69.8 %)
+- [ ] worst block under 50 % (the room, the String drone)
 - [ ] worst-case scenario script (all sources, full CHAIN, Motion, Bloom grow)
-- [ ] a load budget in CI that fails the build
+- [ ] remove the unreachable Dual code (controls, Motion lanes, surfaces); Study 98's hybrid/bowed characters
 
 ## v2.2 — sounds like APSIS
 - [ ] gain staging against the browser (per source and master), then re-pin the sound

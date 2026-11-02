@@ -36,8 +36,14 @@ macOS: clang). Two Phase-5 tests that relied on one seed's random pick now check
 ## Emulator load
 
 `tests/emu.sh` fails if any audio block takes 5805 us or more (a drop-out) or if the audio stalls; it warns over
-50 %. First measurement (2026-11-02, 92dbd5e): avg 188 %, worst 209 %: failing. `PROFILE=1 tests/emu.sh` on the
-`-fno-inline` build prints the cycles per function (CI's emulator job does both).
+50 %. It reads the firmware's probes from a RAM dump: the load, the worst block by part, each part's worst, the
+blocks over 80 % / 100 % and the voices' high water. `PROFILE=1 tests/emu.sh` on the `-fno-inline` build prints the
+cycles per function (CI's emulator job does both).
+
+| date, commit | avg | worst | blocks over 100 % |
+| --- | --- | --- | --- |
+| 2026-11-02 92dbd5e (= P11W's audio) | 188 % | 209 % | ~half lost |
+| 2026-11-02 5918797 (v2.1) | 44.0 % | 69.8 % | 0 |
 
 ## Known gaps
 
