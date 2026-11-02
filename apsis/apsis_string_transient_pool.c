@@ -444,15 +444,41 @@ APSIS_INLINE int32_t strx_sat_q15(int32_t v)
 
 
 
+/* `run` samples of one oscillator at a constant gain, added into out. tri / lp are constants at each call, so
+ * the always-inline body is four specialised loops. */
+APSIS_INLINE void strx_run(int32_t *out, uint32_t run, uint32_t *phase_p, uint32_t inc, int32_t *lp_p,
+                           uint16_t alpha, int32_t gain, int32_t mix_l, int32_t mix_r, int tri, int lp)
+{
+    uint32_t phase = *phase_p, k;
+    int32_t state = *lp_p;
+    for (k = 0u; k < run; ++k) {
+        int32_t raw, voiced;
+        phase += inc;
+        raw = tri ? strx_triangle_q15(phase) : apsis_sine_q15(phase);
+        if (lp) {
+            state += (int32_t)(((int64_t)(raw - state) * alpha) >> 15);
+            raw = state;
+        }
+        voiced = (raw * gain) >> 15;
+        out[k * 2u] += (voiced * mix_l) >> 15;
+        out[k * 2u + 1u] += (voiced * mix_r) >> 15;
+    }
+    *phase_p = phase;
+    *lp_p = state;
+}
+
 /* One voice over the whole block, added into out unsaturated (the caller saturates once, as the per-sample mix
  * did: integer sums do not depend on the order of the voices). Each voice touches only its own state, so
- * voice-outer equals the old sample-outer loop bit for bit. The state lives in locals for the block and is
- * written back once: out[] could alias the voice, so field accesses in the loop were each a load and a store. */
+ * voice-outer equals the old sample-outer loop bit for bit. The state lives in locals for the block.
+ * Decay without a steal (most of a note's life) goes by runs: the gain peak * ENV[env_phase >> 16] only changes
+ * when the envelope index steps (every few hundred samples), so each run renders at one gain and the envelope
+ * phase advances once at its end, by exactly the per-sample rule (minus the step, floored at 0). The attack and
+ * a steal take the general per-sample path. */
 static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint32_t frames)
 {
     uint32_t n = 0u;
-    uint32_t phase = v->phase, inc = v->phase_inc, age = v->age_samples, duration = v->duration_samples;
-    uint32_t env_phase = v->env_phase_q16, decay_step = v->decay_step_q16;
+    uint32_t phase = v->phase, age = v->age_samples, env_phase = v->env_phase_q16;
+    const uint32_t inc = v->phase_inc, duration = v->duration_samples, decay_step = v->decay_step_q16;
     int32_t lp = v->lowpass_q15, steal_gain = v->steal_gain_q15;
     uint16_t attack_left = v->attack_left_samples, steal_left = v->steal_left_samples;
     const uint16_t peak = v->peak_gain_q15, alpha = v->lowpass_alpha_q15;
@@ -464,13 +490,37 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
         n = v->start_delay_samples < frames ? v->start_delay_samples : frames;
         v->start_delay_samples -= n;
     }
-    for (; active && n < frames; ++n) {
+    while (active && n < frames) {
         int32_t raw, filtered, voiced;
         uint16_t gain;
         uint32_t idx;
         if (age >= duration) {
             active = 0u;
             break;
+        }
+        idx = env_phase >> 16;
+        if (idx > 64u) idx = 64u;
+        gain = strx_gain_q15(peak, STRX_ENV_Q15[idx]);
+        if (stage != 0u && !stealing) {
+            uint32_t run = frames - n, left = duration - age, adv;
+            if (idx && decay_step) {             /* the samples until env_phase drops below idx << 16 */
+                uint32_t same = (env_phase - (idx << 16)) / decay_step + 1u;
+                if (run > same) run = same;
+            }
+            if (run > left) run = left;
+            if (triangle) {
+                if (alpha) strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 1);
+                else strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 1, 0);
+            } else {
+                if (alpha) strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 1);
+                else strx_run(out + n * 2u, run, &phase, inc, &lp, alpha, gain, mix_l, mix_r, 0, 0);
+            }
+            n += run;
+            age += run;
+            adv = (uint32_t)((uint64_t)run * decay_step > 0xffffffffu ? 0xffffffffu : run * decay_step);
+            env_phase = env_phase > adv ? env_phase - adv : 0u;
+            if (age >= duration) active = 0u;
+            continue;
         }
         phase += inc;
         raw = triangle ? strx_triangle_q15(phase) : apsis_sine_q15(phase);
@@ -480,15 +530,14 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
         } else {
             filtered = raw;
         }
-        idx = env_phase >> 16;
-        gain = strx_gain_q15(peak, STRX_ENV_Q15[idx > 64u ? 64u : idx]);
         if (stealing)
             gain = strx_gain_q15(gain, (uint16_t)steal_gain);
         voiced = (filtered * (int32_t)gain) >> 15;              /* |filtered|, gain <= 32767 */
         out[n * 2u] += (voiced * mix_l) >> 15;                   /* 32767 * 65535 < 2^31 */
         out[n * 2u + 1u] += (voiced * mix_r) >> 15;
         ++age;
-        if (stage == 0u) {                                       /* strx_advance_envelope */
+        ++n;
+        if (stage == 0u) {                                       /* the attack */
             if (attack_left) --attack_left;
             env_phase = env_phase + STRX_ATTACK_STEP_Q16 >= STRX_ENV_PHASE_ONE
                 ? STRX_ENV_PHASE_ONE : env_phase + STRX_ATTACK_STEP_Q16;
@@ -499,7 +548,7 @@ static void strx_classic_voice(ApsisStringTransientVoice *v, int32_t *out, uint3
         } else {
             env_phase = env_phase > decay_step ? env_phase - decay_step : 0u;
         }
-        if (stealing) {                                          /* strx_advance_steal */
+        if (stealing) {                                          /* the steal's fade */
             int32_t delta = (int32_t)(((int64_t)-steal_gain * STRX_STEAL_ALPHA_Q15) >> 15);
             if (!delta && steal_gain > 0) delta = -1;
             steal_gain += delta;
