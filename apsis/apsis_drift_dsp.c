@@ -1,3 +1,4 @@
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_drift_dsp.h"
 #include "apsis_drift.h"
@@ -42,12 +43,6 @@ APSIS_INLINE uint32_t drift_smooth_u32(uint32_t current, uint32_t target)
     return (uint32_t)((int64_t)current + delta);
 }
 
-APSIS_INLINE int32_t drift_sat_q15(int64_t v)
-{
-    if (v > 32767) return 32767;
-    if (v < -32767) return -32767;
-    return (int32_t)v;
-}
 
 
 
@@ -154,29 +149,39 @@ void apsis_drift_dsp_update(ApsisDriftDsp *dsp,
     }
 }
 
+/* Each voice over the whole block in locals, added into out unsaturated, then one saturation: bit for bit the
+ * old sample-outer loop, without a load and a store of every field each sample. */
 void apsis_drift_dsp_render(ApsisDriftDsp *dsp, int32_t *out, uint32_t frames)
 {
     uint32_t f;
+    uint8_t i;
     if (!dsp || !out || !frames) return;
-    for (f = 0u; f < frames; ++f) {
-        int64_t sum_l = 0, sum_r = 0;
-        uint8_t i;
-        for (i = 0u; i < APSIS_DRIFT_DSP_VOICES; ++i) {
-            ApsisDriftDspVoice *v = &dsp->voice[i];
-            int32_t wave, sample, gain_q15;
-            if (!v->pitch_initialized) continue;
-            v->phase_inc = drift_smooth_u32(v->phase_inc, v->target_phase_inc);
-            v->gain_q23 = drift_smooth_i32(v->gain_q23, v->target_gain_q23);
-            v->mix_left_q15 = drift_smooth_i32(v->mix_left_q15, v->target_mix_left_q15);
-            v->mix_right_q15 = drift_smooth_i32(v->mix_right_q15, v->target_mix_right_q15);
-            wave = apsis_sine_q15(v->phase);
-            gain_q15 = (v->gain_q23 + 128) >> 8;
-            sample = (int32_t)(((int64_t)wave * gain_q15) >> 15);
-            sum_l += ((int64_t)sample * v->mix_left_q15) >> 15;
-            sum_r += ((int64_t)sample * v->mix_right_q15) >> 15;
-            v->phase += v->phase_inc;
+    for (i = 0u; i < APSIS_DRIFT_DSP_VOICES; ++i) {
+        ApsisDriftDspVoice *v = &dsp->voice[i];
+        uint32_t phase = v->phase, inc = v->phase_inc;
+        const uint32_t target_inc = v->target_phase_inc;
+        int32_t gain = v->gain_q23, mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
+        const int32_t target_gain = v->target_gain_q23, target_l = v->target_mix_left_q15,
+                      target_r = v->target_mix_right_q15;
+        if (!v->pitch_initialized) continue;
+        for (f = 0u; f < frames; ++f) {
+            int32_t wave, sample;
+            inc = drift_smooth_u32(inc, target_inc);
+            gain = drift_smooth_i32(gain, target_gain);
+            mix_l = drift_smooth_i32(mix_l, target_l);
+            mix_r = drift_smooth_i32(mix_r, target_r);
+            wave = apsis_sine_q15(phase);
+            sample = (int32_t)(((int64_t)wave * ((gain + 128) >> 8)) >> 15);
+            out[f * 2u] += (int32_t)(((int64_t)sample * mix_l) >> 15);
+            out[f * 2u + 1u] += (int32_t)(((int64_t)sample * mix_r) >> 15);
+            phase += inc;
         }
-        out[f * 2u] = drift_sat_q15((int64_t)out[f * 2u] + sum_l);
-        out[f * 2u + 1u] = drift_sat_q15((int64_t)out[f * 2u + 1u] + sum_r);
+        v->phase = phase;
+        v->phase_inc = inc;
+        v->gain_q23 = gain;
+        v->mix_left_q15 = mix_l;
+        v->mix_right_q15 = mix_r;
     }
+    for (f = 0u; f < frames * 2u; ++f)
+        out[f] = apsis_sat_q15(out[f]);
 }

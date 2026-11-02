@@ -1,3 +1,4 @@
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_string_dsp.h"
 #include "apsis_harmony.h"
@@ -137,12 +138,6 @@ APSIS_INLINE int32_t sdsp_smooth_i32(int32_t current, int32_t target, uint16_t a
     if (!delta) delta = diff > 0 ? 1 : -1;
     return (int32_t)((int64_t)current + delta);
 }
-APSIS_INLINE int32_t sdsp_sat_q15(int64_t v)
-{
-    if (v > 32767) return 32767;
-    if (v < -32767) return -32767;
-    return (int32_t)v;
-}
 static void sdsp_target_common(ApsisStringDspTargets *out, uint8_t i, uint32_t freq,
                                uint16_t gain, uint8_t waveform, uint16_t lp,
                                uint16_t mix_l, uint16_t mix_r, uint8_t audible)
@@ -275,33 +270,56 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
     }
 }
 
+/* Each voice over the whole block in locals, added into out unsaturated, then one saturation: the voices touch
+ * only their own state, so this is the old sample-outer loop bit for bit, without a load and a store of every
+ * field each sample (out[] could alias the voices). */
 void apsis_string_dsp_render(ApsisStringDsp *dsp, int32_t *out, uint32_t frames)
 {
     uint32_t n, i;
     if (!dsp || !out) return;
-    for (n = 0u; n < frames; ++n) {
-        int64_t mix_l = 0, mix_r = 0;
-        for (i = 0u; i < APSIS_STRING_DSP_VOICES; ++i) {
-            ApsisStringDspVoice *v = &dsp->voice[i];
+    for (i = 0u; i < APSIS_STRING_DSP_VOICES; ++i) {
+        ApsisStringDspVoice *v = &dsp->voice[i];
+        uint32_t phase = v->phase, inc = v->phase_inc;
+        const uint32_t target_inc = v->target_phase_inc;
+        int32_t gain = v->gain_q15, target_gain = v->target_gain_q15, lp = v->lowpass_q15;
+        const uint16_t pitch_alpha = v->pitch_alpha_q15;
+        uint16_t alpha = v->lowpass_alpha_q15, mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
+        uint8_t waveform = v->waveform, transition = v->timbre_transition;
+        for (n = 0u; n < frames; ++n) {
             int32_t raw, voiced;
             uint16_t gain_alpha;
-            if (v->timbre_transition && v->gain_q15 <= 1) sdsp_apply_timbre(v);
-            if (v->timbre_transition) gain_alpha = TIMBRE_RELEASE_ALPHA_Q15;
-            else if (!dsp->transport_running && v->target_gain_q15 == 0)
-                gain_alpha = TRANSPORT_RELEASE_ALPHA_Q15;
+            if (transition && gain <= 1) {          /* sdsp_apply_timbre */
+                waveform = v->desired_waveform;
+                alpha = v->desired_lowpass_alpha_q15;
+                mix_l = v->desired_mix_left_q15;
+                mix_r = v->desired_mix_right_q15;
+                lp = 0;
+                target_gain = v->desired_gain_q15;
+                transition = 0u;
+            }
+            if (transition) gain_alpha = TIMBRE_RELEASE_ALPHA_Q15;
+            else if (!dsp->transport_running && target_gain == 0) gain_alpha = TRANSPORT_RELEASE_ALPHA_Q15;
             else gain_alpha = GAIN_ALPHA_Q15;
-            v->phase_inc = sdsp_smooth_u32(v->phase_inc, v->target_phase_inc,
-                                           v->pitch_alpha_q15);
-            v->gain_q15 = sdsp_smooth_i32(v->gain_q15, v->target_gain_q15, gain_alpha);
-            v->phase += v->phase_inc;
-            raw = sdsp_waveform_q15(v->waveform, v->phase);
-            v->lowpass_q15 += (int32_t)(((int64_t)(raw - v->lowpass_q15) *
-                                          v->lowpass_alpha_q15) >> 15);
-            voiced = (int32_t)(((int64_t)v->lowpass_q15 * v->gain_q15) >> 15);
-            mix_l += ((int64_t)voiced * v->mix_left_q15) >> 15;
-            mix_r += ((int64_t)voiced * v->mix_right_q15) >> 15;
+            inc = sdsp_smooth_u32(inc, target_inc, pitch_alpha);
+            gain = sdsp_smooth_i32(gain, target_gain, gain_alpha);
+            phase += inc;
+            raw = sdsp_waveform_q15(waveform, phase);
+            lp += (int32_t)(((int64_t)(raw - lp) * alpha) >> 15);
+            voiced = (int32_t)(((int64_t)lp * gain) >> 15);
+            out[n * 2u] += (int32_t)(((int64_t)voiced * mix_l) >> 15);
+            out[n * 2u + 1u] += (int32_t)(((int64_t)voiced * mix_r) >> 15);
         }
-        out[n * 2u] = sdsp_sat_q15((int64_t)out[n * 2u] + mix_l);
-        out[n * 2u + 1u] = sdsp_sat_q15((int64_t)out[n * 2u + 1u] + mix_r);
+        v->phase = phase;
+        v->phase_inc = inc;
+        v->gain_q15 = gain;
+        v->target_gain_q15 = target_gain;
+        v->lowpass_q15 = lp;
+        v->lowpass_alpha_q15 = alpha;
+        v->mix_left_q15 = mix_l;
+        v->mix_right_q15 = mix_r;
+        v->waveform = waveform;
+        v->timbre_transition = transition;
     }
+    for (n = 0u; n < frames * 2u; ++n)
+        out[n] = apsis_sat_q15(out[n]);
 }
