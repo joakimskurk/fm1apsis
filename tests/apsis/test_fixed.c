@@ -20,6 +20,16 @@ int main(void)
             q = q >= 0 ? (q + 16383) / 32767 : (q - 16383) / 32767;
             assert(apsis_mul_q15_round(a, b) == q);
         }
+    {   /* apsis_div32767_u64 up to 2^46: around every multiple at the edges, and a stride through the range */
+        uint64_t x, m;
+        for (m = 0u; m < 70000u; ++m)
+            for (x = m * 32767u > 2u ? m * 32767u - 2u : 0u; x <= m * 32767u + 2u; ++x)
+                assert(apsis_div32767_u64(x) == x / 32767u);
+        for (m = (1ull << 46) / 32767u - 5u; m <= (1ull << 46) / 32767u; ++m)
+            for (x = m * 32767u - 2u; x <= m * 32767u + 2u && x < (1ull << 46); ++x)
+                assert(apsis_div32767_u64(x) == x / 32767u);
+        for (x = 0u; x < (1ull << 46); x += 0x3B9ACA07ull) assert(apsis_div32767_u64(x) == x / 32767u);
+    }
     puts("PASS: divide-free Q15 scaling is exact");
     return 0;
 }

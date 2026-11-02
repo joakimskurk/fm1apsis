@@ -42,7 +42,7 @@ if [ "${STRESS:-0}" = 1 ]; then
 fi
 
 if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the performance (BLOOM, petals)
-    FM1_STRICT=1 FM1_TPROF="$OUT/tprof.txt,6000,8000" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 8100 \
+    FM1_STRICT=1 FM1_TPROF="$OUT/tprof.txt,${PROF_FROM:-6000},${PROF_TO:-8000}" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot $(( ${PROF_TO:-8000} + 100 )) \
         > "$OUT/emu.log" 2>&1 || { cat "$OUT/emu.log"; exit 1; }
     python3 "$(dirname "$0")/../tools/profile_report.py" "$OUT/tprof.txt" "$OUT/symbols.txt" 40 > "$OUT/profile.txt"
     exit 0

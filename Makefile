@@ -28,7 +28,7 @@ emu:
 	@test -x build/emu-bin/fm1-live || { echo "fetch it: gh run download <run> -n fm1-live-linux-x86_64 -D build/emu-bin"; exit 1; }
 	@docker image inspect apsis-emu >/dev/null 2>&1 || docker build -q --platform linux/amd64 -t apsis-emu tools/docker/emu
 	docker run --rm --platform linux/amd64 -v "$(CURDIR)":/w -v $(HOME)/.jieli/toolchain:/jieli:ro -w /w \
-	    -e STRESS=$(STRESS) -e PROFILE=$(PROFILE) -e EMU_MS=$(EMU_MS) -e JIELI_TOOLCHAIN=/jieli -e EMU=build/emu-bin/fm1-live \
+	    -e STRESS=$(STRESS) -e PROFILE=$(PROFILE) -e EMU_MS=$(EMU_MS) -e PROF_FROM=$(PROF_FROM) -e PROF_TO=$(PROF_TO) -e JIELI_TOOLCHAIN=/jieli -e EMU=build/emu-bin/fm1-live \
 	    apsis-emu sh tests/emu.sh $(FW) $(ELF) $(EMU_OUT)
 image:
 	@docker image inspect apsis-dev >/dev/null 2>&1 || docker build -q --platform linux/amd64 -t apsis-dev tools/docker

@@ -11,6 +11,14 @@ static inline uint32_t apsis_div32767(uint32_t p)
     return (p + (uint32_t)(((uint64_t)p * 131077u) >> 32)) >> 15;
 }
 
+/* floor(x / 32767) for x < 2^46 (the quotient fits 32 bits) without a 64-bit division: q0 = x >> 15 undershoots by (x - 32767 q0) / 32767, and
+ * that remainder, (x & 0x7FFF) + q0, fits 32 bits */
+static inline uint32_t apsis_div32767_u64(uint64_t x)
+{
+    uint32_t q0 = (uint32_t)(x >> 15);
+    return q0 + ((uint32_t)(x & 0x7FFFu) + q0) / 32767u;
+}
+
 /* (a * b) / 32767 rounded half away from zero, for |a|, |b| <= 32767: Q15 * Q15 on the state's 32767 scale */
 static inline int32_t apsis_mul_q15_round(int32_t a, int32_t b)
 {

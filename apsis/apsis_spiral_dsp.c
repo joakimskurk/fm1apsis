@@ -1,3 +1,4 @@
+#include "apsis_fixed.h"
 #include "apsis_sine.h"
 #include "apsis_q31.h"
 #include "apsis_spiral_dsp.h"
@@ -17,14 +18,14 @@ static void spiral_dsp_zero(void *ptr, uint32_t n)
     while (n--) *p++ = 0u;
 }
 
-static int32_t spiral_sat_q15(int64_t v)
+APSIS_INLINE int32_t spiral_sat_q15(int64_t v)
 {
     if (v > 32767) return 32767;
     if (v < -32767) return -32767;
     return (int32_t)v;
 }
 
-static int32_t spiral_filter_state(int64_t v)
+APSIS_INLINE int32_t spiral_filter_state(int64_t v)
 {
     if (v > SPIRAL_FILTER_STATE_LIMIT) return SPIRAL_FILTER_STATE_LIMIT;
     if (v < -SPIRAL_FILTER_STATE_LIMIT) return -SPIRAL_FILTER_STATE_LIMIT;
@@ -46,7 +47,7 @@ static uint16_t spiral_mul_q15(uint16_t a, uint16_t b)
 
 
 
-static int16_t spiral_triangle_q15(uint32_t phase)
+APSIS_INLINE int16_t spiral_triangle_q15(uint32_t phase)
 {
     uint16_t p = (uint16_t)(phase >> 16);
     if (p < 16384u) return (int16_t)((uint32_t)p * 2u);
@@ -435,12 +436,13 @@ APSIS_INLINE uint16_t spiral_envelope_at(uint32_t age, uint32_t attack, uint32_t
 {
     const uint32_t floor_q23 = SPIRAL_GAIN_FLOOR_Q15 << 8;
     if (age < attack && attack) {
-        uint32_t t = (uint32_t)(((uint64_t)(age + 1u) * APSIS_Q15_ONE + attack / 2u) / attack);
+        /* the old 64-bit divisions in 32 bits: age < attack (a few hundred samples), so (age + 1) * 32767 < 2^32;
+         * t * t < 2^30; the last product < 2^39 goes through apsis_div32767_u64 */
+        uint32_t t = ((age + 1u) * APSIS_Q15_ONE + attack / 2u) / attack;
         uint32_t curve;
         if (t > APSIS_Q15_ONE) t = APSIS_Q15_ONE;
-        curve = (uint32_t)(((uint64_t)t * t + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
-        *gain_q23 = floor_q23 + (uint32_t)(((uint64_t)(peak_q23 - floor_q23) * curve + APSIS_Q15_ONE / 2u) /
-                                           APSIS_Q15_ONE);
+        curve = (t * t + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE;
+        *gain_q23 = floor_q23 + apsis_div32767_u64((uint64_t)(peak_q23 - floor_q23) * curve + APSIS_Q15_ONE / 2u);
     } else if (age < tail) {
         *gain_q23 = (uint32_t)(((uint64_t)*gain_q23 * decay_mul_q31 + (1ull << 30)) >> 31);
         if (*gain_q23 < floor_q23) *gain_q23 = floor_q23;

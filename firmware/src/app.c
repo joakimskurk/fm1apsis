@@ -223,8 +223,8 @@ static uint32_t sound_ticks;
 
 #ifdef APSIS_STRESS
 /* what one voice costs, measured while the stress build plays (docs/MARGIN_PLAN.md B): for String partials, Spiral
- * oscillators, Bloom oscillators and Clock voices, the worst ns per voice per block over blocks with 4 or more of
- * them, and how many there were then. [2k] ns, [2k + 1] voices. */
+ * oscillators, Bloom oscillators and Clock voices, ns per voice per block at the most voices seen (the worst block
+ * at that count), so a pool's fixed cost does not inflate it. [2k] ns, [2k + 1] voices. */
 static volatile uint32_t apsis_cost_probe[8];
 
 static void cost_note(uint32_t k, uint32_t ticks, uint32_t voices)
@@ -233,7 +233,8 @@ static void cost_note(uint32_t k, uint32_t ticks, uint32_t voices)
     if (voices < 4u)
         return;
     ns = (uint32_t)((uint64_t)ticks * 1000u / FM1_TICKS_PER_US / voices);
-    if (ns > apsis_cost_probe[2u * k]) {
+    if (voices > apsis_cost_probe[2u * k + 1u] ||
+        (voices == apsis_cost_probe[2u * k + 1u] && ns > apsis_cost_probe[2u * k])) {
         apsis_cost_probe[2u * k] = ns;
         apsis_cost_probe[2u * k + 1u] = voices;
     }
