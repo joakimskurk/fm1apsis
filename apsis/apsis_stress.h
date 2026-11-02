@@ -10,4 +10,8 @@
 
 void apsis_state_stress(ApsisState *s);
 
+/* A listening demo (APSIS_DEMO, a host-mode sound example): the default state with every source sounding at a
+ * musical density, Spiral on a short route, the String with pizz rhythm and the Turing strum. */
+void apsis_state_demo(ApsisState *s);
+
 #endif

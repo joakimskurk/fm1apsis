@@ -71,7 +71,7 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_q31.c"
 #include "apsis_sine.c"
 #include "apsis_state.c"
-#ifdef APSIS_STRESS
+#if defined(APSIS_STRESS) || defined(APSIS_DEMO)
 #include "apsis_stress.c"
 #endif
 #include "apsis_harmony.c"
@@ -959,6 +959,8 @@ static void app_main(void)
     apsis_runtime_probe[0] = 0x41505349u;      /* "APSI" */
 #ifdef APSIS_STRESS
     apsis_state_stress(&apsis);
+#elif defined(APSIS_DEMO)
+    apsis_state_demo(&apsis);
 #else
     apsis_state_default(&apsis);
 #endif

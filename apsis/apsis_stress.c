@@ -40,3 +40,15 @@ void apsis_state_stress(ApsisState *s)
 
     s->space.decay_ms = 12000u;
 }
+
+void apsis_state_demo(ApsisState *s)
+{
+    static const uint8_t route[8] = {12u, 19u, 24u, 16u, 14u, 21u, 26u, 19u};
+    uint8_t i;
+    apsis_state_default(s);
+    for (i = 0u; i < 8u; ++i) s->spiral.route[i] = route[i];
+    s->spiral.route_count = 8u;
+    s->string.rhythm = APSIS_STRING_RHYTHM_PIZZ;
+    s->string.rhythm_every = 2u;
+    s->string.filter_mode = APSIS_STRING_FILTER_ATTRACTOR;
+}
