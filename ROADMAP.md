@@ -534,15 +534,36 @@ Decision: authorize P11V **proof only** for replacing each line's cached sine `A
 
 ### P11V — cached sine A+delta equivalence proof
 
-Status: **[ ] next. Proof only; production remains P11R.**
+Status: **[x] complete, exact proof + real-target projection frozen. Production remains P11R.**
 
-- [ ] prove `A + (((B-A)*frac)>>8)` equals `A + ((delta*frac)>>8)` for all **65,536** top-16 phase combinations with exact signed semantics
-- [ ] cover all 256 old→new index transitions, including wrap, reset initialization and randomized phase resets
-- [ ] retain exactly two signed-16 cache fields per FDN line and prove host/target state size unchanged
-- [ ] compare complete stereo output, state, feedback cache and delay storage across cold/warm/legal/random/reset/adversarial trajectories
-- [ ] optimized + ASAN/UBSAN and complete historical host behavior
-- [ ] regenerate exact P11R target before applying candidate only ephemerally
-- [ ] measure image/RAM/POOL/package and inlined render code-shape delta; reject if target shape is neutral/worse without stronger evidence
+- [x] **65,536** top-16 interpolation cases bit-identical
+- [x] **65,536** index-transition cases; 65,280 refreshes / 256 reuses including `255 → 0`
+- [x] complete FDN **6,311 blocks / 340,003 frames** across cold/warm/legal/random/adversarial trajectories
+- [x] stereo output, existing FDN state, feedback-cache state and full delay storage bit-identical after every block
+- [x] optimized + ASAN/UBSAN PASS
+- [x] complete historical host + sanitizer behavior PASS with ephemeral candidate
+- [x] state unchanged: `ApsisSpaceFdnLine` **28 B**, `ApsisSpaceFdn` **264 B**
+- [x] exact P11R target regenerated first: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, render **1,098 B / 366** lines
+- [x] ephemeral candidate target: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B** — **0 B resource delta**
+- [x] candidate render **1,094 B / 364** static instruction lines = **−4 B / −2 lines**
+- [x] candidate projection package SHA-256 `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- [x] authoritative run `41391510585` on technical head `e7b91e768eb44a07a2149cb4588da65cab653bfa`
+- [x] evidence artifact ID `13116934949`; ZIP SHA-256 `3a884a48d8fc14ad6147b09c9f902819c90a085d4dc89e05f9cfedb6a87bf93f`
+- [x] committed production Space remained exact P11R throughout
+
+Decision: **authorize P11W production validation.** Apply only the proved A+B → A+delta representation change; require actual-production equivalence, full historical behavior, exact JieLi target, idle PCM/runtime and active Motion before promotion.
+
+### P11W — production FDN sine A+delta cache validation
+
+Status: **[ ] next.**
+
+- [ ] replace only cached `B` with exact signed `delta=B-A`; preserve two-int16 state width
+- [ ] reset/refresh store exact A and delta; interpolation remains `A + ((delta*frac)>>8)`
+- [ ] actual-production equivalence against frozen P11R A+B authority, optimized + ASAN/UBSAN
+- [ ] complete historical host + sanitizer behavior
+- [ ] exact real JieLi target must match P11V projection: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, render **1,094 B / 364** lines
+- [ ] exact idle PCM/runtime and active Motion lifecycle
+- [ ] freeze final package hashes before promotion
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -566,4 +587,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11U measurement state to `p11-optimization`, then create one P11V proof branch. Prove the zero-growth sine-cache representation change from A+B to A+delta, and perform an ephemeral real-target projection; production remains P11R unless every equivalence/historical/target gate justifies a later validation phase.
+Promote frozen P11V proof/projection state to `p11-optimization`, then create one P11W production-validation branch. Apply only the proved zero-growth A+B → A+delta cache representation and require complete actual-production equivalence, historical, real-target, idle and active-Motion gates before promotion.

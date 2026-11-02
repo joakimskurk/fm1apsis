@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11U are complete. P11R remains the accepted production baseline. P11U identified a zero-state-growth A+delta sine-cache candidate from measured residual work and authorizes P11V proof-only.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11V are complete. P11R remains the accepted production baseline. P11V proved and real-target-projected the zero-growth A+delta sine cache and authorizes P11W production validation.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -772,6 +772,43 @@ Decision: authorize P11V proof-only for cached A+delta sine interpolation. This 
 Production remains P11R. Replace cached endpoint B with cached signed-16 delta only in proof/ephemeral target workspaces, prove the complete phase and FDN domains, then measure exact target image/RAM/POOL/package and render code shape. Reject the candidate if target evidence does not improve or otherwise justify it.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
+
+## P11V — FDN sine A+delta cache proof complete
+
+Authority:
+- technical head `e7b91e768eb44a07a2149cb4588da65cab653bfa`
+- run `41391510585` — PASS
+- artifact ID `13116934949`
+- artifact ZIP SHA-256 `3a884a48d8fc14ad6147b09c9f902819c90a085d4dc89e05f9cfedb6a87bf93f`
+- committed production Space remained exact P11R throughout
+
+Proof coverage:
+- **65,536** complete top-16 interpolation cases
+- **65,536** index transitions, 65,280 refreshes / 256 reuses including wrap
+- cold 256 blocks / 16,384 frames
+- warm 1,024 blocks / 65,536 frames
+- legal sweep 423 blocks / 13,536 frames
+- random 4,096 blocks / 211,779 frames
+- adversarial 512 blocks / 32,768 frames
+- total **6,311 blocks / 340,003 frames**
+- output, existing FDN state, feedback-cache state and full delay storage bit-identical
+- optimized + ASAN/UBSAN PASS
+- complete historical host + sanitizer behavior PASS
+
+State remains exactly **28 B/line / 264 B FDN**.
+
+Real-target projection:
+- exact P11R baseline first: **140,472 B image / 87,524 B RAM / 319,176 B POOL**, package `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- candidate: **140,472 / 87,524 / 319,176 B** — zero resource delta
+- candidate package SHA-256 `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- FDN render **1,098 → 1,094 B**, **366 → 364** static instruction lines
+- `space_sine_point` remains **48 B / 14** lines
+
+Decision: P11W may apply only the proved A+B → A+delta representation to production. No other FDN, room or state change is authorized. P11V proves equivalence/static target properties, not physical FM-1 cycle or ISR improvement.
+
+## Exact next phase — P11W production sine A+delta validation
+
+Apply the exact P11V candidate to production, then require actual-production equivalence, complete historical host/sanitizer behavior, exact JieLi target matching the P11V projection, exact idle PCM/runtime and exact active Motion lifecycle before promotion. Until that matrix is green, P11R remains the accepted production baseline.
 
 ## Do not regress
 
