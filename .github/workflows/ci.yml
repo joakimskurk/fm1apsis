@@ -61,6 +61,10 @@ jobs:
         run: |
           DINGHY_DEFS=-fno-inline sh build.sh > /dev/null       # a profiling build: functions stay apart
           mkdir -p build/profile && mv build/apsis.fwsc build/apsis.elf build/profile/
+          DINGHY_DEFS=-DAPSIS_STRESS sh build.sh > /dev/null    # diagnostic: every source at its densest, load meter
+          mkdir -p build/stress && mv build/apsis.fwsc build/apsis.elf build/stress/
+          DINGHY_DEFS=-DAPSIS_LOADMETER sh build.sh > /dev/null # diagnostic: the normal app with the load meter
+          mv build/apsis.fwsc build/apsis-loadmeter-${GITHUB_SHA::7}.fwsc
           if [ "$GITHUB_REF_TYPE" = tag ]; then sh build.sh --release "${GITHUB_REF_NAME#v}"; fi
           sh build.sh | tee build-report.txt
           cp build/apsis.fwsc build/apsis-${GITHUB_SHA::7}.fwsc
@@ -74,6 +78,7 @@ jobs:
             build/apsis*.fwsc
             build/apsis.elf
             build/profile/
+            build/stress/
             build/SHA256SUMS
             build-report.txt
             toolchain.txt
@@ -120,6 +125,12 @@ jobs:
         run: sh tools/get_toolchain.sh
       - name: APSIS under FM1_STRICT
         run: EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain sh tests/emu.sh build/apsis.fwsc build/apsis.elf build/emu
+      - name: The worst case (the APSIS_STRESS build, STRESS=1), reported, not yet a gate (docs/MARGIN_PLAN.md)
+        if: always()
+        continue-on-error: true
+        run: |
+          EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain STRESS=1 \
+            sh tests/emu.sh build/stress/apsis.fwsc build/stress/apsis.elf build/emu/stress
       - name: Where the cycles go (the -fno-inline build, FM1_TPROF)
         if: always()
         run: |

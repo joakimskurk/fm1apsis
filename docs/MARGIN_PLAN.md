@@ -69,8 +69,10 @@ commit.
 
 - `tests/scripts/apsis_stress.txt`: every source on, Turing strum at the densest register, 16th-note rhythm, plucks
   as fast as the guard allows, Bloom grow, Motion, CHAIN, knob sweeps on the room.
-- emu.sh reports the **bound** (the sum of the parts' own worsts) next to the measured worst. CI fails on a bound
-  over 100 % now, and over 50 % once B to D are done.
+- emu.sh reports the **bound** (the sum of the parts' own worsts) next to the measured worst, and warns when it is
+  over the budget. It becomes a gate (50 %) once B to D are done; until then a real drop-out still fails CI.
+- The stress run is a diagnostic build (`DINGHY_DEFS=-DAPSIS_STRESS`, `apsis_stress.c`) with `STRESS=1 tests/emu.sh`.
+  CI reports it but does not fail on it yet.
 - Part 5 splits into planning and Spiral/Bloom sound, so each is measured on its own.
 - A **load-meter build** (diagnostic, not production): avg, worst and blocks over 80 %/100 % on the screen, so
   someone with an FM-1 can take one photo. This is the only step that touches the chip question.

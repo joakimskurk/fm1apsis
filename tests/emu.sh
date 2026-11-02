@@ -23,6 +23,20 @@ KEYS="$KEYS,7000:7,7050:7^,7500:15,7600:15^,8500:19,8600:19^,9500:22,9600:22^"
 KEYS="$KEYS,11000:3,11010:2,11060:2^,11070:3^,11500:e2:+8,12000:e4:+5"
 KEYS="$KEYS,13000:10,13050:10^,14000:11,14050:11^,15000:8,15050:8^,16000:e5:+3"
 
+# STRESS=1 (with a build made with DINGHY_DEFS=-DAPSIS_STRESS, every source at its densest): String plucks as fast as
+# the 35 ms guard allows across the keys, then Bloom petals with grow (REC held), then plucks again.
+if [ "${STRESS:-0}" = 1 ]; then
+    KEYS="1000:4,1050:4^"
+    t=1200; k=14
+    while [ $t -lt 8000 ]; do KEYS="$KEYS,$t:$k,$((t + 20)):$k^"; t=$((t + 40)); k=$((k + 7)); [ $k -gt 40 ] && k=$((k - 27)); done
+    KEYS="$KEYS,8000:2,8050:2^,8100:13"
+    t=8200; k=14
+    while [ $t -lt 12000 ]; do KEYS="$KEYS,$t:$k,$((t + 40)):$k^"; t=$((t + 100)); k=$((k + 1)); [ $k -gt 21 ] && k=14; done
+    KEYS="$KEYS,12000:13^,12100:4,12150:4^"
+    t=12300; k=40
+    while [ $t -lt 19500 ]; do KEYS="$KEYS,$t:$k,$((t + 20)):$k^"; t=$((t + 40)); k=$((k - 5)); [ $k -lt 14 ] && k=$((k + 27)); done
+fi
+
 if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the performance (BLOOM, petals)
     FM1_STRICT=1 FM1_TPROF="$OUT/tprof.txt,6000,8000" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 8100 \
         > "$OUT/emu.log" 2>&1 || { cat "$OUT/emu.log"; exit 1; }
@@ -33,7 +47,7 @@ fi
 FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 20000 > "$OUT/emu.log" 2>&1 || {
     cat "$OUT/emu.log"; echo "FAIL: the emulator stopped"; exit 1; }
 cp work/panel.ppm "$OUT/panel.ppm" 2>/dev/null || true
-python3 - "$OUT" <<'PY'
+python3 - "$OUT" "${STRESS:-0}" <<'PY'
 import json, re, sys
 from pathlib import Path
 out = Path(sys.argv[1])
@@ -45,22 +59,26 @@ def words(name, n):
     a = syms[name] - 0x01C00000
     return struct.unpack_from("<%dI" % n, ram, a)
 last, worst, blocks, total = words("apsis_load_probe", 4)
-PARTS = ["updates+Clock triggers", "String drone", "Drift", "Clock", "String notes", "runtime+Spiral+Bloom",
-         "triggers", "room+Motion"]
-parts = words("apsis_worst_probe", 8)
-part_max = words("apsis_part_max_probe", 8)
+PARTS = ["updates+Clock triggers", "String drone", "Drift", "Clock", "String notes", "planning",
+         "triggers", "room+Motion", "Spiral+Bloom sound"]
+parts = words("apsis_worst_probe", 9)
+part_max = words("apsis_part_max_probe", 9)
+stress = sys.argv[2] == "1"
 over = words("apsis_over_probe", 2) if "apsis_over_probe" in syms else (0, 0)
 BUDGET = 5805
 avg = total / blocks if blocks else 0
 r = {"blocks": blocks, "avg_us": round(avg), "worst_us": worst, "last_us": last, "budget_us": BUDGET,
      "avg_pct": round(100 * avg / BUDGET, 1), "worst_pct": round(100 * worst / BUDGET, 1),
-     "worst_parts_us": dict(zip(PARTS, parts)), "part_max_us": dict(zip(PARTS, part_max)), "blocks_over_80pct": over[0], "blocks_over_100pct": over[1]}
+     "worst_parts_us": dict(zip(PARTS, parts)), "part_max_us": dict(zip(PARTS, part_max)), "blocks_over_80pct": over[0], "blocks_over_100pct": over[1],
+     "bound_us": sum(part_max), "bound_pct": round(100 * sum(part_max) / BUDGET, 1), "stress": stress}
 (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
-print(f"audio load (FM1_STRICT, 20 s scripted): avg {r['avg_us']} us ({r['avg_pct']} %), "
+print(f"audio load (FM1_STRICT, 20 s {'STRESS' if stress else 'scripted'}): avg {r['avg_us']} us ({r['avg_pct']} %), "
       f"worst {worst} us ({r['worst_pct']} %) of {BUDGET} us, {blocks} blocks")
 print("worst block by part (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, parts)))
 print("each part's own worst (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, part_max)))
 print(f"blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
+print(f"the bound (each part's own worst, added up): {r['bound_us']} us ({r['bound_pct']} %); "
+      "docs/MARGIN_PLAN.md aims for 50 % or less")
 if "apsis_voice_probe" in syms:
     vp = words("apsis_voice_probe", 4)
     r["voices"] = {"string_logical": vp[0], "string_physical": vp[1], "bloom_petals": vp[2]}
@@ -70,6 +88,8 @@ if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:
     sys.exit("FAIL: a block took longer than its 5.8 ms: the sound drops out")
+if r["bound_us"] >= BUDGET:
+    print("WARNING: the bound is over the budget: blocks where the parts' worsts meet would drop out")
 if worst > BUDGET // 2:
     print("WARNING: the worst block is over half the budget (docs/dinghy/RULES.md); USB and the keys interrupt it too")
 PY

@@ -71,6 +71,9 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_q31.c"
 #include "apsis_sine.c"
 #include "apsis_state.c"
+#ifdef APSIS_STRESS
+#include "apsis_stress.c"
+#endif
 #include "apsis_harmony.c"
 #include "apsis_gravity.c"
 #include "apsis_string.c"
@@ -187,9 +190,10 @@ static volatile uint8_t runtime_ready;
 static volatile uint32_t apsis_runtime_probe[6];
 static volatile uint32_t apsis_load_probe[4];
 /* the worst block so far, by part (us): 0 the block's updates and Clock triggers, 1 String drone, 2 Drift,
- * 3 Clock, 4 String notes (each with its bus commit), 5 the runtime with Spiral and Bloom, 6 the triggered
- * notes (strums, rhythm, plucks, Bloom gestures), 7 the room and Motion */
-#define BLOCK_PARTS 8u
+ * 3 Clock, 4 String notes (each with its bus commit), 5 the runtime's planning (Spiral, Bloom, the attractor),
+ * 6 the triggered notes (strums, rhythm, plucks, Bloom gestures), 7 the room and Motion, 8 Spiral and Bloom's
+ * sound (rendered inside part 5, timed apart) */
+#define BLOCK_PARTS 9u
 static volatile uint32_t apsis_worst_probe[BLOCK_PARTS];
 /* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
 static volatile uint32_t apsis_part_max_probe[BLOCK_PARTS];
@@ -199,10 +203,21 @@ static volatile uint32_t apsis_voice_probe[4];
 static uint32_t block_part_us[BLOCK_PARTS];
 static uint32_t block_mark;
 
+static uint32_t sound_ticks;
+
 static void block_part(uint32_t part)
 {
     uint32_t now = fm1_ticks();
     block_part_us[part] = (uint32_t)(now - block_mark) / FM1_TICKS_PER_US;
+    block_mark = now;
+}
+
+/* part 5 without the Spiral and Bloom sound inside it, which is part 8 */
+static void block_part_planning(void)
+{
+    uint32_t now = fm1_ticks(), t = now - block_mark;
+    block_part_us[5] = (t > sound_ticks ? t - sound_ticks : 0u) / FM1_TICKS_PER_US;
+    block_part_us[8] = sound_ticks / FM1_TICKS_PER_US;
     block_mark = now;
 }
 static ApsisStringTransientPool string_transient_pool;
@@ -390,6 +405,7 @@ static void render_block(int32_t *out, uint32_t n)
      * late, never early. Sample-exact structural-to-audio handoff is Phase 5. */
     if (runtime_ready) {
         block_mark = fm1_ticks();
+        sound_ticks = 0u;
         apsis_space_target_begin_block(&space_target, n);
         if (apsis_string_motion_active || apsis_string_motion_mailbox.pending)
             apsis_p10_motion_prepare_block(n);
@@ -469,10 +485,12 @@ static void render_block(int32_t *out, uint32_t n)
                 if (spiral_dsp.hit_trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
+            uint32_t sound_t0 = fm1_ticks();
             apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
+            sound_ticks += fm1_ticks() - sound_t0;
         }
             }
             {
@@ -484,10 +502,12 @@ static void render_block(int32_t *out, uint32_t n)
                 if (bloom_dsp.trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
+            uint32_t sound_t0 = fm1_ticks();
             apsis_bloom_dsp_render(&bloom_dsp, space_source, n);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.bloom.send_q15, apsis.mother.mix_q15[4],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 4)));
+            sound_ticks += fm1_ticks() - sound_t0;
         }
             }
         } else if (spiral_audio_started) {
@@ -506,10 +526,12 @@ static void render_block(int32_t *out, uint32_t n)
             if (spiral_dsp.hit_trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
+            uint32_t sound_t0 = fm1_ticks();
             apsis_spiral_dsp_render(&spiral_dsp, space_source, n);
             apsis_space_target_commit_source(
                 &space_target, out, n, apsis.spiral.send_q15, apsis.mother.mix_q15[3],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 3)));
+            sound_ticks += fm1_ticks() - sound_t0;
         }
         } else if (string_attractor_runtime.length ||
                    apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
@@ -525,7 +547,7 @@ static void render_block(int32_t *out, uint32_t n)
                                            &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
                                            &rhythm_observation);
         }
-        block_part(5u);
+        block_part_planning();
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string98_strum(&string_transient_pool, &apsis, &string_pitch_memory,
                                        &string_attractor_runtime.binding[attr_ix], apsis_runtime.cursor_sample);
@@ -634,6 +656,54 @@ static void app_audio(int32_t *out, uint32_t n)
 static uint16_t draw_y;
 static uint32_t frame_count;
 
+#if defined(APSIS_STRESS) && !defined(APSIS_LOADMETER)
+#define APSIS_LOADMETER 1
+#endif
+#ifdef APSIS_LOADMETER
+/* a diagnostic build: the audio interrupt's load in the top 20 rows, for a photo of a real FM-1.
+ * "A44 W69 80:0 100:0" = average and worst % of the 5805 us block, blocks over 80 % and over 100 % */
+#define METER_ROWS 20u
+
+static char *meter_num(char *p, uint32_t v)
+{
+    char d[10];
+    uint32_t n = 0u;
+    do {
+        d[n++] = (char)('0' + v % 10u);
+        v /= 10u;
+    } while (v && n < sizeof d);
+    while (n) *p++ = d[--n];
+    return p;
+}
+
+static void meter_draw(void)
+{
+    char line[48], *p = line;
+    uint32_t blocks = apsis_load_probe[2];
+    uint32_t avg = blocks ? (uint32_t)(((uint64_t)apsis_load_probe[3] * 100u / 5805u) / blocks) : 0u;
+    if (draw_y >= METER_ROWS)
+        return;
+    cv_oy = -(int32_t)draw_y;
+    cv_rect(0, 0, (int32_t)APSIS_VISUAL_WIDTH, (int32_t)METER_ROWS, C_BLACK);
+    *p++ = 'A';
+    p = meter_num(p, avg);
+    *p++ = ' ';
+    *p++ = 'W';
+    p = meter_num(p, apsis_load_probe[1] * 100u / 5805u);
+    *p++ = ' ';
+    p = meter_num(p, 80u);
+    *p++ = ':';
+    p = meter_num(p, apsis_over_probe[0]);
+    *p++ = ' ';
+    p = meter_num(p, 100u);
+    *p++ = ':';
+    p = meter_num(p, apsis_over_probe[1]);
+    *p = 0;
+    (void)cv_text(4, 2, &FONT_S, line, C_WHITE);
+    cv_oy = 0;
+}
+#endif
+
 static void draw_step(void)
 {
     ApsisVisualRaster raster;
@@ -657,6 +727,9 @@ static void draw_step(void)
     apsis_visual_render_p8c(&raster, &context, &keep_bank, &chain_sequence);
     for (i = 0u; i < (uint32_t)APSIS_VISUAL_WIDTH * rows; ++i)
         cv_px[i] = swap16(cv_px[i]);
+#ifdef APSIS_LOADMETER
+    meter_draw();
+#endif
     cv_blit(0u, draw_y);
     draw_y = (uint16_t)(draw_y + rows);
     if (draw_y >= APSIS_VISUAL_HEIGHT) {
@@ -884,7 +957,11 @@ static void app_main(void)
     for (i = 0u; i < sizeof apsis_runtime_probe / sizeof apsis_runtime_probe[0]; ++i)
         apsis_runtime_probe[i] = 0u;
     apsis_runtime_probe[0] = 0x41505349u;      /* "APSI" */
+#ifdef APSIS_STRESS
+    apsis_state_stress(&apsis);
+#else
     apsis_state_default(&apsis);
+#endif
     apsis_string_pitch_memory_reset(&string_pitch_memory);
     apsis_string_dsp_reset(&string_dsp);
     apsis_bloom_voicing_reset(&bloom_voicing_state);
