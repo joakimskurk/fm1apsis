@@ -453,66 +453,60 @@ APSIS_INLINE uint16_t spiral_envelope_at(uint32_t age, uint32_t attack, uint32_t
     return (uint16_t)(*gain_q23 >> 8);
 }
 
-/* One leg over `frames` samples, added into mix (unsaturated; the caller saturates once per sample, as the old
- * sample-outer loop did after summing every leg: integer sums do not depend on the order of the legs). The leg's
- * state lives in locals for the block. oscs is a constant at each call. */
-APSIS_INLINE void spiral_leg_render(ApsisSpiralDspLeg *v, int32_t *mix, uint32_t frames, uint8_t oscs)
+#define SPIRAL_CHUNK 256u
+static int32_t spiral_tmp[SPIRAL_CHUNK];
+
+/* one oscillator's m samples added into tmp (the phase steps, then the wave at it, as before) */
+APSIS_INLINE void spiral_osc_add(int32_t *tmp, uint32_t m, ApsisSpiralDspOsc *o)
 {
-    uint32_t k = 0u, age = v->age_samples, gain_q23 = v->gain_q23;
+    uint32_t k, ph = o->phase;
+    const uint32_t inc = o->phase_inc;
+    const int32_t g = o->gain_q15;
+    /* |wave * gain| < 2^31 (wave <= 32767, gain <= 65535): the old int64 sum, in 32 bits */
+    if (o->waveform == APSIS_SPIRAL_DSP_TRIANGLE)
+        for (k = 0u; k < m; ++k) { ph += inc; tmp[k] += (spiral_triangle_q15(ph) * g) >> 15; }
+    else
+        for (k = 0u; k < m; ++k) { ph += inc; tmp[k] += (apsis_sine_q15(ph) * g) >> 15; }
+    o->phase = ph;
+}
+
+/* One leg over `frames` samples, added into mix (unsaturated; the caller saturates once per sample, as the old
+ * sample-outer loop did after summing every leg: integer sums do not depend on the order of the legs). Two passes
+ * that each fit the registers: the oscillators summed into tmp, then the clamp, the filter, the envelope and the
+ * mix with their state in locals. */
+static void spiral_leg_render(ApsisSpiralDspLeg *v, int32_t *mix, uint32_t frames)
+{
+    uint32_t base = 0u, age = v->age_samples, gain_q23 = v->gain_q23;
     const uint32_t life = v->life_samples, attack = v->attack_samples, tail = v->tail_samples;
     const uint32_t peak_q23 = (uint32_t)v->peak_gain_q15 << 8, decay_mul = v->decay_mul_q31;
     const int32_t mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
     const int32_t b0 = v->filter.b0_q30, b1 = v->filter.b1_q30, b2 = v->filter.b2_q30;
     const int32_t a1 = v->filter.a1_q30, a2 = v->filter.a2_q30;
     int32_t x1 = v->filter.x1, x2 = v->filter.x2, y1 = v->filter.y1, y2 = v->filter.y2;
-    uint32_t ph0 = v->osc[0].phase, ph1 = v->osc[1].phase, ph2 = v->osc[2].phase;
-    const uint32_t in0 = v->osc[0].phase_inc, in1 = v->osc[1].phase_inc, in2 = v->osc[2].phase_inc;
-    const int32_t g0 = v->osc[0].gain_q15, g1 = v->osc[1].gain_q15, g2 = v->osc[2].gain_q15;
-    const uint8_t t0 = v->osc[0].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
-    const uint8_t t1 = v->osc[1].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
-    const uint8_t t2 = v->osc[2].waveform == APSIS_SPIRAL_DSP_TRIANGLE;
-    uint8_t active = 1u;
+    uint8_t j;
 
     if (v->start_delay_samples) {              /* a waiting sample only counts its delay down */
-        k = v->start_delay_samples < frames ? v->start_delay_samples : frames;
-        v->start_delay_samples -= k;
+        base = v->start_delay_samples < frames ? v->start_delay_samples : frames;
+        v->start_delay_samples -= base;
     }
-    for (; k < frames; ++k) {
-        int32_t raw, x, y, voiced;
-        int64_t acc;
-        if (age >= life) {
-            active = 0u;
-            break;
-        }
-        /* |wave * gain| < 2^31 (wave <= 32767, gain <= 65535): the old int64 sum, in 32 bits */
-        raw = 0;
-        if (oscs > 0u) {
-            ph0 += in0;
-            raw = ((t0 ? spiral_triangle_q15(ph0) : apsis_sine_q15(ph0)) * g0) >> 15;
-        }
-        if (oscs > 1u) {
-            ph1 += in1;
-            raw += ((t1 ? spiral_triangle_q15(ph1) : apsis_sine_q15(ph1)) * g1) >> 15;
-        }
-        if (oscs > 2u) {
-            ph2 += in2;
-            raw += ((t2 ? spiral_triangle_q15(ph2) : apsis_sine_q15(ph2)) * g2) >> 15;
-        }
-        x = spiral_clamp32(raw);
-        /* |coefficient| < 2^31, |state| <= 2^17: |acc >> 30| < 5 * 2^18 fits 32 bits before the clamp */
-        acc = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
-        y = spiral_clamp32((int32_t)(acc >> 30));
-        x2 = x1;
-        x1 = x;
-        y2 = y1;
-        y1 = y;
-        voiced = (int32_t)(((int64_t)y * spiral_envelope_at(age, attack, tail, peak_q23, decay_mul, &gain_q23)) >> 15);
-        mix[k * 2u] += (int32_t)(((int64_t)voiced * mix_l) >> 15);
-        mix[k * 2u + 1u] += (int32_t)(((int64_t)voiced * mix_r) >> 15);
-        ++age;
-        if (age >= life) {
-            active = 0u;
-            break;
+    if (base < frames && age < life) {
+        uint32_t m = frames - base, k;
+        if (m > life - age) m = life - age;
+        for (k = 0u; k < m; ++k) spiral_tmp[k] = 0;
+        for (j = 0u; j < v->osc_count && j < APSIS_SPIRAL_DSP_OSC_MAX; ++j) spiral_osc_add(spiral_tmp, m, &v->osc[j]);
+        for (k = 0u; k < m; ++k) {
+            int32_t x = spiral_clamp32(spiral_tmp[k]), y, voiced;
+            /* |coefficient| < 2^31, |state| <= 2^17: |acc >> 30| < 5 * 2^18 fits 32 bits before the clamp */
+            int64_t acc = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
+            y = spiral_clamp32((int32_t)(acc >> 30));
+            x2 = x1;
+            x1 = x;
+            y2 = y1;
+            y1 = y;
+            voiced = (int32_t)(((int64_t)y * spiral_envelope_at(age, attack, tail, peak_q23, decay_mul, &gain_q23)) >> 15);
+            mix[(base + k) * 2u] += (int32_t)(((int64_t)voiced * mix_l) >> 15);
+            mix[(base + k) * 2u + 1u] += (int32_t)(((int64_t)voiced * mix_r) >> 15);
+            ++age;
         }
     }
     v->age_samples = age;
@@ -521,13 +515,9 @@ APSIS_INLINE void spiral_leg_render(ApsisSpiralDspLeg *v, int32_t *mix, uint32_t
     v->filter.x2 = x2;
     v->filter.y1 = y1;
     v->filter.y2 = y2;
-    v->osc[0].phase = ph0;
-    v->osc[1].phase = ph1;
-    v->osc[2].phase = ph2;
-    v->active = active;
+    if (age >= life) v->active = 0u;
 }
 
-#define SPIRAL_CHUNK 256u
 static int32_t spiral_mix[SPIRAL_CHUNK * 2u];
 
 void apsis_spiral_dsp_render(ApsisSpiralDsp *dsp, int32_t *out,
@@ -542,10 +532,7 @@ void apsis_spiral_dsp_render(ApsisSpiralDsp *dsp, int32_t *out,
         for (i = 0u; i < APSIS_SPIRAL_DSP_LEG_CAP; ++i) {
             ApsisSpiralDspLeg *v = &dsp->leg[i];
             if (!v->active) continue;
-            if (v->osc_count >= 3u) spiral_leg_render(v, spiral_mix, c, 3u);
-            else if (v->osc_count == 2u) spiral_leg_render(v, spiral_mix, c, 2u);
-            else if (v->osc_count == 1u) spiral_leg_render(v, spiral_mix, c, 1u);
-            else spiral_leg_render(v, spiral_mix, c, 0u);
+            spiral_leg_render(v, spiral_mix, c);
         }
         for (n = 0u; n < c * 2u; ++n)
             out[base * 2u + n] = spiral_sat_q15((int64_t)out[base * 2u + n] + spiral_mix[n]);
