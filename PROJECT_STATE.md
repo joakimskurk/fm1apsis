@@ -4,8 +4,8 @@ Last updated: 2026-11-02
 
 ## Where we are
 
-**v2.1, branch `v2.1-cpu`:** the String is Study 98's (one string), and the audio fits on the emulator's cycle
-model. Not merged to `main` yet (`v2` holds the v2.0 restructure; `v2.1-cpu` is built on it).
+**v2.1, on `main`** (fast-forwarded from `v2.1-cpu` 2026-11-02; `v2` holds the v2.0 restructure): the String is
+Study 98's (one string), and the audio fits on the emulator's cycle model.
 
 - v2.0 (branch `v2`): APSIS as real source on Dinghy 0.4, one CI pipeline, sound bit-identical to P11W
 - the String follows Study 98 (`apsis_string98.c`, DECISIONS.md): one string, every note a classicStringNote;
@@ -36,8 +36,7 @@ model. Not merged to `main` yet (`v2` holds the v2.0 restructure; `v2.1-cpu` is 
 ## Next action
 
 1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
-2. Merge `v2` and `v2.1-cpu` to `main` (ask first).
-3. Then: the room (1.0 ms) and the String drone (0.65 ms) to get the worst block under 50 %; gain staging.
+2. Then: the room (1.0 ms) and the String drone (0.65 ms) to get the worst block under 50 %; gain staging.
 
 ## Authority
 
