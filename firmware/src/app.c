@@ -185,13 +185,15 @@ static volatile uint8_t runtime_ready;
  * block, blocks rendered, their total (us; a block is 5805 us). */
 static volatile uint32_t apsis_runtime_probe[6];
 static volatile uint32_t apsis_load_probe[4];
-/* the worst block so far, by part (us): the sustained sources (String, Drift, Clock, transients), the runtime
- * with Spiral and Bloom, the triggered notes (strums, rhythm, plucks, Bloom gestures), the room and Motion */
-static volatile uint32_t apsis_worst_probe[4];
+/* the worst block so far, by part (us): 0 the block's updates and Clock triggers, 1 String drone, 2 Drift,
+ * 3 Clock, 4 String notes (each with its bus commit), 5 the runtime with Spiral and Bloom, 6 the triggered
+ * notes (strums, rhythm, plucks, Bloom gestures), 7 the room and Motion */
+#define BLOCK_PARTS 8u
+static volatile uint32_t apsis_worst_probe[BLOCK_PARTS];
 /* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
-static volatile uint32_t apsis_part_max_probe[4];
+static volatile uint32_t apsis_part_max_probe[BLOCK_PARTS];
 static volatile uint32_t apsis_over_probe[2];
-static uint32_t block_part_us[4];
+static uint32_t block_part_us[BLOCK_PARTS];
 static uint32_t block_mark;
 
 static void block_part(uint32_t part)
@@ -407,6 +409,7 @@ static void render_block(int32_t *out, uint32_t n)
             (void)apsis_clock_dsp_trigger_event(&clock_dsp, &apsis,
                                                 &clock_batch.event[clock_ix],
                                                 clock_block_start);
+        block_part(0u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             apsis_string_dsp_render(&string_dsp, space_source, n);
@@ -414,6 +417,7 @@ static void render_block(int32_t *out, uint32_t n)
                 &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
         }
+        block_part(1u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             apsis_drift_dsp_render(&drift_dsp, space_source, n);
@@ -421,6 +425,7 @@ static void render_block(int32_t *out, uint32_t n)
                 &space_target, out, n, apsis.drift.send_q15, apsis.mother.mix_q15[1],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 1)));
         }
+        block_part(2u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             apsis_clock_dsp_render(&clock_dsp, space_source, n);
@@ -428,6 +433,7 @@ static void render_block(int32_t *out, uint32_t n)
                 &space_target, out, n, apsis.clock.send_q15, apsis.mother.mix_q15[2],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 2)));
         }
+        block_part(3u);
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
             apsis_string_transient_render(&string_transient_pool, space_source, n);
@@ -435,7 +441,7 @@ static void render_block(int32_t *out, uint32_t n)
                 &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
         }
-        block_part(0u);
+        block_part(4u);
         if (!spiral_audio_started && apsis.spiral.sound && apsis.spiral.route_count)
             spiral_audio_started = 1u;
         if (!bloom_audio_started &&
@@ -516,7 +522,7 @@ static void render_block(int32_t *out, uint32_t n)
                                            &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
                                            &rhythm_observation);
         }
-        block_part(1u);
+        block_part(5u);
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string98_strum(&string_transient_pool, &apsis, &string_pitch_memory,
                                        &string_attractor_runtime.binding[attr_ix], apsis_runtime.cursor_sample);
@@ -579,11 +585,11 @@ static void render_block(int32_t *out, uint32_t n)
                     bloom_audio_started = 1u;
             }
         }
-        block_part(2u);
+        block_part(6u);
         apsis_space_target_render(&space_target, &apsis.space, out, n);
         if (apsis_string_motion_active)
             apsis_p10_motion_finish_block();
-        block_part(3u);
+        block_part(7u);
         apsis_runtime_probe[0] = 0x41505349u; /* "APSI" */
         apsis_runtime_probe[1] = apsis_runtime.queue_high_water;
         apsis_runtime_probe[2] = apsis_runtime.queue_overflowed;
@@ -604,9 +610,9 @@ static void app_audio(int32_t *out, uint32_t n)
         uint32_t i;
         if (us > apsis_load_probe[1]) {
             apsis_load_probe[1] = us;
-            for (i = 0u; i < 4u; ++i) apsis_worst_probe[i] = block_part_us[i];
+            for (i = 0u; i < BLOCK_PARTS; ++i) apsis_worst_probe[i] = block_part_us[i];
         }
-        for (i = 0u; i < 4u; ++i)
+        for (i = 0u; i < BLOCK_PARTS; ++i)
             if (block_part_us[i] > apsis_part_max_probe[i]) apsis_part_max_probe[i] = block_part_us[i];
         if (us > 4644u) apsis_over_probe[0]++;
         if (us >= 5805u) apsis_over_probe[1]++;

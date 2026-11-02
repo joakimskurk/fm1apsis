@@ -45,22 +45,22 @@ def words(name, n):
     a = syms[name] - 0x01C00000
     return struct.unpack_from("<%dI" % n, ram, a)
 last, worst, blocks, total = words("apsis_load_probe", 4)
-parts = words("apsis_worst_probe", 4) if "apsis_worst_probe" in syms else (0, 0, 0, 0)
-part_max = words("apsis_part_max_probe", 4) if "apsis_part_max_probe" in syms else (0, 0, 0, 0)
+PARTS = ["updates+Clock triggers", "String drone", "Drift", "Clock", "String notes", "runtime+Spiral+Bloom",
+         "triggers", "room+Motion"]
+parts = words("apsis_worst_probe", 8)
+part_max = words("apsis_part_max_probe", 8)
 over = words("apsis_over_probe", 2) if "apsis_over_probe" in syms else (0, 0)
 BUDGET = 5805
 avg = total / blocks if blocks else 0
 r = {"blocks": blocks, "avg_us": round(avg), "worst_us": worst, "last_us": last, "budget_us": BUDGET,
      "avg_pct": round(100 * avg / BUDGET, 1), "worst_pct": round(100 * worst / BUDGET, 1),
-     "worst_parts_us": {"sources": parts[0], "runtime_spiral_bloom": parts[1], "triggers": parts[2],
-                        "room_motion": parts[3]},
-     "part_max_us": list(part_max), "blocks_over_80pct": over[0], "blocks_over_100pct": over[1]}
+     "worst_parts_us": dict(zip(PARTS, parts)), "part_max_us": dict(zip(PARTS, part_max)), "blocks_over_80pct": over[0], "blocks_over_100pct": over[1]}
 (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
 print(f"audio load (FM1_STRICT, 20 s scripted): avg {r['avg_us']} us ({r['avg_pct']} %), "
       f"worst {worst} us ({r['worst_pct']} %) of {BUDGET} us, {blocks} blocks")
-print(f"worst block by part (us): sources {parts[0]}, runtime+Spiral+Bloom {parts[1]}, triggers {parts[2]}, "
-      f"room+Motion {parts[3]}")
-print(f"each part's worst (us): {list(part_max)}; blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
+print("worst block by part (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, parts)))
+print("each part's own worst (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, part_max)))
+print(f"blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:
