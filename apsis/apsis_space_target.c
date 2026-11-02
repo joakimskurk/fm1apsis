@@ -1,4 +1,5 @@
 #include "apsis_space_target.h"
+#include "apsis_fixed.h"
 
 #ifdef __APPLE__                                /* (Mach-O host tests: no ELF section names) */
 #define APSIS_SPACE_POOL __attribute__((used, aligned(4)))
@@ -34,15 +35,11 @@ static int32_t apsis_space_target_clamp_q15(int32_t v)
 
 static int32_t apsis_space_target_mul_q15(int32_t sample, uint16_t gain)
 {
-    int32_t p;
     if (!gain || !sample) return 0;
     if (gain >= APSIS_Q15_ONE) return sample;
-    /* sample is a Q15 source-bus value, so the 32-bit product is bounded by
-     * 32767^2 and cannot overflow. Use the state's exact 32767 denominator. */
-    p = sample * (int32_t)gain;
-    if (p >= 0) p += (int32_t)(APSIS_Q15_ONE / 2u);
-    else p -= (int32_t)(APSIS_Q15_ONE / 2u);
-    return p / (int32_t)APSIS_Q15_ONE;
+    /* sample is a Q15 source-bus value: the product is bounded by 32767^2. The state's exact 32767
+     * denominator, rounded half away from zero, without a divide (apsis_fixed.h). */
+    return apsis_mul_q15_round(sample, (int32_t)gain);
 }
 
 uint8_t apsis_space_target_bind(ApsisSpaceTarget *target)
