@@ -10,8 +10,19 @@
 #define APP_NAME "APSIS"
 #include "platform.c"
 #ifdef DINGHY_HOST                              /* (tests/host.c has no cycle counter and an instant screen) */
+#ifdef APSIS_HOST_TIMING   /* the computer's clock in ns instead, so the load probes show where a host run spends */
+#include <time.h>
+static uint32_t fm1_ticks(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)((uint64_t)ts.tv_sec * 1000000000u + (uint64_t)ts.tv_nsec);
+}
+#define FM1_TICKS_PER_US 1000u
+#else
 #define fm1_ticks() 0u
 #define FM1_TICKS_PER_US 1u
+#endif
 #define fm1_lcd_done() 1
 static const uint8_t lcd_busy = 0;
 #endif
@@ -197,6 +208,11 @@ static volatile uint32_t apsis_load_probe[4];
 static volatile uint32_t apsis_worst_probe[BLOCK_PARTS];
 /* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
 static volatile uint32_t apsis_part_max_probe[BLOCK_PARTS];
+static volatile uint32_t apsis_part_max_block_probe[BLOCK_PARTS];   /* the block number of each part's worst */
+/* the first blocks after boot fill tables (the Q31 root memo, the first plans) once: their worst is kept apart, and
+ * the part maxima above start after them */
+#define BOOT_BLOCKS 16u
+static volatile uint32_t apsis_boot_worst_probe;
 static volatile uint32_t apsis_over_probe[2];
 /* the finite voices' high water: String notes (logical, physical), Bloom petals, Clock voices */
 static volatile uint32_t apsis_voice_probe[4];
@@ -637,8 +653,13 @@ static void app_audio(int32_t *out, uint32_t n)
             apsis_load_probe[1] = us;
             for (i = 0u; i < BLOCK_PARTS; ++i) apsis_worst_probe[i] = block_part_us[i];
         }
-        for (i = 0u; i < BLOCK_PARTS; ++i)
-            if (block_part_us[i] > apsis_part_max_probe[i]) apsis_part_max_probe[i] = block_part_us[i];
+        if (apsis_load_probe[2] < BOOT_BLOCKS) {
+            if (us > apsis_boot_worst_probe) apsis_boot_worst_probe = us;
+        } else for (i = 0u; i < BLOCK_PARTS; ++i)
+            if (block_part_us[i] > apsis_part_max_probe[i]) {
+                apsis_part_max_probe[i] = block_part_us[i];
+                apsis_part_max_block_probe[i] = apsis_load_probe[2];
+            }
         apsis_voice_probe[0] = string_transient_pool.transient_logical_high_water;
         apsis_voice_probe[1] = string_transient_pool.transient_physical_high_water;
         if (apsis_bloom_dsp_active(&bloom_dsp) > apsis_voice_probe[2]) apsis_voice_probe[2] = apsis_bloom_dsp_active(&bloom_dsp);
@@ -648,6 +669,25 @@ static void app_audio(int32_t *out, uint32_t n)
     apsis_load_probe[2]++;
     apsis_load_probe[3] += us;
 }
+
+#ifdef APSIS_HOST_TIMING
+#include <stdio.h>
+__attribute__((destructor)) static void host_timing_report(void)
+{
+    static const char *const name[BLOCK_PARTS] = {"updates+Clock triggers", "String drone", "Drift", "Clock",
+                                                  "String notes", "planning", "triggers", "room+Motion",
+                                                  "Spiral+Bloom sound"};
+    uint32_t i, sum = 0u;
+    printf("host load: %u blocks, avg %u us, worst %u us\n", apsis_load_probe[2],
+           apsis_load_probe[2] ? apsis_load_probe[3] / apsis_load_probe[2] : 0u, apsis_load_probe[1]);
+    for (i = 0u; i < BLOCK_PARTS; ++i) {
+        sum += apsis_part_max_probe[i];
+        printf("  %-24s own worst %6u us at %5.2f s\n", name[i], apsis_part_max_probe[i],
+               apsis_part_max_block_probe[i] * 256.0 / 44100.0);
+    }
+    printf("  bound %u us (after the first %u blocks; their worst %u us)\n", sum, BOOT_BLOCKS, apsis_boot_worst_probe);
+}
+#endif
 
 /* ---- the screen: the current surface, drawn again and again in 8-row strips, each strip only once the
  * previous one's DMA is done, so the main loop never waits on the LCD and every change shows within a frame */

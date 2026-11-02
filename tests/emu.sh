@@ -63,6 +63,8 @@ PARTS = ["updates+Clock triggers", "String drone", "Drift", "Clock", "String not
          "triggers", "room+Motion", "Spiral+Bloom sound"]
 parts = words("apsis_worst_probe", 9)
 part_max = words("apsis_part_max_probe", 9)
+part_at = words("apsis_part_max_block_probe", 9) if "apsis_part_max_block_probe" in syms else (0,) * 9
+boot = words("apsis_boot_worst_probe", 1)[0] if "apsis_boot_worst_probe" in syms else 0
 stress = sys.argv[2] == "1"
 over = words("apsis_over_probe", 2) if "apsis_over_probe" in syms else (0, 0)
 BUDGET = 5805
@@ -70,12 +72,14 @@ avg = total / blocks if blocks else 0
 r = {"blocks": blocks, "avg_us": round(avg), "worst_us": worst, "last_us": last, "budget_us": BUDGET,
      "avg_pct": round(100 * avg / BUDGET, 1), "worst_pct": round(100 * worst / BUDGET, 1),
      "worst_parts_us": dict(zip(PARTS, parts)), "part_max_us": dict(zip(PARTS, part_max)), "blocks_over_80pct": over[0], "blocks_over_100pct": over[1],
+     "part_max_at_s": dict(zip(PARTS, (round(b * 256 / 44100, 2) for b in part_at))), "boot_worst_us": boot,
      "bound_us": sum(part_max), "bound_pct": round(100 * sum(part_max) / BUDGET, 1), "stress": stress}
 (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
 print(f"audio load (FM1_STRICT, 20 s {'STRESS' if stress else 'scripted'}): avg {r['avg_us']} us ({r['avg_pct']} %), "
       f"worst {worst} us ({r['worst_pct']} %) of {BUDGET} us, {blocks} blocks")
 print("worst block by part (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, parts)))
-print("each part's own worst (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS, part_max)))
+print("each part's own worst (us, at s): " + ", ".join(f"{k} {v} @{b * 256 / 44100:.1f}" for k, v, b in zip(PARTS, part_max, part_at)))
+print(f"the first 16 blocks after boot (kept apart): worst {boot} us")
 print(f"blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
 print(f"the bound (each part's own worst, added up): {r['bound_us']} us ({r['bound_pct']} %); "
       "docs/MARGIN_PLAN.md aims for 50 % or less")
