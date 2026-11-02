@@ -45,6 +45,8 @@ cycles per function (CI's emulator job does both).
 | 2026-11-02 92dbd5e (= P11W's audio) | 188 % | 209 % | ~half lost |
 | 2026-11-02 5918797 (v2.1) | 44.0 % | 69.8 % | 0 |
 | 2026-11-02 ca04914 STRESS build (every source densest) | 302 % | 483 % | 964 of 970; audio collapses |
+| 2026-11-02 v2.2-margin (B, exact): normal | 43.5 % | 60.9 % | 0; the bound 95.9 % (was 113.8 %) |
+| 2026-11-02 v2.2-margin (B, exact): STRESS | 229 % | 389 % | still collapses: 58 Bloom petals |
 
 ## Known gaps
 
