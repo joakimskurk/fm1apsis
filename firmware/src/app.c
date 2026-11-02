@@ -772,8 +772,10 @@ static void app_audio(int32_t *out, uint32_t n)
             for (i = 0u; i < 3u; ++i)
                 if (plan_ticks[i] / FM1_TICKS_PER_US > apsis_plan_probe[i]) apsis_plan_probe[i] = plan_ticks[i] / FM1_TICKS_PER_US;
 #endif
-        if (us > 4644u) apsis_over_probe[0]++;
-        if (us >= 5805u) apsis_over_probe[1]++;
+        if (apsis_load_probe[2] >= BOOT_BLOCKS) {    /* (the boot blocks have their own probe) */
+            if (us > 4644u) apsis_over_probe[0]++;
+            if (us >= 5805u) apsis_over_probe[1]++;
+        }
     }
     apsis_load_probe[2]++;
     apsis_load_probe[3] += us;

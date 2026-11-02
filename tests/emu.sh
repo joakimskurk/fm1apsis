@@ -48,7 +48,7 @@ if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the perfor
     exit 0
 fi
 
-FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot ${EMU_MS:-20000} > "$OUT/emu.log" 2>&1 || {
+FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" ${EMU_ARGS:-} --fwsc "$PKG" --shot ${EMU_MS:-20000} > "$OUT/emu.log" 2>&1 || {
     cat "$OUT/emu.log"; echo "FAIL: the emulator stopped"; exit 1; }
 cp work/panel.ppm "$OUT/panel.ppm" 2>/dev/null || true
 python3 - "$OUT" "${STRESS:-0}" <<'PY'
@@ -85,8 +85,22 @@ print("worst block by part (us): " + ", ".join(f"{k} {v}" for k, v in zip(PARTS,
 print("each part's own worst (us, at s): " + ", ".join(f"{k} {v} @{b * 256 / 44100:.1f}" for k, v, b in zip(PARTS, part_max, part_at)))
 print(f"the first 16 blocks after boot (kept apart): worst {boot} us")
 print(f"blocks over 80 %: {over[0]}, over 100 %: {over[1]}")
-print(f"the bound (each part's own worst, added up): {r['bound_us']} us ({r['bound_pct']} %); "
-      "docs/MARGIN_PLAN.md aims for 50 % or less")
+if "apsis_c1_probe" in syms and words("apsis_c1_probe", 4)[0]:
+    # two cores: core 0's own parts, and the String job (core 1) against core 0's work beside it; part 1 (the
+    # job done here) and part 2 (the wait) are what the one-core and the two-core timelines add instead
+    pm = dict(zip(PARTS, part_max))
+    job = words("apsis_c1_probe", 4)[3]
+    beside = pm["Clock"] + pm["planning"] + pm["Spiral+Bloom sound"]
+    two = pm["updates+Clock triggers"] + max(job, beside) + pm["commits"] + pm["triggers"] + pm["room+Motion"]
+    one = sum(part_max) - pm["wait for core 1"]
+    r["bound_two_cores_us"], r["bound_one_core_us"] = two, one
+    r["bound_us"], r["bound_pct"] = two, round(100 * two / BUDGET, 1)
+    (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
+    print(f"the bound, two cores: {two} us ({100 * two / BUDGET:.1f} %) (the String job {job} us beside core 0's "
+          f"{beside}); one core (core 1 off): {one} us ({100 * one / BUDGET:.1f} %)")
+else:
+    print(f"the bound (each part's own worst, added up): {r['bound_us']} us ({r['bound_pct']} %); "
+          "docs/MARGIN_PLAN.md aims for 50 % or less")
 if "apsis_voice_probe" in syms:
     vp = words("apsis_voice_probe", 4)
     r["voices"] = {"string_logical": vp[0], "string_physical": vp[1], "bloom_petals": vp[2]}
@@ -117,8 +131,10 @@ if "apsis_c1_probe" in syms:
     print(f"core 1: {c1[0]} blocks there, {c1[1]} on core 0 (screening or off), {c1[2]} late; its job's worst {c1[3]} us")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
-if worst >= BUDGET:
-    sys.exit("FAIL: a block took longer than its 5.8 ms: the sound drops out")
+if over[1]:
+    sys.exit(f"FAIL: {over[1]} blocks after boot took longer than their 5.8 ms: the sound drops out")
+if stress and r["bound_us"] >= BUDGET:
+    sys.exit(f"FAIL: the bound ({r['bound_us']} us) is over the block: the densest settings could drop out")
 if r["bound_us"] >= BUDGET:
     print("WARNING: the bound is over the budget: blocks where the parts' worsts meet would drop out")
 if worst > BUDGET // 2:
