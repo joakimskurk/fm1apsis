@@ -36,6 +36,9 @@ jobs:
           test "$(git hash-object apsis/apsis_space_room.c)" = 'ee00267cbbaef04bb1eed963b7b5cb1c2cc46346'
           echo 'PASS: Phase 12A preflight starts from exact frozen P11W production source'
 
+      - name: Prepare pinned Dinghy checkout
+        run: bash ci/prepare_dinghy.sh
+
       - name: JieLi Linux toolchain
         run: |
           mkdir -p ~/.jieli
