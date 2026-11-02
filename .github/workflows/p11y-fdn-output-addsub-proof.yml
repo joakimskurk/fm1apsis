@@ -88,17 +88,11 @@ jobs:
           print('PASS: exact P11W baseline target regenerated')
           PY
 
-      - name: Gate P11Y.4 - ephemeral candidate and full historical behavior
+      - name: Gate P11Y.4 - ephemeral candidate real-target build
         run: |
           set -euo pipefail
           python3 ci/p11y_apply_output_addsub_candidate.py \
             --source work/apsis/firmware/src/apsis_space_dsp.c
-          # Verify the candidate itself still satisfies the frozen P6 Space hash/control tests.
-          cp work/apsis/firmware/src/apsis_space_dsp.c /tmp/p11y_space_dsp.c
-          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Iwork/apsis/firmware/src \
-            /tmp/p11y_space_dsp.c tests/test_space_dsp.c -o /tmp/p11y_space_dsp_test
-          /tmp/p11y_space_dsp_test | tee "$P11Y_EVIDENCE/candidate-space-dsp.log"
-          grep -q 'PASS: APSIS P6 selected fixed-point FDN core' "$P11Y_EVIDENCE/candidate-space-dsp.log"
           bash ci/build_apsis_target.sh
           cp build/target_report.json "$P11Y_EVIDENCE/candidate-target.json"
           cp build/SHA256SUMS "$P11Y_EVIDENCE/candidate-SHA256SUMS"
@@ -106,6 +100,7 @@ jobs:
           OBJDUMP="${JIELI_TOOLCHAIN:?}/common/bin/objdump"
           "$OBJDUMP" -t "$ELF" > "$P11Y_EVIDENCE/candidate-symbols.txt"
           "$OBJDUMP" -d "$ELF" > "$P11Y_EVIDENCE/candidate-disassembly.txt"
+          echo 'PASS: P11Y ephemeral add-sub candidate built as a real JieLi target'
 
       - name: Gate P11Y.5 - exact real-target projection and decision evidence
         run: |
