@@ -65,7 +65,7 @@ static void test_inactive_context_is_bit_exact_m3c(void)
         remaining -= frames;
     }
 
-    assert(sizeof(ApsisRuntime) == 21928u);
+    assert(sizeof(ApsisRuntime) == 21032u);
     assert(same_bytes(&r0, &r1, sizeof(r0)));
     assert(same_bytes(&s0, &s1, sizeof(s0)));
     assert(same_bytes(&b0, &b1, sizeof(b0)));
