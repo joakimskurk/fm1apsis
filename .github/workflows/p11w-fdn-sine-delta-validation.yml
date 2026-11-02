@@ -141,13 +141,13 @@ jobs:
           python3 - <<'PY' | tee "$P11W_EVIDENCE/active-target-check.log"
           import json
           r=json.load(open('build/target_report.json'))
-          assert r['product'] == 'FM-1_972', r
-          assert r['image'] <= 137736, r
-          assert r['ram'] == 87572, r
-          assert r['pool'] == 319176, r
-          assert r['package_bytes'] == 610110, r
-          print('P11W active target', r)
-          print('PASS: P11W active target resources remain within frozen P11R envelope')
+          expected={
+              'product':'FM-1_972','image':137736,'ram':87572,'pool':319176,
+              'ram_headroom':10732,'pool_headroom':24888,'package_bytes':610110,
+              'package_sha256':'4685179ba074dfa090fc3a0603830d50c40cddae8dca97755f144cd0a885af63',
+          }
+          for k,v in expected.items(): assert r[k] == v, (k,r[k],v,r)
+          print('PASS: P11W active target exactly frozen', r)
           PY
           bash ci/emulator_motion_active.sh build/apsis-0.1-dev.fwsc 2>&1 \
             | tee "$P11W_EVIDENCE/active-motion.log"
