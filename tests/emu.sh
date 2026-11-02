@@ -11,7 +11,8 @@ PKG=${1:?package}; ELF=${2:?elf}; OUT=${3:-build/emu}
 EMU=${EMU:?EMU must point at fm1-live}
 OBJDUMP=${OBJDUMP:-${JIELI_TOOLCHAIN:?JIELI_TOOLCHAIN or OBJDUMP}/common/bin/objdump}
 mkdir -p "$OUT"
-ADDR=$("$OBJDUMP" -t "$ELF" | awk '$NF == "apsis_load_probe" { print $1 }')
+"$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
+ADDR=$(awk '$NF == "apsis_load_probe" { print $1 }' "$OUT/symbols.txt")
 [ -n "$ADDR" ] || { echo "apsis_load_probe not in $ELF"; exit 2; }
 
 # ids: buttons 0..13 (OCT- OCT+ FX SEL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC), keys 14..40; eN:clicks encoders
@@ -25,30 +26,37 @@ KEYS="$KEYS,13000:10,13050:10^,14000:11,14050:11^,15000:8,15050:8^,16000:e5:+3"
 if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the performance (BLOOM, petals)
     FM1_STRICT=1 FM1_TPROF="$OUT/tprof.txt,6000,8000" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 8100 \
         > "$OUT/emu.log" 2>&1 || { cat "$OUT/emu.log"; exit 1; }
-    "$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
     python3 "$(dirname "$0")/../tools/profile_report.py" "$OUT/tprof.txt" "$OUT/symbols.txt" 40 > "$OUT/profile.txt"
     exit 0
 fi
 
-FM1_STRICT=1 FM1_DUMP="$ADDR" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 20000 > "$OUT/emu.log" 2>&1 || {
+FM1_STRICT=1 FM1_DUMPRAM="$OUT/ram.bin" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 20000 > "$OUT/emu.log" 2>&1 || {
     cat "$OUT/emu.log"; echo "FAIL: the emulator stopped"; exit 1; }
 cp work/panel.ppm "$OUT/panel.ppm" 2>/dev/null || true
 python3 - "$OUT" <<'PY'
 import json, re, sys
 from pathlib import Path
 out = Path(sys.argv[1])
-log = (out / "emu.log").read_text(errors="replace")
-m = re.search(r"^dump 0x[0-9a-f]+: ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})", log, re.M)
-if not m:
-    print(log); sys.exit("FAIL: no apsis_load_probe dump in the emulator's output")
-last, worst, blocks, total = (int(g, 16) for g in m.groups())
+import struct
+ram = (out / "ram.bin").read_bytes()
+syms = {l.split()[-1]: int(l.split()[0], 16) for l in (out / "symbols.txt").read_text(errors="replace").splitlines()
+        if l[:8].strip() and len(l.split()) >= 2 and all(c in "0123456789abcdef" for c in l.split()[0])}
+def words(name, n):
+    a = syms[name] - 0x01C00000
+    return struct.unpack_from("<%dI" % n, ram, a)
+last, worst, blocks, total = words("apsis_load_probe", 4)
+parts = words("apsis_worst_probe", 4) if "apsis_worst_probe" in syms else (0, 0, 0, 0)
 BUDGET = 5805
 avg = total / blocks if blocks else 0
 r = {"blocks": blocks, "avg_us": round(avg), "worst_us": worst, "last_us": last, "budget_us": BUDGET,
-     "avg_pct": round(100 * avg / BUDGET, 1), "worst_pct": round(100 * worst / BUDGET, 1)}
+     "avg_pct": round(100 * avg / BUDGET, 1), "worst_pct": round(100 * worst / BUDGET, 1),
+     "worst_parts_us": {"sources": parts[0], "runtime_spiral_bloom": parts[1], "triggers": parts[2],
+                        "room_motion": parts[3]}}
 (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
 print(f"audio load (FM1_STRICT, 20 s scripted): avg {r['avg_us']} us ({r['avg_pct']} %), "
       f"worst {worst} us ({r['worst_pct']} %) of {BUDGET} us, {blocks} blocks")
+print(f"worst block by part (us): sources {parts[0]}, runtime+Spiral+Bloom {parts[1]}, triggers {parts[2]}, "
+      f"room+Motion {parts[3]}")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:

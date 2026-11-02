@@ -184,6 +184,18 @@ static volatile uint8_t runtime_ready;
  * block, blocks rendered, their total (us; a block is 5805 us). */
 static volatile uint32_t apsis_runtime_probe[6];
 static volatile uint32_t apsis_load_probe[4];
+/* the worst block so far, by part (us): the sustained sources (String, Drift, Clock, transients), the runtime
+ * with Spiral and Bloom, the triggered notes (strums, rhythm, plucks, Bloom gestures), the room and Motion */
+static volatile uint32_t apsis_worst_probe[4];
+static uint32_t block_part_us[4];
+static uint32_t block_mark;
+
+static void block_part(uint32_t part)
+{
+    uint32_t now = fm1_ticks();
+    block_part_us[part] = (uint32_t)(now - block_mark) / FM1_TICKS_PER_US;
+    block_mark = now;
+}
 static ApsisStringTransientPool string_transient_pool;
 static ApsisStringAttractorRuntime string_attractor_runtime;
 static ApsisSpiralAudioRuntime spiral_audio_runtime;
@@ -368,6 +380,7 @@ static void render_block(int32_t *out, uint32_t n)
      * inside a 256-frame callback can therefore sound at most one callback
      * late, never early. Sample-exact structural-to-audio handoff is Phase 5. */
     if (runtime_ready) {
+        block_mark = fm1_ticks();
         apsis_space_target_begin_block(&space_target, n);
         if (apsis_string_motion_active || apsis_string_motion_mailbox.pending)
             apsis_p10_motion_prepare_block(n);
@@ -418,6 +431,7 @@ static void render_block(int32_t *out, uint32_t n)
                 &space_target, out, n, apsis.string.send_q15, apsis.mother.mix_q15[0],
                 (uint8_t)(apsis.mother.mute_mask & (1u << 0)));
         }
+        block_part(0u);
         if (!spiral_audio_started && apsis.spiral.sound && apsis.spiral.route_count)
             spiral_audio_started = 1u;
         if (!bloom_audio_started &&
@@ -498,6 +512,7 @@ static void render_block(int32_t *out, uint32_t n)
                                            &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
                                            &rhythm_observation);
         }
+        block_part(1u);
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
             (void)apsis_string98_strum(&string_transient_pool, &apsis, &string_pitch_memory,
                                        &string_attractor_runtime.binding[attr_ix], apsis_runtime.cursor_sample);
@@ -560,9 +575,11 @@ static void render_block(int32_t *out, uint32_t n)
                     bloom_audio_started = 1u;
             }
         }
+        block_part(2u);
         apsis_space_target_render(&space_target, &apsis.space, out, n);
         if (apsis_string_motion_active)
             apsis_p10_motion_finish_block();
+        block_part(3u);
         apsis_runtime_probe[0] = 0x41505349u; /* "APSI" */
         apsis_runtime_probe[1] = apsis_runtime.queue_high_water;
         apsis_runtime_probe[2] = apsis_runtime.queue_overflowed;
@@ -579,8 +596,11 @@ static void app_audio(int32_t *out, uint32_t n)
     render_block(out, n);
     us = (uint32_t)(fm1_ticks() - t0) / FM1_TICKS_PER_US;
     apsis_load_probe[0] = us;
-    if (us > apsis_load_probe[1])
+    if (us > apsis_load_probe[1]) {
+        uint32_t i;
         apsis_load_probe[1] = us;
+        for (i = 0u; i < 4u; ++i) apsis_worst_probe[i] = block_part_us[i];
+    }
     apsis_load_probe[2]++;
     apsis_load_probe[3] += us;
 }
