@@ -161,23 +161,40 @@ static uint8_t bloom_pitch_class(int16_t step)
     return (uint8_t)pc;
 }
 
-static int32_t bloom_candidate_cost(const ApsisState *s, const ApsisBloomHarmony *h,
-                                    const ApsisBloomVoicingState *vs, const BloomCandidate *c)
-{
-    int16_t base[APSIS_BLOOM_VOICES_MAX];
-    uint8_t n = c->plan.count, i, pi, base_n;
-    int16_t min = c->steps[0], max = c->steps[n - 1u];
-    uint16_t spread = apsis_bloom_spread_target_q15(s, h);
-    int32_t span_milli = (int32_t)(max - min) * 1000;
-    int32_t target_span = 10000 + (int32_t)(((uint32_t)spread * 24000u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
-    int32_t center_milli = (int32_t)(min + max) * 500;
-    int32_t base_center, desired, cost;
-    int8_t reg = s ? bloom_clamp_i8(s->bloom.register_oct, -1, 1) : 0;
-    uint8_t grav_inv = h ? (h->inversion >= n ? (uint8_t)(n - 1u) : h->inversion) : 0u;
+/* what bloomVoicingCost needs that is the same for every candidate of one choice: worked out once */
+typedef struct {
+    int32_t target_span;
+    int32_t desired;
+    int32_t same_penalty;
+    uint8_t grav_inv;
+} BloomCostFrame;
 
-    base_n = apsis_bloom_base_chord_steps(s, h, base);
-    base_center = base_n ? (int32_t)(base[0] + base[base_n - 1u]) * 500 + reg * 12000 : 0;
-    desired = base_center + (vs ? vs->drift_milli : 0);
+static BloomCostFrame bloom_cost_frame(const ApsisState *s, const ApsisBloomHarmony *h,
+                                       const ApsisBloomVoicingState *vs, uint8_t n,
+                                       const int16_t *base, uint8_t base_n)
+{
+    BloomCostFrame f;
+    uint16_t spread = apsis_bloom_spread_target_q15(s, h);
+    int8_t reg = s ? bloom_clamp_i8(s->bloom.register_oct, -1, 1) : 0;
+    int32_t base_center = base_n ? (int32_t)(base[0] + base[base_n - 1u]) * 500 + reg * 12000 : 0;
+    f.target_span = 10000 + (int32_t)(((uint32_t)spread * 24000u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
+    f.desired = base_center + (vs ? vs->drift_milli : 0);
+    f.same_penalty = 9500 + (int32_t)(((uint32_t)spread * 4500u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
+    f.grav_inv = h ? (h->inversion >= n ? (uint8_t)(n - 1u) : h->inversion) : 0u;
+    return f;
+}
+
+static int32_t bloom_candidate_cost(const BloomCostFrame *f, const ApsisBloomVoicingState *vs,
+                                    const BloomCandidate *c)
+{
+    uint8_t n = c->plan.count, i, pi;
+    int16_t min = c->steps[0], max = c->steps[n - 1u];
+    int32_t span_milli = (int32_t)(max - min) * 1000;
+    int32_t center_milli = (int32_t)(min + max) * 500;
+    const int32_t target_span = f->target_span, desired = f->desired;
+    const uint8_t grav_inv = f->grav_inv;
+    int32_t cost;
+
     cost = (bloom_abs_i32(span_milli - target_span) * 420 + 500) / 1000;
     cost += (bloom_abs_i32(center_milli - desired) * 300 + 500) / 1000;
 
@@ -200,7 +217,7 @@ static int32_t bloom_candidate_cost(const ApsisState *s, const ApsisBloomHarmony
         if (vs->last_count == n) {
             uint8_t same = 1u;
             for (i = 0u; i < n; ++i) if (c->steps[i] != vs->last_steps[i]) { same = 0u; break; }
-            if (same) cost += 9500 + (int32_t)(((uint32_t)spread * 4500u + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
+            if (same) cost += f->same_penalty;
         }
     }
     if (n) {
@@ -255,7 +272,9 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
     ApsisBloomHarmony local;
     BloomCandidate top[5];
     ApsisBloomPlan fallback;
-    uint8_t top_count = 0u, n, inv, pattern, whole_ix, i, pool_count, pick;
+    BloomCostFrame frame;
+    int16_t base[APSIS_BLOOM_VOICES_MAX];
+    uint8_t top_count = 0u, n, inv, pattern, whole_ix, i, pool_count, pick, base_n;
     int8_t reg;
     if (!h) { apsis_bloom_harmony_from_state(s, &local); h = &local; }
     fallback = apsis_bloom_legacy_plan(s, h);
@@ -263,6 +282,8 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
     n = apsis_bloom_voice_count(s, h);
     reg = bloom_clamp_i8(s->bloom.register_oct, -1, 1);
     if (advance) bloom_advance_drift(s, h, vs, walk_random);
+    base_n = apsis_bloom_base_chord_steps(s, h, base);   /* (n voices: the same count) */
+    frame = bloom_cost_frame(s, h, vs, n, base, base_n);
 
     for (inv = 0u; inv < n; ++inv) {
         for (pattern = 0u; pattern < 6u; ++pattern) {
@@ -282,10 +303,13 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
                     c.plan.tone[i] = tone;
                     c.plan.octave[i] = (int8_t)((tone < inv ? 1 : 0) + extras[pattern][i] + reg + whole);
                 }
-                apsis_bloom_plan_steps(s, h, &c.plan, c.steps);
+                /* apsis_bloom_plan_steps() on the base chord worked out once */
+                for (i = 0u; i < n; ++i)
+                    c.steps[i] = (int16_t)(base[c.plan.tone[i] % n] + bloom_clamp_i8(c.plan.octave[i], -5, 6) * 12);
+                bloom_sort_i16(c.steps, n);
                 min = c.steps[0]; max = c.steps[n - 1u];
                 if ((max - min) < 7 || (max - min) > 43) continue;
-                c.score = bloom_candidate_cost(s, h, vs, &c);
+                c.score = bloom_candidate_cost(&frame, vs, &c);
                 bloom_top_insert(top, &top_count, &c);
             }
         }
