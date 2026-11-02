@@ -1,0 +1,39 @@
+name: APSIS Phase 11Y one-shot harness fix
+
+on:
+  push:
+    branches: [p11y-fdn-output-addsub-proof-staging]
+    paths: [.github/workflows/p11y-fix-harness.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-harness:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - name: Initialize complete local buffers for sanitizer compiler proof
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/test_p11y_fdn_output_addsub_equivalence.c')
+          s=p.read_text()
+          old='    int32_t input[64], oa[128], ob[128];\n'
+          new='    int32_t input[64] = {0}, oa[128] = {0}, ob[128] = {0};\n'
+          if s.count(old) != 1:
+              raise SystemExit('P11Y local-buffer declaration anchor mismatch')
+          p.write_text(s.replace(old,new,1))
+          PY
+          git diff --check
+          git diff -- tests/test_p11y_fdn_output_addsub_equivalence.c
+      - name: Commit harness-only compiler fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/test_p11y_fdn_output_addsub_equivalence.c
+          git commit -m 'phase11y: initialize proof buffers for sanitizer build'
+          git push origin HEAD:p11y-fdn-output-addsub-proof-staging
