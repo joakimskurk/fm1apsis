@@ -6,7 +6,7 @@ name: ci
 
 on:
   push:
-    branches: [main, v2]
+    branches: [main, v2, 'v2.*']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -131,3 +131,7 @@ jobs:
         with:
           name: emulator
           path: build/emu
+      - uses: actions/upload-artifact@v4   # (the pinned fm1-live, for `make emu` on a computer without Rust)
+        with:
+          name: fm1-live-linux-x86_64
+          path: ~/fm1-emu/target/release/fm1-live

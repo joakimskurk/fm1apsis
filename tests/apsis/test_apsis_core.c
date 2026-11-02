@@ -15,7 +15,7 @@ static void test_defaults(void)
     ApsisState s;
     apsis_state_default(&s);
     assert(s.version == APSIS_STATE_VERSION);
-    assert(s.string.surface_mode == APSIS_STRING_DUAL);
+    assert(s.string.surface_mode == APSIS_STRING_CLASSIC);   /* one string (Study 98) */
     assert(s.string.left_split_q15 == APSIS_Q15_MILLI(470));
     assert(s.string.right_split_q15 == APSIS_Q15_MILLI(530));
     assert(s.string.left_anchor == APSIS_ANCHOR_ROOT);
@@ -116,22 +116,23 @@ static void test_string(void)
     assert(iabs32(apsis_string_magnitude_milli(APSIS_Q15_MILLI(530), APSIS_Q15_ONE) - 2080) <= 4);
     assert(apsis_string_magnitude_milli(APSIS_Q15_MILLI(800), APSIS_Q15_ONE) >= 23995);
     assert(apsis_string_magnitude_milli(APSIS_STRING_SPLIT_MAX_Q15, APSIS_Q15_ONE) == 36000);
+    /* one string: nothing mirrors */
     apsis_string_set_side_split(&s.string, APSIS_SIDE_LEFT, APSIS_Q15_MILLI(400), 1u);
     assert(s.string.left_split_q15 == APSIS_Q15_MILLI(400));
-    assert(iabs32((int32_t)s.string.right_split_q15 - (int32_t)APSIS_Q15_MILLI(600)) <= 1);
+    assert(s.string.right_split_q15 == APSIS_Q15_MILLI(530));
     apsis_state_default(&s);
     apsis_string_pitch_memory_reset(&mem);
     assert(apsis_string_anchor_step(&s, APSIS_SIDE_LEFT) == 0);
-    assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 7);
+    assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 0);   /* Study 98: the string's 1:1 is the root */
     raw = apsis_string_raw_step_milli(&s, APSIS_SIDE_RIGHT);
-    assert(iabs32(raw - 9080) <= 4);
-    assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u) == 9000);
+    assert(iabs32(raw - 2080) <= 4);
+    assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u) == 2000);
     s.string.quantize = 0u;
     assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 1u) == raw && mem.right_valid == 0u);
     apsis_state_default(&s);
     s.gravity.degree = 7u;
-    assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 19);
-    assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 0u) == 21000);
+    assert(apsis_string_anchor_step(&s, APSIS_SIDE_RIGHT) == 12);
+    assert(apsis_string_target_step_milli(&s, APSIS_SIDE_RIGHT, &mem, 0u) == 14000);
     apsis_state_default(&s);
     apsis_string_pitch_memory_reset(&mem);
     s.string.harmony = APSIS_HARMONY_CHROMATIC;

@@ -226,7 +226,7 @@ static ExtremeResult run_extreme(uint32_t seed)
     assert(a.advance_count > 1000u);
     assert(a.mutation_count > 1000u);
     assert(a.excitation_count == a.advance_count);
-    assert(a.bind_count > 2000u);
+    assert(a.bind_count > 1000u);   /* one string: one bind per gated excitation (Dual bound both sides) */
     assert(r.spiral_occurrence_count > 2000u);
     assert(r.bloom_occurrence_count > 500u);
 

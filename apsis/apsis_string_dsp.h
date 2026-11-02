@@ -21,8 +21,7 @@ typedef enum {
 
 typedef enum {
     APSIS_STRING_DSP_WAVE_SINE = 0,
-    APSIS_STRING_DSP_WAVE_TRIANGLE,
-    APSIS_STRING_DSP_WAVE_BODY
+    APSIS_STRING_DSP_WAVE_TRIANGLE
 } ApsisStringDspWaveform;
 
 typedef struct {
@@ -98,7 +97,6 @@ typedef struct {
     uint16_t mix_right_q15;
     uint16_t lowpass_alpha_q15;
     uint16_t attack_left_samples;
-    uint16_t body_hold_left_samples;
     uint16_t steal_left_samples;
     uint8_t waveform;
     uint8_t active;
@@ -114,12 +112,12 @@ typedef struct {
     uint32_t transient_drop_count;
     uint16_t transient_logical_high_water;
     uint16_t transient_physical_high_water;
+    uint64_t last_pluck_sample;   /* stringPluck's 35 ms guard (apsis_string98.c) */
+    uint8_t pluck_seen;
 } ApsisStringTransientPool;
 
-/* Source-resolved persistent acoustic targets:
- * - Study-98 Foundation in both modes;
- * - Study-98 Classic sine/Drift pair in Classic;
- * - Study-126 BODY/WIRE pair in Dual, which did not exist in Study 98. */
+/* The persistent String of Study 98 (refreshDrone, CLASSIC character): the Foundation pair around the Gravity
+ * root and the Classic sine pair around the string's pitch, both beating by the Drift delta. */
 void apsis_string_dsp_targets(const ApsisState *state,
                               ApsisStringPitchMemory *pitch_memory,
                               uint8_t transport_running,
@@ -150,8 +148,7 @@ uint8_t apsis_string_dsp_trigger_classic(ApsisStringTransientPool *pool,
                                          uint8_t pizz,
                                          uint16_t root_gain_q15);
 
-/* Same Study-98 partial primitive with an additional event-relative start
- * offset. M4b2 uses this for the Study-126 Classic composite's +4 ms WIRE leg. */
+/* The same note starting start_offset_samples into the block (a strum bound to its exact sample). */
 uint8_t apsis_string_dsp_trigger_classic_offset(ApsisStringTransientPool *pool,
                                                 const ApsisState *state,
                                                 uint32_t base_freq_millihz,
@@ -162,18 +159,6 @@ uint8_t apsis_string_dsp_trigger_classic_offset(ApsisStringTransientPool *pool,
                                                 uint16_t root_gain_q15,
                                                 uint32_t start_offset_samples);
 
-/* Native Study-126 BODY/bowed voice. The oscillator identity is the same
- * seven-harmonic BODY waveform already accepted for M4a sustain. The finite
- * envelope uses source attack/release/brightness/pan inputs and no noise layer. */
-uint8_t apsis_string_dsp_trigger_body(ApsisStringTransientPool *pool,
-                                      const ApsisState *state,
-                                      uint32_t base_freq_millihz,
-                                      uint16_t level_q15,
-                                      uint32_t duration_ms,
-                                      int16_t pan_q15,
-                                      uint16_t brightness_q15,
-                                      uint32_t attack_ms,
-                                      uint32_t start_offset_samples);
 
 uint16_t apsis_string_dsp_transient_logical_active(const ApsisStringTransientPool *pool);
 uint16_t apsis_string_dsp_transient_physical_active(const ApsisStringTransientPool *pool);
@@ -184,11 +169,10 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
                              ApsisStringPitchMemory *pitch_memory,
                              uint8_t transport_running);
 
-/* Frozen M4a sustain renderer. */
+/* The persistent String. */
 void apsis_string_dsp_render(ApsisStringDsp *dsp, int32_t *out, uint32_t frames);
 
-/* M4b finite transient renderer: Study-98 Classic/pizz plus native Study-126
- * BODY voices share one global 80+32 pool/steal ceiling. */
+/* The finite notes: one 80+32 pool, one steal policy. */
 void apsis_string_transient_render(ApsisStringTransientPool *pool, int32_t *out,
                                    uint32_t frames);
 

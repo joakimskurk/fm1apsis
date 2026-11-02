@@ -321,10 +321,10 @@ uint16_t apsis_controls_string_split_nudge(uint8_t side, uint16_t current_split,
 
 uint8_t apsis_controls_string_mode_step(uint8_t current_mode, int32_t detents)
 {
-    uint8_t mode = current_mode == APSIS_STRING_CLASSIC ? APSIS_STRING_CLASSIC : APSIS_STRING_DUAL;
-    int32_t odd = detents % 2;
-    if (odd < 0) odd = -odd;
-    return odd ? (uint8_t)(mode == APSIS_STRING_CLASSIC ? APSIS_STRING_DUAL : APSIS_STRING_CLASSIC) : mode;
+    /* one string (Study 98): there is no Dual mode to step to */
+    (void)current_mode;
+    (void)detents;
+    return APSIS_STRING_CLASSIC;
 }
 
 uint8_t apsis_controls_string_param_edits(const ApsisStringState *string,

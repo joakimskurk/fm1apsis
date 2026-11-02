@@ -197,3 +197,18 @@ FM1_STRICT and fails on a drop-out.
 ## 2026-11-02 - One source per module
 
 **Decision:** The module the firmware ships is the module the tests test. No target-only rewrites of DSP.
+
+## 2026-11-02 - The String is Study 98's: one string
+
+**Decision:** The String's sound and structure follow Study 98 (`old_index.html`): one string, the persistent
+Foundation + Classic sine pair, and every finite note a `classicStringNote` (stringPluck / keyboardStringStrum,
+stringRhythm bow/pizz/motion, turingStrum). Study 126's Dual String (left/right sides, BODY/WIRE voices,
+anchors, Classic/Dual switch) is removed from the sound and the default; `surface_mode` is always CLASSIC.
+Other modules keep Study 126 as their authority. Mutable Instruments' Rings/Plaits (MIT) may be borrowed where
+an algorithm is heavy, translated to fixed point (the FM-1 has no FPU) and credited.
+
+**Why:** The user's call: Study 98's String sounds better and is one string. It is also far cheaper (no 7-sine
+BODY wave per sample, no BODY transients).
+
+**Not yet:** Study 98's hybrid and bowed characters (stringSolo's body/noise path); the Dual remnants in the
+controls, Motion lanes and surfaces are unreachable and still to be removed.

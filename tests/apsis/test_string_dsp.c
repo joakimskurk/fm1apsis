@@ -28,34 +28,8 @@ static int target_contract(void)
     apsis_string_pitch_memory_reset(&m);
     CHECK(apsis_drift_audible_delta_millihz(&s.drift) == 587u);
 
-    /* Default Study-126 mode is Dual. Study 98 supplies Foundation; the two
-       side voices retain Study-126 BODY/WIRE because Study 98 had no Dual. */
-    apsis_string_dsp_targets(&s, &m, 1u, &t);
-    CHECK(t.enabled[0] && t.enabled[1] && t.enabled[2] && t.enabled[3]);
-    CHECK(absdiff_u32(t.freq_millihz[0], 65084u) <= 2u);
-    CHECK(absdiff_u32(t.freq_millihz[1], 65730u) <= 2u);
-    CHECK(t.freq_millihz[2] == 146833u);
-    CHECK(t.freq_millihz[3] == 220000u);
-    CHECK(t.gain_q15[0] == 218u && t.gain_q15[1] == 218u);
-    CHECK(t.gain_q15[2] == 378u);
-    CHECK(t.gain_q15[3] == 276u);
-    CHECK(t.waveform[2] == APSIS_STRING_DSP_WAVE_BODY);
-    CHECK(t.waveform[3] == APSIS_STRING_DSP_WAVE_TRIANGLE);
-    CHECK(t.lowpass_alpha_q15[2] == 6493u);
-    CHECK(t.lowpass_alpha_q15[3] == 13148u);
-    CHECK(t.mix_left_q15[2] == 26955u && t.mix_right_q15[2] == 18630u);
-    CHECK(t.mix_left_q15[3] == 18630u && t.mix_right_q15[3] == 26955u);
-
-    /* Left and right are genuinely independent native String targets. */
-    apsis_string_set_side_split(&s.string, APSIS_SIDE_LEFT, APSIS_Q15_MILLI(430), 0u);
-    apsis_string_pitch_memory_reset(&m);
-    apsis_string_dsp_targets(&s, &m, 1u, &t);
-    CHECK(t.freq_millihz[2] != 146833u);
-    CHECK(t.freq_millihz[3] == 220000u);
-
-    /* Classic restores Study-98 sine/Drift sustain around one played pitch. */
+    /* Study 98: the Foundation pair and the sine/Drift pair around one played pitch (the default: one string) */
     apsis_state_default(&s);
-    s.string.surface_mode = APSIS_STRING_CLASSIC;
     apsis_string_pitch_memory_reset(&m);
     apsis_string_dsp_targets(&s, &m, 1u, &t);
     CHECK(t.enabled[0] && t.enabled[1] && t.enabled[2] && t.enabled[3]);
@@ -155,56 +129,6 @@ static int classic_render_contract(void)
     return 0;
 }
 
-static int dual_render_and_transition_contract(void)
-{
-    ApsisState s;
-    ApsisStringPitchMemory m;
-    ApsisStringDsp d;
-    int32_t buf[512];
-    uint32_t k, i, left_peak = 0u, right_peak = 0u;
-    uint32_t phase2, phase3;
-
-    apsis_state_default(&s);
-    apsis_string_pitch_memory_reset(&m);
-    apsis_string_dsp_reset(&d);
-    apsis_string_dsp_update(&d, &s, &m, 1u);
-    CHECK(d.voice[2].waveform == APSIS_STRING_DSP_WAVE_BODY);
-    CHECK(d.voice[3].waveform == APSIS_STRING_DSP_WAVE_TRIANGLE);
-    for (k = 0u; k < 300u; ++k) {
-        for (i = 0u; i < 512u; ++i) buf[i] = 0;
-        apsis_string_dsp_render(&d, buf, 256u);
-        for (i = 0u; i < 256u; ++i) {
-            uint32_t l = (uint32_t)abs_i32(buf[i * 2u]);
-            uint32_t r = (uint32_t)abs_i32(buf[i * 2u + 1u]);
-            if (l > left_peak) left_peak = l;
-            if (r > right_peak) right_peak = r;
-        }
-    }
-    CHECK(left_peak > 100u && right_peak > 100u);
-    CHECK(left_peak != right_peak);
-
-    /* Study-126 rebuild semantics become a native fade-to-zero timbre swap.
-       No phase reset is allowed while changing Dual -> Classic. */
-    phase2 = d.voice[2].phase;
-    phase3 = d.voice[3].phase;
-    s.string.surface_mode = APSIS_STRING_CLASSIC;
-    apsis_string_pitch_memory_reset(&m);
-    apsis_string_dsp_update(&d, &s, &m, 1u);
-    CHECK(d.voice[2].timbre_transition && d.voice[3].timbre_transition);
-    CHECK(d.voice[2].phase == phase2 && d.voice[3].phase == phase3);
-    for (k = 0u; k < 200u && (d.voice[2].timbre_transition || d.voice[3].timbre_transition); ++k) {
-        for (i = 0u; i < 512u; ++i) buf[i] = 0;
-        apsis_string_dsp_render(&d, buf, 256u);
-    }
-    CHECK(!d.voice[2].timbre_transition && !d.voice[3].timbre_transition);
-    CHECK(d.voice[2].waveform == APSIS_STRING_DSP_WAVE_SINE);
-    CHECK(d.voice[3].waveform == APSIS_STRING_DSP_WAVE_SINE);
-    CHECK(d.voice[2].gain_q15 > 0 && d.voice[3].gain_q15 > 0);
-    CHECK(d.voice[2].phase != phase2 && d.voice[3].phase != phase3);
-    printf("PASS: M4a Dual render L=%u R=%u\n", left_peak, right_peak);
-    return 0;
-}
-
 static int deterministic_contract(void)
 {
     ApsisState s;
@@ -238,7 +162,6 @@ int main(void)
 {
     CHECK(target_contract() == 0);
     CHECK(classic_render_contract() == 0);
-    CHECK(dual_render_and_transition_contract() == 0);
     CHECK(deterministic_contract() == 0);
     puts("PASS: APSIS M4a source-resolved persistent String DSP");
     return 0;

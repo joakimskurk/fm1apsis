@@ -41,18 +41,17 @@ static uint32_t render_hash(ApsisState *s, uint32_t blocks)
 int main(void)
 {
     ApsisState s;
-    uint32_t classic, dual;
+    uint32_t classic;
 
     apsis_state_default(&s);
     s.string.surface_mode = APSIS_STRING_CLASSIC;
     classic = render_hash(&s, 600u);
     CHECK(classic == 0xb20610c1u);
 
+    /* the default is that same one string now (Dual is gone) */
     apsis_state_default(&s);
-    dual = render_hash(&s, 200u);
-    CHECK(dual == 0x10d23cf4u);
+    CHECK(render_hash(&s, 600u) == classic);
 
-    printf("PASS: M4a frozen audio hashes Classic=%08x Dual=%08x with idle M4b\n",
-           classic, dual);
+    printf("PASS: the persistent String's audio hash %08x, idle transient pool a no-op\n", classic);
     return 0;
 }

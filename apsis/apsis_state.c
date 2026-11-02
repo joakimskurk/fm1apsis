@@ -26,7 +26,7 @@ void apsis_state_default(ApsisState *s)
     s->string.split_q15 = APSIS_Q15_MILLI(530);
     s->string.left_split_q15 = APSIS_Q15_MILLI(470);
     s->string.right_split_q15 = APSIS_Q15_MILLI(530);
-    s->string.surface_mode = APSIS_STRING_DUAL;
+    s->string.surface_mode = APSIS_STRING_CLASSIC;   /* one string (Study 98) */
     s->string.linked = 1u;
     s->string.active_side = APSIS_SIDE_RIGHT;
     s->string.left_anchor = APSIS_ANCHOR_ROOT;

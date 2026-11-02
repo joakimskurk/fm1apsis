@@ -10,7 +10,7 @@ CC="${CC:-cc}"
 fail=0
 
 pass() {   # $1 name, $2 flags
-    mkdir -p "$OUT/$1"
+    rm -rf "$OUT/$1" && mkdir -p "$OUT/$1"       # (no objects of a source that has since gone)
     for f in apsis/*.c; do
         b=$(basename "$f" .c)
         case $b in apsis_project_fm1|apsis_target_div64) continue ;; esac   # (the app's flash; the chip's division)

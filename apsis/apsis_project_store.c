@@ -93,7 +93,7 @@ static void store_normalize_keep(ApsisKeepSnapshot *s)
         return;
     }
     s->valid = 1u;
-    if (s->surface_mode > APSIS_STRING_DUAL) s->surface_mode = APSIS_STRING_CLASSIC;
+    s->surface_mode = APSIS_STRING_CLASSIC;   /* one string (Study 98); older records may say Dual */
     s->linked = s->linked ? 1u : 0u;
     if (s->left_anchor > APSIS_ANCHOR_NINTH) s->left_anchor = APSIS_ANCHOR_ROOT;
     if (s->right_anchor > APSIS_ANCHOR_NINTH) s->right_anchor = APSIS_ANCHOR_ROOT;

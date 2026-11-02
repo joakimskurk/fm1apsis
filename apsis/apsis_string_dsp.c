@@ -6,15 +6,9 @@
 #define MONO_Q15 32767u
 #define FOUNDATION_LP_ALPHA_Q15 4553u
 #define CLASSIC_LP_ALPHA_Q15 7412u
-#define BODY_LP_ALPHA_Q15 6493u
-#define WIRE_LP_ALPHA_Q15 13148u
 #define GAIN_ALPHA_Q15 11u
 #define TRANSPORT_RELEASE_ALPHA_Q15 17u
 #define TIMBRE_RELEASE_ALPHA_Q15 30u
-#define BODY_LEFT_Q15 26955u
-#define BODY_RIGHT_Q15 18630u
-#define WIRE_LEFT_Q15 18630u
-#define WIRE_RIGHT_Q15 26955u
 
 static const int16_t SDSP_SINE_QUARTER[65] = {
 0,804,1608,2410,3212,4011,4808,5602,6393,7179,7962,8739,9512,10278,11039,11793,
@@ -37,9 +31,6 @@ static const uint32_t SDSP_CENT_Q20[101] = {
 1091843u,1092473u,1093105u,1093736u,1094368u,1095000u,1095633u,1096266u,1096900u,1097533u,
 1098167u,1098802u,1099437u,1100072u,1100708u,1101344u,1101980u,1102617u,1103254u,1103891u,
 1104529u,1105167u,1105806u,1106445u,1107084u,1107724u,1108364u,1109004u,1109645u,1110286u,1110928u
-};
-static const uint16_t SDSP_BODY_COEFF_Q15[7] = {
-    19919u, 6175u, 2988u, 1693u, 1036u, 598u, 359u
 };
 
 static void sdsp_zero_bytes(void *ptr, uint32_t n)
@@ -145,23 +136,9 @@ static int16_t sdsp_triangle_q15(uint32_t phase)
     if (p < 49152u) return (int16_t)(32767 - (int32_t)(p - 16384u) * 2);
     return (int16_t)(-32767 + (int32_t)(p - 49152u) * 2);
 }
-static int16_t sdsp_body_q15(uint32_t phase)
-{
-    int64_t sum = 0;
-    uint8_t h;
-    for (h = 1u; h <= 7u; ++h) {
-        uint32_t hp = phase * (uint32_t)h + 0x40000000u;
-        sum += (int64_t)sdsp_sine_q15(hp) * SDSP_BODY_COEFF_Q15[h - 1u];
-    }
-    sum >>= 15;
-    if (sum > 32767) sum = 32767;
-    if (sum < -32767) sum = -32767;
-    return (int16_t)sum;
-}
 static int16_t sdsp_waveform_q15(uint8_t waveform, uint32_t phase)
 {
     if (waveform == APSIS_STRING_DSP_WAVE_TRIANGLE) return sdsp_triangle_q15(phase);
-    if (waveform == APSIS_STRING_DSP_WAVE_BODY) return sdsp_body_q15(phase);
     return sdsp_sine_q15(phase);
 }
 static uint32_t sdsp_smooth_u32(uint32_t current, uint32_t target, uint16_t alpha)
@@ -231,7 +208,7 @@ void apsis_string_dsp_targets(const ApsisState *s,
                            APSIS_STRING_DSP_WAVE_SINE, FOUNDATION_LP_ALPHA_Q15,
                            MONO_Q15, MONO_Q15, audible);
     }
-    if (s->string.surface_mode == APSIS_STRING_CLASSIC) {
+    {
         int32_t centre_step = apsis_string_target_step_milli(s, APSIS_SIDE_RIGHT,
                                                               pitch_memory, 1u);
         uint32_t centre = sdsp_frequency_millihz(s, centre_step);
@@ -243,21 +220,6 @@ void apsis_string_dsp_targets(const ApsisState *s,
         sdsp_target_common(out, 3u, centre + half, gain,
                            APSIS_STRING_DSP_WAVE_SINE, CLASSIC_LP_ALPHA_Q15,
                            MONO_Q15, MONO_Q15, audible);
-    } else {
-        int32_t left_step = apsis_string_target_step_milli(s, APSIS_SIDE_LEFT,
-                                                            pitch_memory, 1u);
-        int32_t right_step = apsis_string_target_step_milli(s, APSIS_SIDE_RIGHT,
-                                                             pitch_memory, 1u);
-        uint32_t left = sdsp_frequency_millihz(s, left_step);
-        uint32_t right = sdsp_frequency_millihz(s, right_step);
-        uint16_t body_gain = sdsp_mul_q15(sdsp_mul_q15(APSIS_Q15_MILLI(20),
-                                                       s->string.left_level_q15), string_level);
-        uint16_t wire_gain = sdsp_mul_q15(508u,
-                                          sdsp_mul_q15(s->string.right_level_q15, string_level));
-        sdsp_target_common(out, 2u, left, body_gain, APSIS_STRING_DSP_WAVE_BODY,
-                           BODY_LP_ALPHA_Q15, BODY_LEFT_Q15, BODY_RIGHT_Q15, audible);
-        sdsp_target_common(out, 3u, right, wire_gain, APSIS_STRING_DSP_WAVE_TRIANGLE,
-                           WIRE_LP_ALPHA_Q15, WIRE_LEFT_Q15, WIRE_RIGHT_Q15, audible);
     }
 }
 
@@ -295,7 +257,7 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
                              uint8_t transport_running)
 {
     ApsisStringDspTargets targets;
-    uint32_t glide_ms, wire_ms;
+    uint32_t glide_ms;
     uint8_t i;
     if (!dsp || !s) return;
     apsis_string_dsp_targets(s, pitch_memory, transport_running, &targets);
@@ -303,13 +265,11 @@ void apsis_string_dsp_update(ApsisStringDsp *dsp,
                APSIS_Q15_ONE;
     if (glide_ms < 25u) glide_ms = 25u;
     if (glide_ms > 800u) glide_ms = 800u;
-    wire_ms = glide_ms > 45u ? 45u : glide_ms;
     dsp->transport_running = transport_running ? 1u : 0u;
     dsp->voice[0].pitch_alpha_q15 = sdsp_alpha_for_ms(12u);
     dsp->voice[1].pitch_alpha_q15 = sdsp_alpha_for_ms(12u);
     dsp->voice[2].pitch_alpha_q15 = sdsp_alpha_for_ms(glide_ms);
-    dsp->voice[3].pitch_alpha_q15 = sdsp_alpha_for_ms(
-        s->string.surface_mode == APSIS_STRING_CLASSIC ? glide_ms : wire_ms);
+    dsp->voice[3].pitch_alpha_q15 = sdsp_alpha_for_ms(glide_ms);
     for (i = 0u; i < APSIS_STRING_DSP_VOICES; ++i) {
         ApsisStringDspVoice *v = &dsp->voice[i];
         uint8_t metadata_changed;

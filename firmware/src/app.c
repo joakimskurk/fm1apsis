@@ -20,9 +20,8 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_gravity.h"
 #include "apsis_string.h"
 #include "apsis_string_dsp.h"
-#include "apsis_string_rhythm_audio.h"
+#include "apsis_string98.h"
 #include "apsis_string_attractor.h"
-#include "apsis_string_attractor_audio.h"
 #include "apsis_drift.h"
 #include "apsis_drift_dsp.h"
 #include "apsis_clock.h"
@@ -54,7 +53,6 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_controls_dispatch.h"
 #include "apsis_controls_dirty.h"
 #include "apsis_controls_performance.h"
-#include "apsis_string_manual_audio.h"
 #include "apsis_bloom_manual_audio.h"
 #include "apsis_string_motion.h"
 #include "apsis_string_motion_dsp.h"
@@ -76,9 +74,8 @@ static const uint8_t lcd_busy = 0;
 #include "apsis_string.c"
 #include "apsis_string_dsp.c"
 #include "apsis_string_transient_pool.c"
-#include "apsis_string_rhythm_audio.c"
+#include "apsis_string98.c"
 #include "apsis_string_attractor.c"
-#include "apsis_string_attractor_audio.c"
 #include "apsis_drift.c"
 #include "apsis_drift_dsp.c"
 #include "apsis_clock.c"
@@ -154,7 +151,6 @@ static int project_flash_write(uint32_t at, const uint8_t *p, uint32_t n) { retu
 #include "apsis_controls_dispatch.c"
 #include "apsis_controls_dirty.c"
 #include "apsis_controls_performance.c"
-#include "apsis_string_manual_audio.c"
 #include "apsis_bloom_manual_audio.c"
 #include "apsis_string_motion.c"
 #include "apsis_string_motion_dsp.c"
@@ -503,28 +499,22 @@ static void render_block(int32_t *out, uint32_t n)
                                            &rhythm_observation);
         }
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
-            (void)apsis_string_attractor_trigger_binding(
-                &string_transient_pool, &apsis, &string_pitch_memory,
-                &string_attractor_runtime.binding[attr_ix],
-                apsis_runtime.cursor_sample);
+            (void)apsis_string98_strum(&string_transient_pool, &apsis, &string_pitch_memory,
+                                       &string_attractor_runtime.binding[attr_ix], apsis_runtime.cursor_sample);
         if (rhythm_observation.valid ||
             apsis_controls_performance.string_request ||
             apsis_controls_performance.bloom_request ||
             apsis_bloom_manual_pending_count(&apsis_bloom_manual_audio)) {
             if (rhythm_observation.valid)
-                (void)apsis_string_rhythm_trigger_event(&string_transient_pool,
-                                                        &apsis,
-                                                        &string_pitch_memory,
-                                                        &rhythm_observation.event);
+                (void)apsis_string98_rhythm(&string_transient_pool, &apsis, &string_pitch_memory,
+                                            &rhythm_observation.event);
             if (apsis_controls_performance.string_request) {
                 uint8_t manual_side;
                 if (apsis_controls_performance_take_string(
                         &apsis_controls_performance, apsis_runtime.cursor_sample,
                         &manual_side))
-                    (void)apsis_string_manual_trigger(&string_transient_pool,
-                                                      &apsis,
-                                                      &string_pitch_memory,
-                                                      manual_side);
+                    (void)apsis_string98_pluck(&string_transient_pool, &apsis, &string_pitch_memory,
+                                               apsis_runtime.cursor_sample);   /* one string: no side */
             }
             if (apsis_controls_performance.bloom_request ||
                 apsis_bloom_manual_pending_count(&apsis_bloom_manual_audio)) {

@@ -131,7 +131,7 @@ uint8_t apsis_keep_apply(ApsisState *s, const ApsisKeepSnapshot *snap,
         s->string.right_split_q15 = apsis_keep_clamp_q15(snap->right_split_q15,
             APSIS_Q15_MILLI(500), APSIS_Q15_MILLI(850));
         s->string.split_q15 = s->string.right_split_q15;
-        if (snap->surface_mode <= APSIS_STRING_DUAL) s->string.surface_mode = snap->surface_mode;
+        s->string.surface_mode = APSIS_STRING_CLASSIC;   /* one string (Study 98) */
         s->string.linked = snap->linked ? 1u : 0u;
         if (snap->left_anchor <= APSIS_ANCHOR_NINTH) s->string.left_anchor = snap->left_anchor;
         if (snap->right_anchor <= APSIS_ANCHOR_NINTH) s->string.right_anchor = snap->right_anchor;
