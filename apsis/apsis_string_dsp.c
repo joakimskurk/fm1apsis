@@ -285,7 +285,29 @@ void apsis_string_dsp_render(ApsisStringDsp *dsp, int32_t *out, uint32_t frames)
         const uint16_t pitch_alpha = v->pitch_alpha_q15;
         uint16_t alpha = v->lowpass_alpha_q15, mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
         uint8_t waveform = v->waveform, transition = v->timbre_transition;
-        for (n = 0u; n < frames; ++n) {
+        if (!transition && inc == target_inc && gain == target_gain) {
+            /* settled (most blocks): both smoothers would return their current value, so leave them out. Every
+             * product fits 32 bits: |raw - lp| <= 65534 times alpha <= 32767, |lp| and gain <= 32767, mix <= 65535 */
+            if (waveform == APSIS_STRING_DSP_WAVE_TRIANGLE) {
+                for (n = 0u; n < frames; ++n) {
+                    int32_t voiced;
+                    phase += inc;
+                    lp += ((sdsp_triangle_q15(phase) - lp) * (int32_t)alpha) >> 15;
+                    voiced = (lp * gain) >> 15;
+                    out[n * 2u] += (voiced * (int32_t)mix_l) >> 15;
+                    out[n * 2u + 1u] += (voiced * (int32_t)mix_r) >> 15;
+                }
+            } else {
+                for (n = 0u; n < frames; ++n) {
+                    int32_t voiced;
+                    phase += inc;
+                    lp += ((apsis_sine_q15(phase) - lp) * (int32_t)alpha) >> 15;
+                    voiced = (lp * gain) >> 15;
+                    out[n * 2u] += (voiced * (int32_t)mix_l) >> 15;
+                    out[n * 2u + 1u] += (voiced * (int32_t)mix_r) >> 15;
+                }
+            }
+        } else for (n = 0u; n < frames; ++n) {
             int32_t raw, voiced;
             uint16_t gain_alpha;
             if (transition && gain <= 1) {          /* sdsp_apply_timbre */
