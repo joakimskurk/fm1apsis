@@ -188,6 +188,9 @@ static volatile uint32_t apsis_load_probe[4];
 /* the worst block so far, by part (us): the sustained sources (String, Drift, Clock, transients), the runtime
  * with Spiral and Bloom, the triggered notes (strums, rhythm, plucks, Bloom gestures), the room and Motion */
 static volatile uint32_t apsis_worst_probe[4];
+/* each part's own worst (us), and how many blocks went over 80 % and over 100 % of the 5805 us */
+static volatile uint32_t apsis_part_max_probe[4];
+static volatile uint32_t apsis_over_probe[2];
 static uint32_t block_part_us[4];
 static uint32_t block_mark;
 
@@ -597,10 +600,16 @@ static void app_audio(int32_t *out, uint32_t n)
     render_block(out, n);
     us = (uint32_t)(fm1_ticks() - t0) / FM1_TICKS_PER_US;
     apsis_load_probe[0] = us;
-    if (us > apsis_load_probe[1]) {
+    {
         uint32_t i;
-        apsis_load_probe[1] = us;
-        for (i = 0u; i < 4u; ++i) apsis_worst_probe[i] = block_part_us[i];
+        if (us > apsis_load_probe[1]) {
+            apsis_load_probe[1] = us;
+            for (i = 0u; i < 4u; ++i) apsis_worst_probe[i] = block_part_us[i];
+        }
+        for (i = 0u; i < 4u; ++i)
+            if (block_part_us[i] > apsis_part_max_probe[i]) apsis_part_max_probe[i] = block_part_us[i];
+        if (us > 4644u) apsis_over_probe[0]++;
+        if (us >= 5805u) apsis_over_probe[1]++;
     }
     apsis_load_probe[2]++;
     apsis_load_probe[3] += us;
