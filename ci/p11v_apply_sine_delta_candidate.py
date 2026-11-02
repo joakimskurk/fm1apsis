@@ -62,8 +62,8 @@ s = s.replace(old_render, new_render, 1)
 
 if 'lfo_sine_b_q15' in s:
     raise SystemExit('FAIL: stale lfo_sine_b_q15 remains in candidate source')
-if s.count('lfo_sine_delta_q15') != 2:
-    raise SystemExit(f'FAIL: candidate delta field source count {s.count("lfo_sine_delta_q15")} != 2')
+if s.count('lfo_sine_delta_q15') != 3:
+    raise SystemExit(f'FAIL: candidate delta field source count {s.count("lfo_sine_delta_q15")} != 3')
 
 c.write_text(s)
 print('PASS: applied ephemeral P11V A+delta sine cache candidate with unchanged two-int16 state shape')
