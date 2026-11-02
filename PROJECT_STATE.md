@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11T are complete. P11R remains the accepted production baseline. P11T proved the selective narrow-Q15 candidate exact but rejected it for production after a worse real-target code shape; P11U is the next measurement-only residual FDN inventory.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11U are complete. P11R remains the accepted production baseline. P11U identified a zero-state-growth A+delta sine-cache candidate from measured residual work and authorizes P11V proof-only.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -741,9 +741,35 @@ Target projection:
 
 Decision: **no production validation.** There is no physical timing evidence that could justify accepting a strictly worse static target shape, and there is no RAM/POOL benefit. P11R remains the production authority. The selective narrow-Q15 path is closed unless future physical timing evidence explicitly reopens it.
 
-## Exact next phase — P11U post-P11R residual FDN workload/code-shape inventory
+## P11U — post-P11R residual FDN workload/code-shape inventory complete
 
-Return to measurement without a preselected rewrite. Quantify and re-rank the remaining P11R per-room-frame work and pair dynamic counts with exact JieLi symbol/disassembly shape, while carrying forward all prior vetoes and accepted optimizations. Production remains P11R. Only a newly evidenced repeated-work candidate with a plausible non-regressive target shape may advance to proof.
+Measurement authority:
+- technical head `28386fe6e26d6aadb2102469bceac662f310e599`
+- run `41384451346` — PASS
+- evidence artifact ID `13115075736`
+- evidence ZIP SHA-256 `02b8f2d74fd932721e89524f1b2bad174a452ae7ccc189dd3193a853f69a88c3`
+- optimized + ASAN/UBSAN PASS
+- exact P11R real-target package regenerated
+- committed production Space remained byte-for-byte P11R
+
+Residual sine result:
+- **655,360** current `sine_b - sine_a` evaluations in the cold+warm measurement
+- only **455** dynamic endpoint transitions; **463** delta evaluations total if reset initialization is included
+- **654,905** render-time delta subtractions are avoidable under an A+delta cache model
+- exhaustive adjacent endpoint delta domain is **−804 .. +804**, exactly signed-16 representable
+- A+delta therefore fits the same two 16-bit per-line cache fields as P11R's A+B state
+
+Target residual shape:
+- P11R render **1,098 B / 366** static instruction lines
+- `space_mul_q15` **88 B / 27** and `space_sine_point` **48 B / 14** are the relevant out-of-line helpers
+- line-read, Hadamard, clamp, damping-alpha and feedback-gain are inlined
+- render has **14** call instructions: 12 static wide-multiply references and 2 sine-point references
+
+Decision: authorize P11V proof-only for cached A+delta sine interpolation. This is a representation proof, not a production change. It must retain exact interpolation semantics and complete FDN behavior, preserve state size, pass sanitizer/historical gates, and produce a non-regressive ephemeral JieLi target projection before any production-validation authorization.
+
+## Exact next phase — P11V cached sine A+delta equivalence proof
+
+Production remains P11R. Replace cached endpoint B with cached signed-16 delta only in proof/ephemeral target workspaces, prove the complete phase and FDN domains, then measure exact target image/RAM/POOL/package and render code shape. Reject the candidate if target evidence does not improve or otherwise justify it.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 

@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11T are complete; P11R remains the accepted production baseline. The P11T selective narrow-Q15 candidate is rejected for production; P11U returns to measurement-only residual FDN inventory.**
+Status: **[~] active on `p11-optimization`. P11A–P11U are complete; P11R remains the accepted production baseline. P11U identifies cached sine delta as the next proof-only candidate; P11V is authorized for equivalence + ephemeral target projection only.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -511,16 +511,38 @@ Decision: **reject production validation for the P11T candidate.** The candidate
 
 ### P11U — post-P11R residual FDN workload/code-shape inventory
 
-Status: **[ ] next. Measurement only; no production patch authorized.**
+Status: **[x] complete, frozen measurement phase. Production Space remains exact P11R.**
 
-- [ ] re-rank the remaining per-room-frame FDN work after the accepted P11L/P11O/P11R optimizations
-- [ ] quantify residual dynamic families without assuming another arithmetic rewrite: line reads/writes, sine refresh/interpolation, damping/output/cross multiplies, Hadamard transform, wide normalization/feedback multiplies and clamp/write work
-- [ ] pair dynamic counts with the exact P11R JieLi symbol/disassembly shape and out-of-line call structure
-- [ ] identify which work is already structurally irreducible or previously vetoed, including the P11S/P11T wide/narrow result
-- [ ] keep production Space byte-identical to P11R and regenerate the exact P11R package
-- [ ] authorize a later proof candidate only if the residual inventory exposes a narrow repeated computation with a plausible non-regressive target shape
+- [x] residual fixed work classified: **8** line reads, **8** line writes, **8** sine interpolations, **8** sine endpoint-delta subtractions, **16** fixed-sign output projections, **24** Hadamard add/subs, **8** clamps and **40** Q15 multiplies per room frame
+- [x] cold **16,384 frames / 131,072 sine calls**: endpoint transitions **88**, reuses **130,984**
+- [x] warm **65,536 frames / 524,288 sine calls**: endpoint transitions **367**, reuses **523,921**
+- [x] combined **655,360** current `sine_b - sine_a` evaluations vs **455** dynamic endpoint transitions
+- [x] including eight reset initializations, an A+delta representation would need only **463** delta evaluations over the measured window
+- [x] current render performs **654,905** delta subtractions that are unnecessary under that cache model
+- [x] exhaustive 256-index delta domain **−804 .. +804**, max abs **804**, 128 positive / 128 negative / 0 zero; signed-16 representation exact
+- [x] exact P11R target regenerated: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, package `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- [x] FDN render remains **1,098 B / 366** static instruction lines
+- [x] target out-of-line helpers: `space_mul_q15` **88 B / 27**, `space_sine_point` **48 B / 14**; line-read/Hadamard/clamp/damping-alpha/feedback-gain are inlined
+- [x] render disassembly contains **14** call instructions: 12 static `space_mul_q15` references + 2 `space_sine_point` references
+- [x] optimized + ASAN/UBSAN measurement PASS
+- [x] authoritative run `41384451346` on technical head `28386fe6e26d6aadb2102469bceac662f310e599`
+- [x] evidence artifact ID `13115075736`; ZIP SHA-256 `02b8f2d74fd932721e89524f1b2bad174a452ae7ccc189dd3193a853f69a88c3`
+- [x] committed production Space remained exact P11R throughout
+- [x] historical inventory workflow manual-only and pinned to the proven technical head
 
-P11U deliberately resets candidate selection after the rejected P11T projection. It is a residual workload inventory, not a mandate to continue optimizing Q15 arithmetic.
+Decision: authorize P11V **proof only** for replacing each line's cached sine `A+B` representation with `A+delta`, where `delta=B-A`. Delta is exhaustively bounded to ±804 and fits the same signed-16 field width, so expected state size remains unchanged. P11V must prove complete interpolation/FDN equivalence and perform an ephemeral real-target projection before any production authorization.
+
+### P11V — cached sine A+delta equivalence proof
+
+Status: **[ ] next. Proof only; production remains P11R.**
+
+- [ ] prove `A + (((B-A)*frac)>>8)` equals `A + ((delta*frac)>>8)` for all **65,536** top-16 phase combinations with exact signed semantics
+- [ ] cover all 256 old→new index transitions, including wrap, reset initialization and randomized phase resets
+- [ ] retain exactly two signed-16 cache fields per FDN line and prove host/target state size unchanged
+- [ ] compare complete stereo output, state, feedback cache and delay storage across cold/warm/legal/random/reset/adversarial trajectories
+- [ ] optimized + ASAN/UBSAN and complete historical host behavior
+- [ ] regenerate exact P11R target before applying candidate only ephemerally
+- [ ] measure image/RAM/POOL/package and inlined render code-shape delta; reject if target shape is neutral/worse without stronger evidence
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -544,4 +566,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11T proof/rejection state to `p11-optimization`, then create one P11U measurement branch. Re-inventory the residual P11R FDN hot path and exact JieLi code shape without changing production DSP; only a newly measured, non-vetoed repeated-work candidate may advance to proof.
+Promote frozen P11U measurement state to `p11-optimization`, then create one P11V proof branch. Prove the zero-growth sine-cache representation change from A+B to A+delta, and perform an ephemeral real-target projection; production remains P11R unless every equivalence/historical/target gate justifies a later validation phase.
