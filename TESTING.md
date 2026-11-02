@@ -47,6 +47,8 @@ cycles per function (CI's emulator job does both).
 | 2026-11-02 ca04914 STRESS build (every source densest) | 302 % | 483 % | 964 of 970; audio collapses |
 | 2026-11-02 v2.2-margin (B, exact): normal | 43.5 % | 60.9 % | 0; the bound 95.9 % (was 113.8 %) |
 | 2026-11-02 v2.2-margin (B, exact): STRESS | 229 % | 389 % | still collapses: 58 Bloom petals |
+| 2026-11-02 4b5992b (FM Bloom + voice budget): STRESS | 114 % | the bound 186 % | still over: the fixed parts (planning 2.1 ms, Clock 1.4, room 1.1) |
+| 2026-11-02 4b5992b: normal | 43.4 % | 60.3 % | 0; the bound 93 % |
 
 ## Known gaps
 

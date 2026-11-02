@@ -19,7 +19,8 @@
 
 ## v2.2 — margin by construction (docs/MARGIN_PLAN.md)
 - [x] A: stress build, the bound (sum of the parts' worsts) in CI, a load-meter build for a real FM-1
-- [ ] B: one oscillator budget for String notes, Spiral and Bloom; least-audible stealing; same-pitch lanes if they pass A/B
+- [x] B: per-voice cost down bit for bit; Bloom as 2-op FM (A/B approved); hard caps for String, Spiral, Bloom with least-audible fades
+- [ ] Clock's voice cost; the boot blocks warmed before the audio starts
 - [ ] C: planning out of the audio interrupt into sample-stamped events
 - [ ] D: the room on core 1 (fm1-dock's screening), a cheaper one-core fallback
 - [ ] E: the mix into the buses directly; the String drone and Drift at block-rate coefficients

@@ -36,10 +36,9 @@ Study 98's (one string), and the audio fits on the emulator's cycle model.
 ## Next action
 
 1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
-2. v2.2 margin (docs/MARGIN_PLAN.md), branch `v2.2-margin`. Step A is done: the stress build collapses
-   (302 % average, 483 % worst). The 17.8 ms planning spike was boot (now measured apart). While playing, the
-   costs are Spiral + Bloom sound (15.3 ms) and String notes (10.2 ms). Next: B (one voice budget for String,
-   Spiral and Bloom), then a boot warm-up, then C.
+2. v2.2 margin (docs/MARGIN_PLAN.md), branch `v2.2-margin`. A and B are done: Bloom is FM (approved), and the
+   voices have hard caps. Stress: the bound is 186 % (it was 560 %); normal play's worst block is 60 %. Next: C (planning),
+   Clock, boot, D (core 1).
 3. The load-meter build `apsis-loadmeter-ca04914.fwsc` is waiting for someone with an FM-1 (step F).
 
 ## Authority
