@@ -121,22 +121,6 @@ static void bloom_biquad_lowpass(ApsisBloomDspBiquad *b,
     b->x1 = b->x2 = b->y1 = b->y2 = 0;
 }
 
-APSIS_INLINE int32_t bloom_biquad_process(ApsisBloomDspBiquad *b, int32_t x)
-{
-    int64_t acc;
-    int32_t y;
-    if (!b) return x;
-    acc = (int64_t)b->b0_q30 * x + (int64_t)b->b1_q30 * b->x1 +
-          (int64_t)b->b2_q30 * b->x2 - (int64_t)b->a1_q30 * b->y1 -
-          (int64_t)b->a2_q30 * b->y2;
-    y = bloom_filter_state(acc >> 30);
-    b->x2 = b->x1;
-    b->x1 = x;
-    b->y2 = b->y1;
-    b->y1 = y;
-    return y;
-}
-
 static uint32_t bloom_detune_q20(int8_t cents)
 {
     switch (cents) {
@@ -344,33 +328,6 @@ static void bloom_env_prepare(ApsisBloomDspPetal *v)
     }
 }
 
-APSIS_INLINE void bloom_env_advance(ApsisBloomDspPetal *v)
-{
-    if (!v) return;
-    if (v->env_stage_left) {
-        if (v->env_stage_rising) {
-            v->env_gain_q23 += v->env_linear_step_q23;
-            v->env_linear_acc_q23 += v->env_linear_rem_q23;
-            if (v->env_linear_acc_q23 >= v->env_linear_den) {
-                v->env_gain_q23++;
-                v->env_linear_acc_q23 -= v->env_linear_den;
-            }
-        } else {
-            v->env_gain_q23 = (uint32_t)(((uint64_t)v->env_gain_q23 *
-                                           v->env_decay_mul_q31 +
-                                           (1ull << 30)) >> 31);
-        }
-        v->env_stage_left--;
-    }
-    v->age_samples++;
-    if (!v->env_stage_left && v->env_event_index < 3u &&
-        v->age_samples >= v->env_event_sample[v->env_event_index]) {
-        v->env_gain_q23 = v->env_stage_target_q23;
-        v->env_event_index++;
-        bloom_env_prepare(v);
-    }
-}
-
 static uint16_t bloom_active_count(const ApsisBloomDsp *dsp, uint16_t *osc)
 {
     uint16_t active = 0u, oscs = 0u;
@@ -476,40 +433,116 @@ uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
 /* One petal over the whole block, added into out unsaturated; the caller saturates once. Petals touch only their
  * own state, so this equals the old sample-outer loop bit for bit (|term| < 2^19, 136 of them fit in 32 bits), and
  * an idle slot costs one test a block instead of one a sample. */
+/* One petal over the block with its state in locals (the oscillators, the filter, the envelope), written back at
+ * the end and around an envelope stage change (bloom_env_prepare, a few times in a petal's life). Each sample does
+ * exactly what the old per-sample envelope advance and biquad did on the struct. oscs is a constant at each call. */
+APSIS_INLINE void bloom_petal_run(ApsisBloomDspPetal *v, int32_t *out, uint32_t frames, uint8_t oscs)
+{
+    uint32_t frame = 0u, age = v->age_samples;
+    const uint32_t life = v->life_samples;
+    const int32_t mix_l = v->mix_left_q15, mix_r = v->mix_right_q15;
+    const int32_t b0 = v->filter.b0_q30, b1 = v->filter.b1_q30, b2 = v->filter.b2_q30;
+    const int32_t a1 = v->filter.a1_q30, a2 = v->filter.a2_q30;
+    int32_t x1 = v->filter.x1, x2 = v->filter.x2, y1 = v->filter.y1, y2 = v->filter.y2;
+    uint32_t ph0 = v->osc[0].phase, ph1 = v->osc[1].phase, ph2 = v->osc[2].phase;
+    const uint32_t in0 = v->osc[0].phase_inc, in1 = v->osc[1].phase_inc, in2 = v->osc[2].phase_inc;
+    const int32_t g0 = v->osc[0].gain_q15, g1 = v->osc[1].gain_q15, g2 = v->osc[2].gain_q15;
+    const uint8_t t0 = v->osc[0].waveform == APSIS_BLOOM_DSP_TRIANGLE;
+    const uint8_t t1 = v->osc[1].waveform == APSIS_BLOOM_DSP_TRIANGLE;
+    const uint8_t t2 = v->osc[2].waveform == APSIS_BLOOM_DSP_TRIANGLE;
+    uint32_t gain = v->env_gain_q23, left = v->env_stage_left, step = v->env_linear_step_q23;
+    uint32_t rem = v->env_linear_rem_q23, acc = v->env_linear_acc_q23, den = v->env_linear_den;
+    uint32_t mul = v->env_decay_mul_q31;
+    uint8_t rising = v->env_stage_rising, active = 1u;
+
+    if (v->start_delay_samples) {
+        frame = v->start_delay_samples < frames ? v->start_delay_samples : frames;
+        v->start_delay_samples -= frame;
+    }
+    for (; frame < frames; ++frame) {
+        int32_t sum = 0, x, y, mono;
+        int64_t f;
+        if (age >= life) {
+            active = 0u;
+            break;
+        }
+        /* |wave * gain| < 2^31: the old int64 products, in 32 bits */
+        if (oscs > 0u) {
+            sum += ((t0 ? bloom_triangle_q15(ph0) : apsis_sine_q15(ph0)) * g0) >> 15;
+            ph0 += in0;
+        }
+        if (oscs > 1u) {
+            sum += ((t1 ? bloom_triangle_q15(ph1) : apsis_sine_q15(ph1)) * g1) >> 15;
+            ph1 += in1;
+        }
+        if (oscs > 2u) {
+            sum += ((t2 ? bloom_triangle_q15(ph2) : apsis_sine_q15(ph2)) * g2) >> 15;
+            ph2 += in2;
+        }
+        x = sum;
+        f = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
+        y = bloom_filter_state(f >> 30);
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+        mono = (int32_t)(((int64_t)y * (uint16_t)(gain >> 8)) >> 15);
+        out[frame * 2u] += (int32_t)(((int64_t)mono * mix_l) >> 15);
+        out[frame * 2u + 1u] += (int32_t)(((int64_t)mono * mix_r) >> 15);
+
+        if (left) {                                 /* the envelope's step */
+            if (rising) {
+                gain += step;
+                acc += rem;
+                if (acc >= den) {
+                    gain++;
+                    acc -= den;
+                }
+            } else {
+                gain = (uint32_t)(((uint64_t)gain * mul + (1ull << 30)) >> 31);
+            }
+            left--;
+        }
+        age++;
+        if (!left && v->env_event_index < 3u && age >= v->env_event_sample[v->env_event_index]) {
+            v->age_samples = age;
+            v->env_gain_q23 = v->env_stage_target_q23;
+            v->env_event_index++;
+            bloom_env_prepare(v);
+            gain = v->env_gain_q23;
+            left = v->env_stage_left;
+            step = v->env_linear_step_q23;
+            rem = v->env_linear_rem_q23;
+            acc = v->env_linear_acc_q23;
+            den = v->env_linear_den;
+            mul = v->env_decay_mul_q31;
+            rising = v->env_stage_rising;
+        }
+        if (age >= life) {
+            active = 0u;
+            break;
+        }
+    }
+    v->age_samples = age;
+    v->env_gain_q23 = gain;
+    v->env_stage_left = left;
+    v->env_linear_acc_q23 = acc;
+    v->filter.x1 = x1;
+    v->filter.x2 = x2;
+    v->filter.y1 = y1;
+    v->filter.y2 = y2;
+    v->osc[0].phase = ph0;
+    v->osc[1].phase = ph1;
+    v->osc[2].phase = ph2;
+    v->active = active;
+}
+
 static void bloom_petal_render(ApsisBloomDspPetal *v, int32_t *out, uint32_t frames)
 {
-    uint32_t frame;
-    for (frame = 0u; frame < frames; ++frame) {
-        int32_t sum = 0, filtered, mono;
-        uint8_t j;
-        uint16_t gain_q15;
-
-        if (!v->active) return;
-        if (v->start_delay_samples) {
-            v->start_delay_samples--;
-            continue;
-        }
-        if (v->age_samples >= v->life_samples) {
-            v->active = 0u;
-            return;
-        }
-
-        for (j = 0u; j < v->osc_count; ++j) {
-            ApsisBloomDspOsc *o = &v->osc[j];
-            int32_t wave = o->waveform == APSIS_BLOOM_DSP_TRIANGLE
-                ? bloom_triangle_q15(o->phase) : apsis_sine_q15(o->phase);
-            sum += (int32_t)(((int64_t)wave * o->gain_q15) >> 15);
-            o->phase += o->phase_inc;
-        }
-        filtered = bloom_biquad_process(&v->filter, sum);
-        gain_q15 = (uint16_t)(v->env_gain_q23 >> 8);
-        mono = (int32_t)(((int64_t)filtered * gain_q15) >> 15);
-        out[frame * 2u] += (int32_t)(((int64_t)mono * v->mix_left_q15) >> 15);
-        out[frame * 2u + 1u] += (int32_t)(((int64_t)mono * v->mix_right_q15) >> 15);
-
-        bloom_env_advance(v);
-        if (v->age_samples >= v->life_samples) v->active = 0u;
-    }
+    if (v->osc_count >= 3u) bloom_petal_run(v, out, frames, 3u);
+    else if (v->osc_count == 2u) bloom_petal_run(v, out, frames, 2u);
+    else if (v->osc_count == 1u) bloom_petal_run(v, out, frames, 1u);
+    else bloom_petal_run(v, out, frames, 0u);
 }
 
 void apsis_bloom_dsp_render(ApsisBloomDsp *dsp, int32_t *out,
