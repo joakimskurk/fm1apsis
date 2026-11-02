@@ -64,6 +64,12 @@ typedef struct {
     uint16_t q_milli;
     ApsisBloomDspOsc osc[APSIS_BLOOM_DSP_OSC_MAX];
     ApsisBloomDspBiquad filter;
+    /* the FM petal (the default; APSIS_BLOOM_ADDITIVE builds the old oscillator bank + biquad): osc[0] is the
+     * carrier, osc[1] the modulator. The index in phase units per full-scale modulator sample (radians * 20861),
+     * at the envelope's peak; it follows the envelope not at all (0), linearly (1) or squared (2). */
+    uint16_t fm_index_peak;
+    uint16_t fm_env_peak_q15;
+    uint8_t fm_follow;
 } ApsisBloomDspPetal;
 
 typedef struct {

@@ -57,6 +57,7 @@ static ApsisBloomAudioBinding make_binding(const ApsisState *s, uint8_t voice,
     return b;
 }
 
+#ifdef APSIS_BLOOM_ADDITIVE
 static void test_voice_vectors(void)
 {
     static const uint32_t expected_peak[4] = {175u, 143u, 122u, 129u};
@@ -112,6 +113,64 @@ static void test_voice_vectors(void)
     assert(dsp.petal[0].osc_count == 1u);
     assert(dsp.petal[0].osc[0].waveform == APSIS_BLOOM_DSP_SINE);
 }
+#else
+/* the FM petal (docs/MARGIN_PLAN.md B): a carrier and a modulator per voice, the additive Bloom's envelope timing,
+ * brightness raising the index, and the petal ending on time */
+static void test_voice_vectors(void)
+{
+    ApsisState s;
+    ApsisBloomAcousticPlan plan;
+    ApsisBloomDsp dsp;
+    ApsisBloomAudioBinding b;
+    uint8_t voice;
+    uint16_t dim_index;
+
+    apsis_state_default(&s);
+    apsis_bloom_audio_plan(&s, 4u, &plan);
+    assert(plan.valid == 1u);
+
+    for (voice = APSIS_BLOOM_VEIL; voice <= APSIS_BLOOM_GLASS; ++voice) {
+        const ApsisBloomDspPetal *v = &dsp.petal[0];
+        uint32_t peak, hash;
+        apsis_bloom_dsp_reset(&dsp);
+        b = make_binding(&s, voice, 0u, 0u, &plan.petal[0]);
+        assert(apsis_bloom_dsp_trigger_binding(&dsp, &s, &b, 0u) == 1u);
+        assert(v->active == 1u && v->osc_count == 2u);
+        assert(v->fm_index_peak > 0u && v->fm_env_peak_q15 > 0u);
+        if (voice == APSIS_BLOOM_GLASS) {          /* 1:4, the index falling with the envelope squared */
+            assert(v->osc[1].phase_inc / 4u == v->osc[0].phase_inc || v->osc[1].phase_inc / 4u + 1u == v->osc[0].phase_inc);
+            assert(v->fm_follow == 2u && v->env_event_sample[0] == 572u);
+        } else if (voice == APSIS_BLOOM_CHOIR) {   /* 1:1, the modulator 6 cents up */
+            assert(v->osc[1].phase_inc > v->osc[0].phase_inc);
+            assert(v->osc[1].phase_inc - v->osc[0].phase_inc < v->osc[0].phase_inc / 200u);
+            assert(v->fm_follow == 1u && v->env_event_sample[0] == 1985u);
+        } else if (voice == APSIS_BLOOM_ORGAN) {   /* 1:1 at a fixed index */
+            assert(v->osc[1].phase_inc == v->osc[0].phase_inc && v->fm_follow == 0u);
+            assert(v->env_event_sample[0] == 794u);
+        } else {
+            assert(v->osc[1].phase_inc == v->osc[0].phase_inc && v->fm_follow == 1u);
+            assert(v->env_event_sample[0] == 794u);
+        }
+        hash = render_hash(&dsp, 97020u, &peak);  /* 2.2 seconds */
+        printf("M4G_FM voice=%u peak=%u hash=%08x\n", (unsigned)voice, (unsigned)peak, (unsigned)hash);
+        assert(peak > 50u && peak < 400u);
+        assert(apsis_bloom_dsp_active(&dsp) == 0u);
+        assert(dsp.drop_count == 0u);
+    }
+
+    /* brightness is the index */
+    apsis_bloom_dsp_reset(&dsp);
+    s.bloom.brightness_q15 = 0u;
+    b = make_binding(&s, APSIS_BLOOM_GLASS, 0u, 0u, &plan.petal[0]);
+    assert(apsis_bloom_dsp_trigger_binding(&dsp, &s, &b, 0u) == 1u);
+    dim_index = dsp.petal[0].fm_index_peak;
+    apsis_bloom_dsp_reset(&dsp);
+    s.bloom.brightness_q15 = APSIS_Q15_ONE;
+    b = make_binding(&s, APSIS_BLOOM_GLASS, 0u, 0u, &plan.petal[0]);
+    assert(apsis_bloom_dsp_trigger_binding(&dsp, &s, &b, 0u) == 1u);
+    assert(dsp.petal[0].fm_index_peak > 2u * dim_index);
+}
+#endif
 
 static void test_target_delay_is_exact(void)
 {
@@ -201,10 +260,15 @@ static void test_frozen_worst_case_capacity(void)
            (unsigned)sizeof(ApsisBloomDsp));
     assert(dsp.trigger_count == 186u);
     assert(dsp.petal_high_water == 125u);
-    assert(dsp.oscillator_high_water == 375u);
     assert(dsp.drop_count == 0u);
+#ifdef APSIS_BLOOM_ADDITIVE
+    assert(dsp.oscillator_high_water == 375u);
     assert(peak == 266u);
     assert(hash == 0x5881bb36u);
+#else
+    assert(dsp.oscillator_high_water == 250u);   /* two operators a petal */
+    assert(peak > 100u && peak < 2000u);
+#endif
 }
 
 int main(void)

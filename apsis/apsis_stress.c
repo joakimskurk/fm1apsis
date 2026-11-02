@@ -51,6 +51,12 @@ void apsis_state_demo(ApsisState *s)
     s->string.rhythm = APSIS_STRING_RHYTHM_PIZZ;
     s->string.rhythm_every = 2u;
     s->string.filter_mode = APSIS_STRING_FILTER_ATTRACTOR;
+#ifdef APSIS_DEMO_BLOOM_VOICE   /* Bloom alone, one voice, every cycle, louder: the A/B listen of the FM Bloom */
+    s->bloom.voice = APSIS_DEMO_BLOOM_VOICE;
+    s->bloom.cycles = 1u;
+    s->bloom.level_q15 = APSIS_Q15_ONE;
+    s->mother.mute_mask = (uint8_t)(0x1Fu & ~(1u << 4));
+#endif
 #ifdef APSIS_DEMO_SOLO   /* one source alone: 0 String, 1 Drift, 2 Clock, 3 Spiral, 4 Bloom */
     s->mother.mute_mask = (uint8_t)(0x1Fu & ~(1u << APSIS_DEMO_SOLO));
 #endif
