@@ -1,0 +1,122 @@
+# APSIS: one pipeline. host: APSIS's tests (plain and sanitized) and the whole firmware in Dinghy's host mode against
+# tests/sound.sha256. firmware: the real JieLi build and Dinghy's platform tests -> apsis.fwsc. emulator: that
+# package on Joakim Eriksson's fm1-emu under FM1_STRICT, the audio interrupt's load measured. A tag vX.Y also
+# publishes apsis-X.Y.fwsc with SHA256SUMS and a build attestation.
+name: ci
+
+on:
+  push:
+    branches: [main, v2]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FM1_EMU_COMMIT: ce0f03e693da80bb5ce03b8a398f0f51e5989d8d   # fm1-emu 0.4.0
+  AC79_SDK_TAG: AC79NN_SDK_V1.2.1_2023-12-13
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install -q Pillow
+      - name: APSIS tests, gcc (plain, ASan+UBSan)
+        run: sh tests/apsis/run.sh
+      - name: APSIS tests, clang (the firmware's compiler family; C leaves some orders open)
+        run: CC=clang SAN=0 sh tests/apsis/run.sh
+      - name: The firmware in host mode, the sound against tests/sound.sha256
+        run: sh tests/sound.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: host-mode
+          path: |
+            build/host/*.wav
+            build/host/*.png
+            build/host/sound.sha256
+
+  firmware:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install -q Pillow
+      - name: JieLi toolchain
+        run: sh tools/get_toolchain.sh | tee toolchain.txt
+      - name: JieLi AC79 SDK
+        run: |
+          for i in 1 2 3; do
+            git clone -q --depth 1 --branch "$AC79_SDK_TAG" \
+                https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/fw-AC79_AIoT_SDK && break
+            rm -rf ~/fw-AC79_AIoT_SDK; sleep 20
+          done
+          test -d ~/fw-AC79_AIoT_SDK
+      - name: Build
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then sh build.sh --release "${GITHUB_REF_NAME#v}"; fi
+          sh build.sh | tee build-report.txt
+          cp build/apsis.fwsc build/apsis-${GITHUB_SHA::7}.fwsc
+          (cd build && sha256sum apsis*.fwsc > SHA256SUMS && cat SHA256SUMS)
+      - name: Dinghy's platform tests (FM-1)
+        run: sh tests/run_tests.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            build/apsis*.fwsc
+            build/apsis.elf
+            build/SHA256SUMS
+            build-report.txt
+            toolchain.txt
+          if-no-files-found: error
+      - name: Attest (tags)
+        if: github.ref_type == 'tag'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: build/apsis-[0-9]*.fwsc
+      - name: Release (tags)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/apsis-[0-9]*.fwsc
+            build/SHA256SUMS
+          generate_release_notes: true
+
+  emulator:
+    needs: firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: firmware, path: build }
+      - name: fm1-emu (pinned), cached
+        id: emu
+        uses: actions/cache@v4
+        with:
+          path: ~/fm1-emu/target/release/fm1-live
+          key: fm1-live-${{ env.FM1_EMU_COMMIT }}
+      - name: Build fm1-live
+        if: steps.emu.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2-dev libx11-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxi-dev pkg-config
+          git init -q ~/fm1-emu && cd ~/fm1-emu
+          git fetch -q --depth 1 https://github.com/joakimeriksson/fm1-emu.git "$FM1_EMU_COMMIT"
+          git checkout -q FETCH_HEAD
+          cargo build -q --release -p fm1-live
+      - name: Runtime libraries
+        run: sudo apt-get install -y -qq libasound2 libx11-6 libxkbcommon0 >/dev/null || true
+      - name: JieLi toolchain (objdump)
+        run: sh tools/get_toolchain.sh
+      - name: APSIS under FM1_STRICT
+        run: EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain sh tests/emu.sh build/apsis.fwsc build/apsis.elf build/emu
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator
+          path: build/emu

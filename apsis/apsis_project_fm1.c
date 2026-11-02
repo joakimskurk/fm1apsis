@@ -1,9 +1,8 @@
 #include "apsis_project_fm1.h"
 
-/* This file is target-only and is included into Dinghy's single translation
- * unit after platform.c. st_read(), fl_erase4k(), fl_write() and flash_ok are
- * therefore intentionally the pinned platform primitives, not a second flash
- * driver. */
+/* Included into the app's single translation unit after the project_flash_*
+ * primitives (app.c): the platform's flash driver on the FM-1, a RAM fake in
+ * host mode. */
 
 static uint32_t project_fm1_addr(uint8_t slot)
 {
@@ -23,7 +22,7 @@ static int project_fm1_read_valid(ApsisProjectFm1 *store, uint8_t slot,
 {
     uint32_t at;
     int rc;
-    if (!store || !info || !flash_ok) return -1;
+    if (!store || !info || !PROJECT_FLASH_OK) return -1;
     info->valid = 0u;
     info->generation = 0u;
     at = project_fm1_addr(slot);
@@ -31,12 +30,12 @@ static int project_fm1_read_valid(ApsisProjectFm1 *store, uint8_t slot,
     /* Empty factory sectors are overwhelmingly the common case. Read only the
      * 24-byte header first so first boot does not consume eight 256-byte flash
      * read windows merely to discover 0xFFFFFFFF. */
-    rc = st_read(at, store->record, APSIS_PROJECT_HEADER_SIZE);
+    rc = project_flash_read(at, store->record, APSIS_PROJECT_HEADER_SIZE);
     if (rc) return rc;
     if (project_fm1_u32le(store->record) != APSIS_PROJECT_RECORD_MAGIC)
         return 1;
 
-    rc = st_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
+    rc = project_flash_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
     if (rc) return rc;
     rc = apsis_project_record_inspect(store->record,
                                       APSIS_PROJECT_RECORD_SIZE, info);
@@ -60,7 +59,7 @@ int apsis_project_fm1_prefetch(ApsisProjectFm1 *store)
     uint8_t va, vb, pick;
     uint32_t at;
     int rc;
-    if (!store || !flash_ok) return -1;
+    if (!store || !PROJECT_FLASH_OK) return -1;
 
     va = project_fm1_read_valid(store, 0u, &a) == 0 ? 1u : 0u;
     vb = project_fm1_read_valid(store, 1u, &b) == 0 ? 1u : 0u;
@@ -75,7 +74,7 @@ int apsis_project_fm1_prefetch(ApsisProjectFm1 *store)
     else pick = apsis_project_generation_newer(b.generation, a.generation) ? 1u : 0u;
 
     at = project_fm1_addr(pick);
-    rc = st_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
+    rc = project_flash_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
     if (rc) goto done;
     rc = apsis_project_record_inspect(store->record,
                                       APSIS_PROJECT_RECORD_SIZE, &chosen);
@@ -130,10 +129,10 @@ int apsis_project_fm1_service_save(ApsisProjectFm1 *store,
                                    const ApsisChainState *chain_settings)
 {
     ApsisProjectRecordInfo info;
-    uint32_t generation, at, took;
+    uint32_t generation, at;
     uint8_t target;
     int rc;
-    if (!store || !keep || !chain || !chain_settings || !flash_ok) return -1;
+    if (!store || !keep || !chain || !chain_settings || !PROJECT_FLASH_OK) return -1;
     if (!store->save_pending) return 0;
 
     /* Consume one explicit request per attempt. A failed NOR operation is not
@@ -147,17 +146,17 @@ int apsis_project_fm1_service_save(ApsisProjectFm1 *store,
     if (rc) goto done;
 
     at = project_fm1_addr(target);
-    rc = fl_erase4k(at, &took);
+    rc = project_flash_erase(at);
     if (rc) goto done;
 
     /* Commit protocol: payload first, verify its CRC from flash, then publish
      * the 24-byte CRC-protected header. A power cut before the last operation
      * cannot turn this sector into the newest valid project. */
-    rc = fl_write(at + APSIS_PROJECT_PAYLOAD_OFFSET,
+    rc = project_flash_write(at + APSIS_PROJECT_PAYLOAD_OFFSET,
                   store->record + APSIS_PROJECT_PAYLOAD_OFFSET,
                   APSIS_PROJECT_PAYLOAD_SIZE);
     if (rc) goto done;
-    rc = st_read(at + APSIS_PROJECT_PAYLOAD_OFFSET,
+    rc = project_flash_read(at + APSIS_PROJECT_PAYLOAD_OFFSET,
                  store->record + APSIS_PROJECT_PAYLOAD_OFFSET,
                  APSIS_PROJECT_PAYLOAD_SIZE);
     if (rc) goto done;
@@ -165,9 +164,9 @@ int apsis_project_fm1_service_save(ApsisProjectFm1 *store,
                                       APSIS_PROJECT_RECORD_SIZE, &info);
     if (rc) goto done;
 
-    rc = fl_write(at, store->record, APSIS_PROJECT_HEADER_SIZE);
+    rc = project_flash_write(at, store->record, APSIS_PROJECT_HEADER_SIZE);
     if (rc) goto done;
-    rc = st_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
+    rc = project_flash_read(at, store->record, APSIS_PROJECT_RECORD_SIZE);
     if (rc) goto done;
     rc = apsis_project_record_inspect(store->record,
                                       APSIS_PROJECT_RECORD_SIZE, &info);

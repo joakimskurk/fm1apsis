@@ -1,0 +1,37 @@
+800 btn 4
+1200 keys 0x80
+1400 keys 0
+1600 keys 0x800
+1800 keys 0
+2000 keys 0x4000
+2200 keys 0
+2500 enc 2 6
+3000 enc 3 -4
+4000 btn 2
+4400 keys 0x1
+4600 keys 0
+4800 keys 0x4
+5000 keys 0
+5200 btndown 13
+5300 keys 0x10
+5500 keys 0
+5600 btnup 13
+6000 keys 0x40
+6200 keys 0
+7000 btn 7
+7400 keys 0x2
+7600 keys 0
+8500 keys 0x20
+8700 keys 0
+9500 keys 0x100
+9700 keys 0
+11000 btndown 3
+11050 btn 2
+11100 btnup 3
+11500 enc 2 8
+12000 enc 4 5
+13000 btn 10
+14000 btn 11
+15000 btn 8
+16000 enc 5 3
+19000 end

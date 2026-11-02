@@ -19,8 +19,8 @@
 
 /* Dedicated FM-1 project sectors selected in Phase 7. They intentionally do
  * not use Dinghy's 0xFC000 one-sector settings store. */
-#define APSIS_PROJECT_FM1_SLOT_A 0x000F4000u
-#define APSIS_PROJECT_FM1_SLOT_B 0x000F5000u
+#define APSIS_PROJECT_FM1_SLOT_A 0x000F4000u /* = Dinghy BLOBS_AT, blob 0 */
+#define APSIS_PROJECT_FM1_SLOT_B 0x000F5000u /* = Dinghy blob 1 */
 
 typedef struct {
     uint8_t valid;

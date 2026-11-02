@@ -104,6 +104,7 @@ static uint8_t apsis_transport_queue_push(ApsisEventQueue *q, ApsisTransportEven
     e.serial = q->next_serial++;
     pos = q->count++;
     q->events[pos] = e;
+    q->events[pos].reserved[0] = q->events[pos].reserved[1] = q->events[pos].reserved[2] = 0u;
     while (pos) {
         uint16_t parent = (uint16_t)((pos - 1u) / 2u);
         ApsisTransportEvent tmp;

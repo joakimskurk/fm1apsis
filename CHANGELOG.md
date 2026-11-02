@@ -2,6 +2,17 @@
 
 Human-readable milestone history. Git remains the detailed source history.
 
+## 2026-11-02 - v2: real source on Dinghy 0.4
+
+- Dinghy 0.4 imported as source; the app is `firmware/src/app.c`; the fifteen-script patch chain, the overlay and
+  54 per-phase workflows are gone; one CI workflow
+- the shipping DSP is the tested DSP (the room's one-pole filters and 32-bit paths were target-only before)
+- runtime layers merged into one `apsis_runtime.c`; dead layer code removed
+- input on Dinghy 0.4's edges (no HAL patch); continuous screen redraw; no placeholder boot screen
+- the project journal on Dinghy's blob sectors 0/1; works in host mode too
+- audio-load probe; fm1-emu FM1_STRICT load check in CI
+- host-mode sound bit-identical to P11W on two scripts
+
 ## 2026-11-01 - Phase 9 physical interaction parity merged
 
 PR #19 squash-merged to `main` as `bbfab322557b6760425503268b550b789f796c23` after final documentation/CI head `dc288b6424b957ad382997f62cd6924b4146f675` passed the complete exact-head matrix: core #504, staged #493, P6-final #96, P7-storage #83, P7-target #76, P8-visuals #86, P8-target #61, P9-controls #84, P9-H4b #8 and P9-target #41.

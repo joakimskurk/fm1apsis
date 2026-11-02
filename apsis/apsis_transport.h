@@ -46,7 +46,9 @@ typedef struct {
     uint8_t sub_index;
     uint8_t sub_count;
     uint8_t flags;
+    uint8_t reserved[3];   /* zeroed on insertion: queue memory is deterministic, byte for byte */
 } ApsisTransportEvent;
+_Static_assert(sizeof(ApsisTransportEvent) == 32u, "ApsisTransportEvent stays 32 bytes");
 
 #define APSIS_EVENT_FLAG_ACCENT       (1u << 0)
 #define APSIS_EVENT_FLAG_STEP_ONE     (1u << 1)

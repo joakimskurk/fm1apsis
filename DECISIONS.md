@@ -165,3 +165,35 @@ Only durable decisions that would be expensive or confusing to rediscover belong
 **Decision:** SPACE/CATHEDRAL is one of the ten native target-addressable surfaces, but Phase 8 does not assign it an FM-1 button gesture. Final physical routing belongs to Phase 9.
 
 **Why:** Surface identity and rendering are visual architecture; control ergonomics must be frozen separately so the visual phase does not silently choose interaction policy.
+
+## 2026-11-02 - v2: the firmware is source, on Dinghy 0.4
+
+**Decision:** Import Dinghy 0.4 as source and write the app as `firmware/src/app.c`; delete the CI patch chain
+(`ci/apply_apsis*.sh`, `overlay/`, Python source patches) and the per-phase workflows.
+
+**Why:** The shipped firmware only existed after fifteen chained text patches over Dinghy 0.3; nobody could read
+the code that ran, and the shipped room differed from the host-tested one. Dinghy is meant to be used as a
+template; 0.4 also brings TRS MIDI, clock/transport and a test suite. The audio graph was carried over unchanged
+and proven bit-identical in host mode.
+
+**Supersedes:** "Dinghy baseline and product identity are pinned" (now Dinghy 0.4, `FM-1_97N`), "Space owns a
+dedicated pre-.pool NOLOAD region" (now `.pool.*`), "Native visual takeover is deferred past frozen audio
+bootstrap", "Project NOR is never touched by active audio" for boot reads (the journal loads in `app_main()`;
+saves still quiesce the audio).
+
+## 2026-11-02 - Sound is pinned by host-mode WAV hashes, deliberately updated
+
+**Decision:** `tests/sound.sha256` pins the whole firmware's host-mode sound. Intended sound changes update it in
+the same commit with the reason. Target-PCM and cursor-exact emulator hashes are no longer gates.
+
+**Why:** A pin catches unintended changes cheaply; freezing everything (including boot timing) made the old
+phases optimise for unchanged hashes instead of for how APSIS sounds and feels.
+
+## 2026-11-02 - CPU headroom is measured, not inferred
+
+**Decision:** The audio interrupt measures itself (`apsis_load_probe`); CI runs the package on fm1-emu under
+FM1_STRICT and fails on a drop-out.
+
+## 2026-11-02 - One source per module
+
+**Decision:** The module the firmware ships is the module the tests test. No target-only rewrites of DSP.

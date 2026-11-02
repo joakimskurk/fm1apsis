@@ -50,10 +50,18 @@ static int32_t space_clamp_q15(int64_t v)
 
 static int32_t space_mul_q15(int32_t a, int32_t b)
 {
-    int64_t p = (int64_t)a * b;
-    if (p >= 0) p += 16384;
-    else p -= 16384;
-    return (int32_t)(p >> 15);
+    if (a >= -65535 && a <= 65535 && b >= -32767 && b <= 32767) {
+        int32_t p = a * b;
+        if (p >= 0) p += 16384;
+        else p -= 16384;
+        return p >> 15;
+    }
+    {
+        int64_t p = (int64_t)a * b;
+        if (p >= 0) p += 16384;
+        else p -= 16384;
+        return (int32_t)(p >> 15);
+    }
 }
 
 static int16_t space_sine_point(uint8_t index)

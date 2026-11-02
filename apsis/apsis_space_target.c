@@ -1,26 +1,29 @@
 #include "apsis_space_target.h"
 
+#ifdef __APPLE__                                /* (Mach-O host tests: no ELF section names) */
+#define APSIS_SPACE_POOL __attribute__((used, aligned(4)))
+#else
+#define APSIS_SPACE_POOL __attribute__((section(".pool.apsis_space"), used, aligned(4)))
+#endif
 #define APSIS_SPACE_TARGET_SAMPLES (APSIS_SPACE_ROOM_BLOCK_MAX * 2u)
 
-/* Phase-6 production storage. This section is placed immediately before
- * Dinghy's ordinary .pool so the linker still accounts it against POOL while
- * fm1_cstart() does not spend boot time clearing it. The room's fill counters
- * make stale NOLOAD delay contents inaudible until overwritten. */
+/* The room's delay memory lives in Dinghy's POOL (.pool*, app.ld): zeroed at boot, and the room's fill counters
+ * keep unwritten history inaudible anyway. */
 static int16_t apsis_space_target_history[APSIS_SPACE_HISTORY_STORAGE_SAMPLES]
-    __attribute__((section(".apsis_space_pool"), used, aligned(4)));
+    APSIS_SPACE_POOL;
 static int16_t apsis_space_target_echo[APSIS_SPACE_ECHO_STORAGE_SAMPLES]
-    __attribute__((section(".apsis_space_pool"), used, aligned(4)));
+    APSIS_SPACE_POOL;
 static int16_t apsis_space_target_fdn[APSIS_SPACE_FDN_STORAGE_SAMPLES]
-    __attribute__((section(".apsis_space_pool"), used, aligned(4)));
+    APSIS_SPACE_POOL;
 
 /* One reusable source bus plus one shared room-input block. Keeping both here
  * costs POOL rather than the remaining ordinary static RAM. The source bus is
  * cleared as each source is committed. The input bus is overwritten by the
  * first committed source in every block, avoiding a separate 512-word clear. */
 static int32_t apsis_space_target_source[APSIS_SPACE_TARGET_SAMPLES]
-    __attribute__((section(".apsis_space_pool"), used, aligned(4)));
+    APSIS_SPACE_POOL;
 static int32_t apsis_space_target_input[APSIS_SPACE_TARGET_SAMPLES]
-    __attribute__((section(".apsis_space_pool"), used, aligned(4)));
+    APSIS_SPACE_POOL;
 
 static int32_t apsis_space_target_clamp_q15(int32_t v)
 {

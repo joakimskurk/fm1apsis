@@ -5,3 +5,5 @@ work/
 *.png
 *.bmp
 __pycache__/
+*.pyc
+.DS_Store

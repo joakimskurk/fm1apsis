@@ -112,10 +112,16 @@ static int32_t space_room_round_shift(int64_t v, uint8_t bits)
 
 static int32_t space_room_mul_q15(int32_t a, int32_t b)
 {
+    if (a >= -65535 && a <= 65535 && b >= -32767 && b <= 32767) {
+        int32_t p = a * b;
+        if (p >= 0) p += 16384;
+        else p -= 16384;
+        return p >> 15;
+    }
     return space_room_round_shift((int64_t)a * b, 15u);
 }
 
-static int32_t space_room_biquad(ApsisSpaceBiquadState *s,
+static __attribute__((unused)) int32_t space_room_biquad(ApsisSpaceBiquadState *s,
                                  const SpaceRoomBiquadCoeff *c,
                                  int32_t x_q15)
 {
@@ -167,7 +173,7 @@ static uint32_t space_room_smooth_u32(uint32_t cur, uint32_t target, uint16_t al
     return (uint32_t)((int64_t)cur + step);
 }
 
-static const SpaceRoomBiquadCoeff *space_room_guard_lp_coeff(int32_t hz_q16)
+static __attribute__((unused)) const SpaceRoomBiquadCoeff *space_room_guard_lp_coeff(int32_t hz_q16)
 {
     uint32_t hz, index;
     if (hz_q16 <= 0) return &ROOM_GUARD_LP[0];
@@ -194,7 +200,7 @@ static SpaceRoomStereoPair space_room_stereo_read_pair(
     SpaceRoomStereoPair out = {0, 0};
     uint32_t needed, span_q16, write_q16, read_q16, i0, i1, frac;
     int32_t a_left, a_right, b_left, b_right;
-    int64_t mixed;
+    int32_t mixed;
 
     if (!storage || !capacity_frames) return out;
     needed = (delay_q16 + 65535u) >> 16;
@@ -219,10 +225,10 @@ static SpaceRoomStereoPair space_room_stereo_read_pair(
 
     b_left = storage[i1 * 2u];
     b_right = storage[i1 * 2u + 1u];
-    mixed = (int64_t)a_left * (65536u - frac) + (int64_t)b_left * frac;
-    out.left = (int32_t)(mixed >> 16);
-    mixed = (int64_t)a_right * (65536u - frac) + (int64_t)b_right * frac;
-    out.right = (int32_t)(mixed >> 16);
+    mixed = a_left * (int32_t)(65536u - frac) + b_left * (int32_t)frac;
+    out.left = mixed >> 16;
+    mixed = a_right * (int32_t)(65536u - frac) + b_right * (int32_t)frac;
+    out.right = mixed >> 16;
     return out;
 }
 
@@ -265,11 +271,65 @@ static int32_t space_room_compressor(ApsisSpaceRoom *room, int32_t left,
         channel ? right : left, room->compressor_gain_q15));
 }
 
+/* FM-1 target hot-path one-poles at 44.1 kHz, Q15. The four roles are
+ * unchanged from the high-precision reference room: 170-Hz guard HP,
+ * 3.8..5.6-kHz guard LP, 4.2-kHz echo LP and 190-Hz tail HP. */
+#define ROOM_FAST_GUARD_HP_LP_ALPHA_Q15 784u
+#define ROOM_FAST_TAIL_HP_LP_ALPHA_Q15 875u
+#define ROOM_FAST_ECHO_LP_ALPHA_Q15 14755u
+
+static const uint16_t ROOM_FAST_GUARD_LP_ALPHA[19] = {
+    13699u,13969u,14235u,14497u,14755u,15010u,15261u,
+    15509u,15753u,15994u,16231u,16465u,16696u,16923u,
+    17147u,17368u,17586u,17801u,18012u
+};
+
+static uint16_t space_room_fast_guard_alpha(int32_t hz_q16)
+{
+    uint32_t hz, index;
+    if (hz_q16 <= 0) return ROOM_FAST_GUARD_LP_ALPHA[0];
+    hz = ((uint32_t)hz_q16 + 32768u) >> 16;
+    if (hz <= ROOM_GUARD_LP_MIN_HZ) return ROOM_FAST_GUARD_LP_ALPHA[0];
+    if (hz >= ROOM_GUARD_LP_MAX_HZ) return ROOM_FAST_GUARD_LP_ALPHA[18];
+    index = (hz - ROOM_GUARD_LP_MIN_HZ + 50u) / 100u;
+    if (index > 18u) index = 18u;
+    return ROOM_FAST_GUARD_LP_ALPHA[index];
+}
+
+static int32_t space_room_fast_lp(ApsisSpaceBiquadState *state,
+                                  int32_t x_q15, uint16_t alpha_q15)
+{
+    int32_t cur, delta, product, step;
+    if (!state) return x_q15;
+    cur = (int32_t)state->z1_q60;
+    delta = x_q15 - cur;
+    product = delta * (int32_t)alpha_q15;
+    if (product >= 0) product += 16384;
+    else product -= 16384;
+    step = product >> 15;
+    if (!step && delta) step = delta > 0 ? 1 : -1;
+    cur += step;
+    cur = space_room_clamp_q15(cur);
+    state->z1_q60 = cur;
+    return cur;
+}
+
+static int32_t space_room_fast_hp(ApsisSpaceBiquadState *state,
+                                  int32_t x_q15, uint16_t low_alpha_q15)
+{
+    int32_t low = space_room_fast_lp(state, x_q15, low_alpha_q15);
+    return space_room_clamp_q15((int64_t)x_q15 - low);
+}
+
 static void space_room_targets(ApsisSpaceRoom *room, const ApsisSpaceState *state)
 {
     uint16_t mix, decay, predelay, damping, echo_time, feedback;
     uint32_t guard_hz;
     if (!room || !state) return;
+    (void)&ROOM_GUARD_HP_170;
+    (void)&ROOM_TAIL_HP_190;
+    (void)&ROOM_ECHO_LP_4200;
+    (void)&ROOM_GUARD_LP[0];
     mix = state->mix_q15 > APSIS_Q15_MILLI(720) ? APSIS_Q15_MILLI(720) : state->mix_q15;
     decay = space_room_clamp_u16(state->decay_ms, 4000u, 12000u);
     predelay = space_room_clamp_u16(state->predelay_ms, 15u, 140u);
@@ -397,7 +457,7 @@ void apsis_space_room_render(ApsisSpaceRoom *room,
         if (n > APSIS_SPACE_ROOM_BLOCK_MAX) n = APSIS_SPACE_ROOM_BLOCK_MAX;
 
         for (i = 0u; i < n; ++i) {
-            const SpaceRoomBiquadCoeff *guard_lp;
+            uint16_t guard_lp_alpha;
             int32_t in_l = input_stereo_q15 ? input_stereo_q15[(done + i) * 2u] : 0;
             int32_t in_r = input_stereo_q15 ? input_stereo_q15[(done + i) * 2u + 1u] : 0;
             int32_t g_l, g_r, early_l = 0, early_r = 0;
@@ -406,14 +466,16 @@ void apsis_space_room_render(ApsisSpaceRoom *room,
             uint32_t tap;
 
             space_room_smooth_params(room);
-            guard_lp = space_room_guard_lp_coeff(room->guard_lp_hz_q16);
+            guard_lp_alpha = space_room_fast_guard_alpha(room->guard_lp_hz_q16);
 
-            g_l = space_room_mul_q15(in_l, ROOM_TRIM_Q15);
-            g_r = space_room_mul_q15(in_r, ROOM_TRIM_Q15);
-            g_l = space_room_biquad(&room->guard_hp[0], &ROOM_GUARD_HP_170, g_l);
-            g_r = space_room_biquad(&room->guard_hp[1], &ROOM_GUARD_HP_170, g_r);
-            g_l = space_room_biquad(&room->guard_lp[0], guard_lp, g_l);
-            g_r = space_room_biquad(&room->guard_lp[1], guard_lp, g_r);
+            g_l = space_room_clamp_q15(space_room_mul_q15(in_l, ROOM_TRIM_Q15));
+            g_r = space_room_clamp_q15(space_room_mul_q15(in_r, ROOM_TRIM_Q15));
+            g_l = space_room_fast_hp(&room->guard_hp[0], g_l,
+                                     ROOM_FAST_GUARD_HP_LP_ALPHA_Q15);
+            g_r = space_room_fast_hp(&room->guard_hp[1], g_r,
+                                     ROOM_FAST_GUARD_HP_LP_ALPHA_Q15);
+            g_l = space_room_fast_lp(&room->guard_lp[0], g_l, guard_lp_alpha);
+            g_r = space_room_fast_lp(&room->guard_lp[1], g_r, guard_lp_alpha);
             /* Linked stereo detector: update gain once, then apply the same
              * compressor state to both channels. */
             g_l = space_room_compressor(room, g_l, g_r, 0u);
@@ -447,8 +509,10 @@ void apsis_space_room_render(ApsisSpaceRoom *room,
                 echo_l = echo.left;
                 echo_r = echo.right;
             }
-            echo_fb_l = space_room_biquad(&room->echo_lp[0], &ROOM_ECHO_LP_4200, echo_l);
-            echo_fb_r = space_room_biquad(&room->echo_lp[1], &ROOM_ECHO_LP_4200, echo_r);
+            echo_fb_l = space_room_fast_lp(&room->echo_lp[0], echo_l,
+                                           ROOM_FAST_ECHO_LP_ALPHA_Q15);
+            echo_fb_r = space_room_fast_lp(&room->echo_lp[1], echo_r,
+                                           ROOM_FAST_ECHO_LP_ALPHA_Q15);
             echo_fb_l = space_room_mul_q15(echo_fb_l, room->echo_feedback_q15);
             echo_fb_r = space_room_mul_q15(echo_fb_r, room->echo_feedback_q15);
 
@@ -457,11 +521,13 @@ void apsis_space_room_render(ApsisSpaceRoom *room,
                 (int32_t)space_room_clamp_q15((int64_t)g_l + echo_fb_l),
                 (int32_t)space_room_clamp_q15((int64_t)g_r + echo_fb_r));
 
-            tail_l = space_room_biquad(&room->tail_hp[0], &ROOM_TAIL_HP_190,
-                                       pred_l + echo_l);
-            tail_r = space_room_biquad(&room->tail_hp[1], &ROOM_TAIL_HP_190,
-                                       pred_r + echo_r);
-            tail_mono[i] = space_room_clamp_q15(((int64_t)tail_l + tail_r) / 2);
+            tail_l = space_room_fast_hp(&room->tail_hp[0],
+                                         space_room_clamp_q15((int64_t)pred_l + echo_l),
+                                         ROOM_FAST_TAIL_HP_LP_ALPHA_Q15);
+            tail_r = space_room_fast_hp(&room->tail_hp[1],
+                                         space_room_clamp_q15((int64_t)pred_r + echo_r),
+                                         ROOM_FAST_TAIL_HP_LP_ALPHA_Q15);
+            tail_mono[i] = (tail_l + tail_r) / 2;
             fdn_out[i * 2u] = 0;
             fdn_out[i * 2u + 1u] = 0;
             wet_gain[i] = room->wet_q15;

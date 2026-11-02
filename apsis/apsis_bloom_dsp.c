@@ -41,7 +41,7 @@ static uint32_t bloom_samples_ms(uint32_t ms)
     return 44u * ms + (100u * ms + 500u) / 1000u;
 }
 
-static uint16_t bloom_mul_q15(uint16_t a, uint16_t b)
+static uint16_t bloom_dsp_mul_q15(uint16_t a, uint16_t b)
 {
     return (uint16_t)(((uint32_t)a * b + APSIS_Q15_ONE / 2u) / APSIS_Q15_ONE);
 }
@@ -498,10 +498,10 @@ uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
     if (hold > attack + bloom_samples_ms(420u))
         hold = attack + bloom_samples_ms(420u);
 
-    peak = bloom_mul_q15(binding->acoustic.amp_q15,
+    peak = bloom_dsp_mul_q15(binding->acoustic.amp_q15,
                          bloom_voice_gain_scale(v->voice));
     if (peak < BLOOM_GAIN_MIN_PEAK_Q15) peak = BLOOM_GAIN_MIN_PEAK_Q15;
-    sustain = bloom_mul_q15((uint16_t)peak, bloom_voice_sustain(v->voice));
+    sustain = bloom_dsp_mul_q15((uint16_t)peak, bloom_voice_sustain(v->voice));
     if (sustain < BLOOM_GAIN_MIN_SUSTAIN_Q15) sustain = BLOOM_GAIN_MIN_SUSTAIN_Q15;
 
     v->env_gain_q23 = BLOOM_GAIN_FLOOR_Q15 << 8;
