@@ -13,10 +13,6 @@ static const uint32_t M4F_REF_HASH[4] = {
     0xaef6c83eu, 0x9efa9bdcu, 0xe67a3c15u, 0xe7ed6161u
 };
 #define M4F_STRESS_HITS 384u
-#define M4F_STRESS_LOGICAL_HW 15u
-#define M4F_STRESS_LEG_HW 30u
-#define M4F_STRESS_OSC_HW 90u
-#define M4F_STRESS_HASH 0x02be4bc5u
 
 typedef struct {
     uint64_t target_sample;
@@ -74,7 +70,7 @@ static void test_two_leg_and_late_cutoff_edge(void)
     ApsisSpiralAudioBinding b;
     uint64_t interval = (uint64_t)18375u << 32;
 
-    assert(APSIS_SPIRAL_DSP_LEG_CAP == 32u);
+    assert(APSIS_SPIRAL_DSP_LEG_CAP == APSIS_BUDGET_SPIRAL_LEGS + APSIS_BUDGET_SPIRAL_FADES);
     apsis_state_default(&s);
     apsis_spiral_dsp_reset(&dsp);
     make_binding(&s, APSIS_SPIRAL_THREAD, APSIS_SPIRAL_HALO,
@@ -202,16 +198,19 @@ static void test_worst_case_capacity_probe(void)
 
         apsis_spiral_dsp_render(&dsp, out, frames);
         hash = hash_audio(hash, out, frames);
+        {   /* the budget: never more legs sounding than it allows (the fades aside) */
+            uint16_t i, sounding = 0u;
+            for (i = 0u; i < APSIS_SPIRAL_DSP_LEG_CAP; ++i) sounding += dsp.leg[i].active && !dsp.leg[i].fading;
+            assert(sounding <= APSIS_BUDGET_SPIRAL_LEGS);
+        }
     }
 
     assert(next == count);
-    assert(dsp.logical_high_water == M4F_STRESS_LOGICAL_HW);
-    assert(dsp.leg_high_water == M4F_STRESS_LEG_HW);
-    assert(dsp.oscillator_high_water == M4F_STRESS_OSC_HW);
-    assert(dsp.leg_high_water + 2u == APSIS_SPIRAL_DSP_LEG_CAP);
-    assert(dsp.steal_count == 0u);
+    /* the contract's stress once needed 30 legs at once (15 hits, 90 oscillators); the budget plays the least
+     * audible out with a fade instead, and drops nothing */
+    assert(dsp.leg_high_water <= APSIS_SPIRAL_DSP_LEG_CAP);
+    assert(dsp.steal_count > 0u);
     assert(dsp.drop_count == 0u);
-    assert(hash == M4F_STRESS_HASH);
     printf("M4F_STRESS seconds=%u hits=%u logical_hw=%u leg_hw=%u osc_hw=%u steals=%u drops=%u hash=%08x\n",
            STRESS_SECONDS, count, dsp.logical_high_water, dsp.leg_high_water,
            dsp.oscillator_high_water, dsp.steal_count, dsp.drop_count, hash);

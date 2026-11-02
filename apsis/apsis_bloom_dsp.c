@@ -275,6 +275,53 @@ void apsis_bloom_dsp_reset(ApsisBloomDsp *dsp)
     bloom_dsp_zero(dsp, (uint32_t)sizeof(*dsp));
 }
 
+/* the budget's steal: the petal fades to -60 dB in 10 ms from where it is, and its later envelope stages are gone */
+static void bloom_fade(ApsisBloomDspPetal *v)
+{
+    uint32_t end = v->age_samples + APSIS_BUDGET_FADE_SAMPLES;
+    v->fading = 1u;
+    v->env_event_index = 3u;
+    v->env_stage_left = APSIS_BUDGET_FADE_SAMPLES;
+    v->env_stage_rising = 0u;
+    v->env_decay_mul_q31 = APSIS_BUDGET_FADE_MUL_Q31;
+    if (v->life_samples > end) v->life_samples = end;
+}
+
+/* a petal slot. Over the budget's sounding petals, the least audible fades first (one still unfolding its attack
+ * only when every petal is); a petal not begun simply goes; with no free slot, the quietest fade ends at once. */
+static ApsisBloomDspPetal *bloom_alloc_petal(ApsisBloomDsp *dsp)
+{
+    uint16_t i, sounding = 0u;
+    int32_t free_ix = -1, quiet = -1, fade = -1;
+    uint32_t quiet_l = 0xFFFFFFFFu, fade_l = 0xFFFFFFFFu;
+    for (i = 0u; i < APSIS_BLOOM_DSP_PETAL_CAP; ++i) {
+        const ApsisBloomDspPetal *v = &dsp->petal[i];
+        uint32_t l = v->env_gain_q23;
+        if (!v->active) {
+            if (free_ix < 0) free_ix = (int32_t)i;
+            continue;
+        }
+        if (v->fading) {
+            if (l < fade_l) { fade_l = l; fade = (int32_t)i; }
+            continue;
+        }
+        ++sounding;
+        if (v->start_delay_samples || v->env_event_index == 0u) l = 0x80000000u + (l > 0x7FFFFFFFu ? 0x7FFFFFFFu : l);
+        if (l < quiet_l) { quiet_l = l; quiet = (int32_t)i; }
+    }
+    if (sounding >= APSIS_BUDGET_BLOOM_PETALS && quiet >= 0) {
+        if (dsp->petal[quiet].start_delay_samples) {
+            dsp->petal[quiet].active = 0u;
+            if (free_ix < 0) free_ix = quiet;
+        } else {
+            bloom_fade(&dsp->petal[quiet]);
+        }
+        dsp->steal_count++;
+    }
+    if (free_ix < 0) free_ix = fade;
+    return free_ix < 0 ? 0 : &dsp->petal[free_ix];
+}
+
 uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
                                         const ApsisState *state,
                                         const ApsisBloomAudioBinding *binding,
@@ -282,17 +329,12 @@ uint8_t apsis_bloom_dsp_trigger_binding(ApsisBloomDsp *dsp,
 {
     ApsisBloomDspPetal *v = 0;
     uint32_t base_mhz, attack, hold, duration, peak, sustain;
-    uint16_t active, oscs, i;
+    uint16_t active, oscs;
 
     if (!dsp || !state || !binding || !binding->valid || !binding->pitch.valid)
         return 0u;
 
-    for (i = 0u; i < APSIS_BLOOM_DSP_PETAL_CAP; ++i) {
-        if (!dsp->petal[i].active) {
-            v = &dsp->petal[i];
-            break;
-        }
-    }
+    v = bloom_alloc_petal(dsp);
     if (!v) {
         dsp->drop_count++;
         return 0u;

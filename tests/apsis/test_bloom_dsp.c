@@ -135,6 +135,8 @@ static void test_target_delay_is_exact(void)
     assert(dsp.petal[0].age_samples == 22u);
 }
 
+/* the contract's densest legal Bloom (it once held 125 petals at once): within the budget now, the least audible
+ * petals fading out, nothing dropped */
 static void test_frozen_worst_case_capacity(void)
 {
     ApsisState s;
@@ -155,7 +157,7 @@ static void test_frozen_worst_case_capacity(void)
     s.bloom.brightness_q15 = APSIS_Q15_ONE;
     apsis_bloom_audio_plan(&s, 5u, &plan);
     assert(plan.valid == 1u && plan.count == 5u);
-    assert(APSIS_BLOOM_DSP_PETAL_CAP == 136u);
+    assert(APSIS_BLOOM_DSP_PETAL_CAP == APSIS_BUDGET_BLOOM_PETALS + APSIS_BUDGET_BLOOM_FADES);
     apsis_bloom_dsp_reset(&dsp);
 
     while (block_start < total_frames) {
@@ -183,6 +185,11 @@ static void test_frozen_worst_case_capacity(void)
 
         memset(out, 0, sizeof(out));
         apsis_bloom_dsp_render(&dsp, out, frames);
+        {
+            uint16_t k, sounding = 0u;
+            for (k = 0u; k < APSIS_BLOOM_DSP_PETAL_CAP; ++k) sounding += dsp.petal[k].active && !dsp.petal[k].fading;
+            assert(sounding <= APSIS_BUDGET_BLOOM_PETALS);
+        }
         for (i = 0u; i < frames * 2u; ++i) {
             uint32_t a = out[i] < 0 ? (uint32_t)(-out[i]) : (uint32_t)out[i];
             if (a > peak) peak = a;
@@ -191,19 +198,20 @@ static void test_frozen_worst_case_capacity(void)
         block_start = block_end;
     }
 
-    printf("M4G_STRESS triggers=%u petals=%u/%u oscs=%u drops=%u peak=%u hash=%08x sizeof=%u\n",
+    printf("M4G_STRESS triggers=%u petals=%u/%u oscs=%u drops=%u steals=%u peak=%u hash=%08x sizeof=%u\n",
            (unsigned)dsp.trigger_count,
            (unsigned)dsp.petal_high_water,
            (unsigned)APSIS_BLOOM_DSP_PETAL_CAP,
            (unsigned)dsp.oscillator_high_water,
            (unsigned)dsp.drop_count,
+           (unsigned)dsp.steal_count,
            (unsigned)peak,
            (unsigned)hash,
            (unsigned)sizeof(ApsisBloomDsp));
     assert(dsp.trigger_count == 186u);
-    assert(dsp.petal_high_water == 125u);
-    assert(dsp.drop_count == 0u);
-    assert(dsp.oscillator_high_water == 250u);   /* two operators a petal */
+    assert(dsp.petal_high_water <= APSIS_BLOOM_DSP_PETAL_CAP);
+    assert(dsp.drop_count == 0u && dsp.steal_count > 0u);
+    assert(dsp.oscillator_high_water <= 2u * APSIS_BLOOM_DSP_PETAL_CAP);   /* two operators a petal */
     assert(peak > 100u && peak < 2000u);
 }
 

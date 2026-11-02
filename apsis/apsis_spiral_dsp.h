@@ -3,13 +3,14 @@
 
 #include <stdint.h>
 #include "apsis_spiral_audio_runtime.h"
+#include "apsis_voice_budget.h"
 
 #define APSIS_SPIRAL_DSP_RATE 44100u
 #define APSIS_SPIRAL_DSP_OSC_MAX 3u
-/* Frozen after the contract worst-case probe measured 30 simultaneous legs
- * (15 logical two-leg hits / 90 oscillators) with zero steals/drops. Keep one
- * complete two-leg hit of reserve above that observed high-water. */
-#define APSIS_SPIRAL_DSP_LEG_CAP 32u
+/* The voice budget (apsis_voice_budget.h): this many sounding legs, and a few slots for the 10 ms fades of the
+ * legs it steals. (The contract's probe once measured 30 simultaneous legs; the budget plays the least audible
+ * of those out instead.) */
+#define APSIS_SPIRAL_DSP_LEG_CAP (APSIS_BUDGET_SPIRAL_LEGS + APSIS_BUDGET_SPIRAL_FADES)
 
 typedef enum {
     APSIS_SPIRAL_DSP_SINE = 0,
@@ -41,6 +42,7 @@ typedef struct {
     uint8_t cutoff_voice;
     uint8_t shadow;
     uint8_t osc_count;
+    uint8_t fading;                  /* stolen by the budget: 10 ms to -60 dB, then free */
     uint32_t serial;
     uint32_t token;
     uint32_t start_delay_samples;

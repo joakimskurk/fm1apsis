@@ -2,15 +2,15 @@
 #define APSIS_BLOOM_DSP_H
 
 #include <stdint.h>
+#include "apsis_voice_budget.h"
 #include "apsis_bloom_audio_runtime.h"
 
 #define APSIS_BLOOM_DSP_RATE 44100u
 #define APSIS_BLOOM_DSP_OSC_MAX 2u   /* the FM pair: carrier, modulator */
-/* Frozen from the legal 11-second worst-case probe: 125 simultaneous petals
- * / 375 oscillators with zero drops. 136 leaves 11 petal slots of margin,
- * enough for more than two complete five-petal occurrences beyond the measured
- * high-water, without carrying the provisional 160-slot RAM cost to target. */
-#define APSIS_BLOOM_DSP_PETAL_CAP 136u
+/* The voice budget (apsis_voice_budget.h): this many sounding petals, and a few slots for the 10 ms fades of the
+ * petals it steals. (The contract's 11-second probe once held 125 petals at once; the budget plays the least
+ * audible out instead.) */
+#define APSIS_BLOOM_DSP_PETAL_CAP (APSIS_BUDGET_BLOOM_PETALS + APSIS_BUDGET_BLOOM_FADES)
 
 typedef enum {
     APSIS_BLOOM_DSP_SINE = 0,
@@ -29,6 +29,7 @@ typedef struct {
     uint8_t voice;
     uint8_t petal_index;
     uint8_t osc_count;
+    uint8_t fading;                  /* stolen by the budget: 10 ms to -60 dB, then free */
     uint32_t serial;
     uint32_t token;
     uint32_t start_delay_samples;
@@ -61,6 +62,7 @@ typedef struct {
     uint32_t next_serial;
     uint32_t trigger_count;
     uint32_t drop_count;
+    uint32_t steal_count;
     uint16_t petal_high_water;
     uint16_t oscillator_high_water;
 } ApsisBloomDsp;

@@ -326,33 +326,57 @@ uint16_t apsis_string_dsp_transient_physical_active(const ApsisStringDsp *dsp)
     return n;
 }
 
-static int32_t strx_find_free(const ApsisStringDsp *dsp)
+/* a free slot; with none, the reserve of fades is full too: the quietest fade ends at once and gives its slot */
+static int32_t strx_find_free(ApsisStringDsp *dsp)
 {
     uint16_t i;
+    int32_t quiet = -1;
+    int32_t gain = 0x7FFFFFFF;
     for (i = 0u; i < APSIS_STRING_TRANSIENT_POOL_CAP; ++i)
         if (!dsp->transient[i].active) return (int32_t)i;
-    return -1;
+    for (i = 0u; i < APSIS_STRING_TRANSIENT_POOL_CAP; ++i)
+        if (dsp->transient[i].stealing && dsp->transient[i].steal_gain_q15 < gain) {
+            gain = dsp->transient[i].steal_gain_q15;
+            quiet = (int32_t)i;
+        }
+    if (quiet >= 0) dsp->transient[quiet].active = 0u;
+    return quiet;
 }
 
-static uint8_t strx_steal_oldest(ApsisStringDsp *dsp)
+/* how loud a decaying partial is now: its peak through the envelope */
+static uint32_t strx_loudness(const ApsisStringTransientVoice *v)
+{
+    uint32_t idx = v->env_phase_q16 >> 16;
+    if (idx > 64u) idx = 64u;
+    return strx_gain_q15(v->peak_gain_q15, STRX_ENV_Q15[idx]);
+}
+
+/* the budget's steal (apsis_voice_budget.h): the least audible partial fades out (105 ms), or goes at once if it
+ * has not started yet */
+static uint8_t strx_steal_quietest(ApsisStringDsp *dsp)
 {
     uint16_t i;
-    int32_t oldest = -1;
-    uint32_t serial = 0xFFFFFFFFu;
+    int32_t pick = -1;
+    uint32_t loud = 0xFFFFFFFFu;
     for (i = 0u; i < APSIS_STRING_TRANSIENT_POOL_CAP; ++i) {
         ApsisStringTransientVoice *v = &dsp->transient[i];
-        if (v->active && !v->stealing && v->serial < serial) {
-            serial = v->serial;
-            oldest = (int32_t)i;
+        uint32_t l;
+        if (!v->active || v->stealing) continue;
+        /* a partial not started yet or still in its attack belongs to a note just struck: it goes only when every
+         * partial is that young (above 65535: always after the decaying ones) */
+        l = v->start_delay_samples || v->envelope_stage == 0u ? 0x10000u + v->peak_gain_q15 : strx_loudness(v);
+        if (l < loud || (l == loud && pick >= 0 && v->serial < dsp->transient[pick].serial)) {
+            loud = l;
+            pick = (int32_t)i;
         }
     }
-    if (oldest < 0) return 0u;
-    if (dsp->transient[oldest].start_delay_samples) {
-        dsp->transient[oldest].active = 0u;
+    if (pick < 0) return 0u;
+    if (dsp->transient[pick].start_delay_samples) {
+        dsp->transient[pick].active = 0u;
     } else {
-        dsp->transient[oldest].stealing = 1u;
-        dsp->transient[oldest].steal_gain_q15 = APSIS_Q15_ONE;
-        dsp->transient[oldest].steal_left_samples = STRX_STEAL_SAMPLES;
+        dsp->transient[pick].stealing = 1u;
+        dsp->transient[pick].steal_gain_q15 = APSIS_Q15_ONE;
+        dsp->transient[pick].steal_left_samples = STRX_STEAL_SAMPLES;
     }
     dsp->transient_steal_count++;
     return 1u;
@@ -380,7 +404,7 @@ static uint8_t strx_allocate(ApsisStringDsp *dsp,
         return 0u;
     }
     if (apsis_string_dsp_transient_logical_active(dsp) >= APSIS_STRING_TRANSIENT_LOGICAL_CAP)
-        (void)strx_steal_oldest(dsp);
+        (void)strx_steal_quietest(dsp);
     v = &dsp->transient[free_ix];
     strx_zero(v, (uint32_t)sizeof(*v));
     v->active = 1u;

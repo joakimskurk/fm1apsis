@@ -311,26 +311,54 @@ static void spiral_update_high_water(ApsisSpiralDsp *dsp)
     if (oscs > dsp->oscillator_high_water) dsp->oscillator_high_water = oscs;
 }
 
+/* the budget's steal: the leg fades to -60 dB in 10 ms from where it is (its attack done, a plain decay) */
+static void spiral_fade(ApsisSpiralDspLeg *v)
+{
+    uint32_t end = v->age_samples + APSIS_BUDGET_FADE_SAMPLES;
+    v->fading = 1u;
+    v->attack_samples = 0u;
+    v->decay_mul_q31 = APSIS_BUDGET_FADE_MUL_Q31;
+    if (v->tail_samples > end) v->tail_samples = end;
+    if (v->life_samples > end) v->life_samples = end;
+}
+
+/* a leg for a new hit. Over the budget's sounding legs, the least audible one fades first (a leg in its attack
+ * only when every leg is that young); with no free slot, the quietest fade ends at once. */
 static ApsisSpiralDspLeg *spiral_alloc_leg(ApsisSpiralDsp *dsp)
 {
-    uint16_t i, oldest = 0u;
-    uint32_t oldest_serial = 0xffffffffu;
+    uint16_t i, sounding = 0u;
+    int32_t free_ix = -1, quiet = -1, fade = -1;
+    uint32_t quiet_l = 0xFFFFFFFFu, fade_l = 0xFFFFFFFFu;
     if (!dsp) return 0;
     for (i = 0u; i < APSIS_SPIRAL_DSP_LEG_CAP; ++i) {
-        if (!dsp->leg[i].active) {
-            spiral_dsp_zero(&dsp->leg[i], (uint32_t)sizeof(dsp->leg[i]));
-            dsp->leg[i].active = 1u;
-            return &dsp->leg[i];
+        ApsisSpiralDspLeg *v = &dsp->leg[i];
+        uint32_t l;
+        if (!v->active) {
+            if (free_ix < 0) free_ix = (int32_t)i;
+            continue;
         }
-        if (dsp->leg[i].serial < oldest_serial) {
-            oldest_serial = dsp->leg[i].serial;
-            oldest = i;
+        l = v->gain_q23;
+        if (v->fading) {
+            if (l < fade_l) { fade_l = l; fade = (int32_t)i; }
+            continue;
         }
+        ++sounding;
+        if (v->start_delay_samples || v->age_samples < v->attack_samples) l = 0x80000000u + ((uint32_t)v->peak_gain_q15 << 8);
+        if (l < quiet_l) { quiet_l = l; quiet = (int32_t)i; }
     }
-    dsp->steal_count++;
-    spiral_dsp_zero(&dsp->leg[oldest], (uint32_t)sizeof(dsp->leg[oldest]));
-    dsp->leg[oldest].active = 1u;
-    return &dsp->leg[oldest];
+    if (sounding >= APSIS_BUDGET_SPIRAL_LEGS && quiet >= 0) {
+        if (dsp->leg[quiet].start_delay_samples) dsp->leg[quiet].active = 0u;   /* not begun: it simply goes */
+        else spiral_fade(&dsp->leg[quiet]);
+        dsp->steal_count++;
+        if (free_ix < 0 && !dsp->leg[quiet].active) free_ix = quiet;
+    }
+    if (free_ix < 0) {
+        if (fade < 0) return 0;              /* (the caller counts the drop) */
+        free_ix = fade;
+    }
+    spiral_dsp_zero(&dsp->leg[free_ix], (uint32_t)sizeof(dsp->leg[free_ix]));
+    dsp->leg[free_ix].active = 1u;
+    return &dsp->leg[free_ix];
 }
 
 void apsis_spiral_dsp_reset(ApsisSpiralDsp *dsp)
