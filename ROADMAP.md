@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11W are complete. P11W is the accepted production baseline; any further production optimization requires a new measured, equivalence-backed candidate.**
+Status: **[~] active on `p11-optimization`. P11A–P11X are complete. P11W remains the accepted production baseline; P11X authorizes P11Y proof-only for the measured FDN output sign-mix candidate.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -582,6 +582,38 @@ Frozen P11W production target:
 
 P11W replaces P11R as the accepted production baseline. It keeps target image/RAM/POOL size unchanged relative to P11R while removing two additional static render instruction lines through the zero-growth A+delta representation. Physical CPU/ISR improvement remains unverified.
 
+### P11X — FDN output sign-mix census
+
+Status: **[x] complete, frozen measurement phase. Production remains exact P11W.**
+
+- [x] both frozen output sign vectors contain only ±1: left **5+/3−**, right **5+/3−**
+- [x] structural absolute eight-term sum bound **262,136**, signed-32 safe with **2,147,221,511** headroom
+- [x] current source workload **16 sign products/frame**
+- [x] cold 16,384-frame census: **262,144** sign products
+- [x] warm 65,536-frame census: **1,048,576** sign products
+- [x] optimized + ASAN/UBSAN PASS
+- [x] exact P11W target regenerated: **140,472 B image / 87,524 B RAM / 319,176 B POOL**, package `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- [x] raw JieLi render disassembly captured for all **364** static instruction lines
+- [x] target loop loads signed `SPACE_OUT_RIGHT[k]`/`SPACE_OUT_LEFT[k]` and executes explicit `r1 *= r0` + `r0 *= r2` — **two general sign multiplies per FDN line**
+- [x] authoritative run `41396085585` on technical head `a28fb0047550b729c15cc7e5bc3413a71a13819b`
+- [x] evidence artifact ID `13119167571`; ZIP SHA-256 `5ab3d57b84c7fb941cabc46ae478144763d8cc6e2661c9919f8d996ffab51c66`
+- [x] production Space blobs remain exact P11W
+- [x] historical workflow manual-only and pinned to the proven technical head
+
+Decision: authorize P11Y **proof only** for replacing the two fixed ±1 dot products with explicit fixed add/sub accumulation. The generic opcode histogram is not treated as semantic JieLi-ISA evidence; the raw disassembly lines are the authority.
+
+### P11Y — fixed FDN output add/sub equivalence proof
+
+Status: **[ ] next. Production remains P11W.**
+
+- [ ] prove loop sign-multiply and fixed add/sub arithmetic identical over boundary/exhaustive/random mixed vectors
+- [ ] prove complete FDN stereo output/state/delay-storage equivalence across cold/warm/legal/random/reset/adversarial trajectories
+- [ ] optimized + ASAN/UBSAN PASS
+- [ ] patch only an ephemeral generated target; committed Space remains P11W
+- [ ] compare exact image/RAM/POOL/package and FDN render code shape to P11W
+- [ ] reject if target shape/resources regress without physical timing evidence
+- [ ] authorize production validation only if the real-target projection is non-regressive and justified
+
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
 - [ ] UI redraw/DMA optimization only if later measurement justifies it
@@ -604,4 +636,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11W production state to `p11-optimization`, then return to measurement before selecting P11X. Do not infer physical CPU/ISR improvement from static code-shape proxies. Any further production optimization requires a new measured hotspot, explicit structural bounds where relevant, an equivalence proof and non-regressive real-target evidence.
+Promote frozen P11X measurement state to `p11-optimization`, then create one P11Y proof branch from that freeze. Keep production at P11W. Prove fixed add/sub output mixing against the frozen sign-multiply authority and project it ephemerally on the real JieLi target before any production-validation decision.

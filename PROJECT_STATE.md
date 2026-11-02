@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11W are complete. P11W is exact-head validated and is the accepted production baseline; further production optimization returns to measurement-first selection.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11X are complete. P11W remains the accepted production baseline. P11X measured explicit target sign multiplies in the FDN output mix and authorizes P11Y proof-only.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -850,9 +850,35 @@ Active Motion authority remains exact:
 
 P11W therefore replaces P11R as the accepted production baseline. Relative to P11R it has zero image/RAM/POOL growth and reduces the inlined FDN render from 1,098 B / 366 lines to 1,094 B / 364 lines. This is exact static/proxy evidence, not physical FM-1 cycle timing.
 
-## Exact next phase
+## P11X — FDN output sign-mix census complete
 
-Return to measurement before P11X. Select no new production optimization unless a concrete remaining workload/resource hotspot is measured, bounded where necessary, proved equivalent and shown non-regressive on the real JieLi target. Physical ISR timing, stack high-water, LCD/audio contention, NOR timing and DAC/listening quality remain Phase-12 hardware work.
+Authority:
+- technical head `a28fb0047550b729c15cc7e5bc3413a71a13819b`
+- run `41396085585` — PASS
+- evidence artifact ID `13119167571`
+- evidence ZIP SHA-256 `5ab3d57b84c7fb941cabc46ae478144763d8cc6e2661c9919f8d996ffab51c66`
+- production Space source/header remain exact P11W
+
+Measured facts:
+- left/right sign vectors are fixed ±1 only, each **5 positive / 3 negative**
+- eight-term Q15 signed-sum absolute bound **262,136**, safely inside int32
+- source performs **16 sign products/frame**
+- cold 16,384 frames → **262,144** sign products
+- warm 65,536 frames → **1,048,576** sign products
+- optimized + ASAN/UBSAN PASS
+
+Exact target authority:
+- P11W package regenerated exactly: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**, package `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- render remains **364** static instruction lines
+- raw JieLi loop loads signed sign-vector bytes and executes `r1 *= r0` and `r0 *= r2` for each line
+- therefore the compiler retains **two general sign multiplications/line = 16/frame**
+- the generic opcode classifier is not semantic authority for JieLi assignment-style disassembly; raw disassembly is
+
+P11X authorizes only a P11Y proof candidate: replace the frozen sign products with explicit add/sub using exactly the same sign pattern. No production change is authorized.
+
+## Exact next phase — P11Y fixed output add/sub proof
+
+Production remains P11W. Prove arithmetic and complete FDN behavior bit-identical, normal + ASAN/UBSAN, then patch only an ephemeral generated target and compare exact resource/package/render shape. Reject any regressive target candidate absent physical timing evidence. Physical ISR timing, stack high-water, LCD/audio contention, NOR timing and DAC/listening quality remain Phase-12 hardware work.
 
 ## Do not regress
 
