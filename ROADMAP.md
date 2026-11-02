@@ -30,8 +30,11 @@
 - [ ] gain staging against the browser (per source and master), then re-pin the sound
 - [ ] the room: full-rate or better quarter-rate (aliasing, brightness), against the browser's Cathedral
 
-## v2.4 — looks and feels like APSIS
-- [ ] surfaces that move (Clock pulses, Spiral path, Bloom petals, String vibration, Drift beating)
+## v2.4 — the screen, designed for the FM-1 (docs/screen/README.md)
+- [x] references: Study 126 in play, every surface (docs/screen/reference/)
+- [ ] a 240x240 design sketch per surface next to its reference (what moves, what the knobs show, what is left out)
+- [ ] shared drawing pieces: glow tables, source colour ramps, 1-2 px lines and arcs at RGB565 cost
+- [ ] the surfaces one by one, checked in host mode and fm1-emu (screenshot, frame rate) against the reference
 - [ ] parameter feedback on every knob turn
 - [ ] a short manual (the panel map, the surfaces)
 
