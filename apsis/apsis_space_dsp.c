@@ -172,8 +172,10 @@ void apsis_space_fdn_reset(ApsisSpaceFdn *fdn)
         line->damping_state_q15 = 0;
         {
             uint8_t sine_i = (uint8_t)(line->lfo_phase >> 24);
-            line->lfo_sine_a_q15 = space_sine_point(sine_i);
-            line->lfo_sine_b_q15 = space_sine_point((uint8_t)(sine_i + 1u));
+            int32_t sine_a = space_sine_point(sine_i);
+            int32_t sine_b = space_sine_point((uint8_t)(sine_i + 1u));
+            line->lfo_sine_a_q15 = (int16_t)sine_a;
+            line->lfo_sine_delta_q15 = (int16_t)(sine_b - sine_a);
         }
         offset += line->capacity;
     }
@@ -208,18 +210,20 @@ void apsis_space_fdn_render(ApsisSpaceFdn *fdn,
             ApsisSpaceFdnLine *line = &fdn->line[k];
             uint32_t old_phase = line->lfo_phase;
             int32_t mod_q8, delayed;
-            int32_t sine_a, sine_b;
+            int32_t sine_a, sine_delta;
             uint8_t sine_i, sine_frac;
             line->lfo_phase += line->lfo_phase_inc;
             sine_i = (uint8_t)(line->lfo_phase >> 24);
             if ((uint8_t)(old_phase >> 24) != sine_i) {
-                line->lfo_sine_a_q15 = space_sine_point(sine_i);
-                line->lfo_sine_b_q15 = space_sine_point((uint8_t)(sine_i + 1u));
+                int32_t next_a = space_sine_point(sine_i);
+                int32_t next_b = space_sine_point((uint8_t)(sine_i + 1u));
+                line->lfo_sine_a_q15 = (int16_t)next_a;
+                line->lfo_sine_delta_q15 = (int16_t)(next_b - next_a);
             }
             sine_frac = (uint8_t)(line->lfo_phase >> 16);
             sine_a = line->lfo_sine_a_q15;
-            sine_b = line->lfo_sine_b_q15;
-            mod_q8 = (int32_t)(int16_t)(sine_a + (((sine_b - sine_a) * sine_frac) >> 8));
+            sine_delta = line->lfo_sine_delta_q15;
+            mod_q8 = (int32_t)(int16_t)(sine_a + ((sine_delta * sine_frac) >> 8));
             mod_q8 = (mod_q8 * SPACE_MOD_DEPTH_Q8) >> 15;
             delayed = space_line_read(fdn, line, mod_q8);
             line->damping_state_q15 += space_mul_q15(
