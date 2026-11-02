@@ -21,11 +21,14 @@
 - [x] A: stress build, the bound (sum of the parts' worsts) in CI, a load-meter build for a real FM-1
 - [x] B: per-voice cost down bit for bit; Bloom as 2-op FM (A/B approved); hard caps for String, Spiral, Bloom with least-audible fades
 - [ ] Clock's voice cost; the boot blocks warmed before the audio starts
-- [ ] C: planning out of the audio interrupt into sample-stamped events
-- [ ] D: the room on core 1 (fm1-dock's screening), a cheaper one-core fallback
+- [~] C: planning cut in place (Spiral's route map, Bloom's voicing): 2.1 -> 1.0 ms; moving it out is not needed for the bound now
+- [x] D: two cores (fm1-dock's HAL, screening, one-core fallback); drone, Drift, notes and the room (one block late) on core 1
 - [ ] E: the mix into the buses directly; the String drone and Drift at block-rate coefficients
 - [ ] F: the load-meter build on a real FM-1, the gap to FM1_STRICT in TESTING.md
-- [ ] the bound at 50 % or less, measured worst at 40 % or less, average at 30 % or less (core 0, FM1_STRICT)
+- [x] the densest settings within the block: stress bound 90 %, no drop-out after boot (CI gate)
+- [x] normal play under half: 30.9 % average, 46.7 % worst
+- [ ] the first block after boot (~8 ms)
+- [ ] stress under half (the bound 90 %): Clock, the commits, the planning
 
 ## v2.3 — sounds like APSIS
 - [ ] gain staging against the browser (per source and master), then re-pin the sound

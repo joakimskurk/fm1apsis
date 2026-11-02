@@ -49,10 +49,16 @@ cycles per function (CI's emulator job does both).
 | 2026-11-02 v2.2-margin (B, exact): STRESS | 229 % | 389 % | still collapses: 58 Bloom petals |
 | 2026-11-02 4b5992b (FM Bloom + voice budget): STRESS | 114 % | the bound 186 % | still over: the fixed parts (planning 2.1 ms, Clock 1.4, room 1.1) |
 | 2026-11-02 4b5992b: normal | 43.4 % | 60.3 % | 0; the bound 93 % |
+| 2026-11-02 1790ae7 two cores: normal | 30.9 % | 46.7 % | 0 |
+| 2026-11-02 1790ae7 two cores: STRESS | 57.1 % | the bound 90.4 % | 0 after boot (the first block 8.3 ms) |
+| 2026-11-02 1790ae7 a flaky core 1 (one core): normal | 35.1 % | 55.8 % | 0 |
 
 ## Known gaps
 
 - host mode feeds keys and buttons but not every interaction the panel allows (held combinations are partial)
 - FM1_STRICT is a cycle model, not the chip: the real margin, USB/key-scan interrupt cost and LCD/audio bus
   contention remain unverified until an FM-1 runs it
+- the second core and the supply levels (fm1_power.h) come from firmwares that run them on FM-1s; on APSIS they
+  are tested on fm1-emu only (both cores, `--flaky-core1`)
+- the first audio block after boot takes ~8 ms (the first plans); it falls while the output is still silent
 - no power-cut test of the journal on real NOR (fm1-emu's FM1_FLASH_CUT could cover the emulated part)

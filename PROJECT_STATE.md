@@ -36,9 +36,10 @@ Study 98's (one string), and the audio fits on the emulator's cycle model.
 ## Next action
 
 1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
-2. v2.2 margin (docs/MARGIN_PLAN.md), branch `v2.2-margin`. A and B are done: Bloom is FM (approved), and the
-   voices have hard caps. Stress: the bound is 186 % (it was 560 %); normal play's worst block is 60 %. Next: C (planning),
-   Clock, boot, D (core 1).
+2. v2.2 margin (docs/MARGIN_PLAN.md), branch `v2.2-margin`. A, B and D are done: FM Bloom, a voice budget, and two
+   cores (fm1-dock's HAL). Normal play is 31 % average and 47 % worst; the densest settings bound at 90 % with no
+   drop-out after boot (a CI gate). A flaky core 1 falls back to one core (normal play 56 % worst). Next: the first
+   block after boot, then the screen (v2.4).
 3. The load-meter build `apsis-loadmeter-ca04914.fwsc` is waiting for someone with an FM-1 (step F).
 
 ## Authority
