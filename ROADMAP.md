@@ -15,16 +15,22 @@
 - [x] a load budget in CI that fails the build (a block over 100 %)
 - [x] the String from Study 98: one string
 - [x] worst block under 70 % (69.8 %)
-- [ ] worst block under 50 % (the room, the String drone)
-- [ ] worst-case scenario script (all sources, full CHAIN, Motion, Bloom grow)
 - [ ] remove the unreachable Dual code (controls, Motion lanes, surfaces); Study 98's hybrid/bowed characters
 
-## v2.2 — sounds like APSIS
+## v2.2 — margin by construction (docs/MARGIN_PLAN.md)
+- [ ] A: stress script, the bound (sum of the parts' worsts) in CI, a load-meter build for a real FM-1
+- [ ] B: one oscillator budget for String notes, Spiral and Bloom; least-audible stealing; same-pitch lanes if they pass A/B
+- [ ] C: planning out of the audio interrupt into sample-stamped events
+- [ ] D: the room on core 1 (fm1-dock's screening), a cheaper one-core fallback
+- [ ] E: the mix into the buses directly; the String drone and Drift at block-rate coefficients
+- [ ] F: the load-meter build on a real FM-1, the gap to FM1_STRICT in TESTING.md
+- [ ] the bound at 50 % or less, measured worst at 40 % or less, average at 30 % or less (core 0, FM1_STRICT)
+
+## v2.3 — sounds like APSIS
 - [ ] gain staging against the browser (per source and master), then re-pin the sound
 - [ ] the room: full-rate or better quarter-rate (aliasing, brightness), against the browser's Cathedral
-- [ ] the second core for the room, with fm1-dock's screening and a one-core fallback
 
-## v2.3 — looks and feels like APSIS
+## v2.4 — looks and feels like APSIS
 - [ ] surfaces that move (Clock pulses, Spiral path, Bloom petals, String vibration, Drift beating)
 - [ ] parameter feedback on every knob turn
 - [ ] a short manual (the panel map, the surfaces)

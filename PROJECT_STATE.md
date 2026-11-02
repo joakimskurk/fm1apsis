@@ -36,7 +36,8 @@ Study 98's (one string), and the audio fits on the emulator's cycle model.
 ## Next action
 
 1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
-2. Then: the room (1.0 ms) and the String drone (0.65 ms) to get the worst block under 50 %; gain staging.
+2. v2.2 margin (docs/MARGIN_PLAN.md): the parts' own worsts add up to 104 %, so the 69.8 % worst block is luck.
+   Start with step A (stress script, the bound in CI, a load-meter build).
 
 ## Authority
 
