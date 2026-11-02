@@ -107,6 +107,9 @@ if "apsis_bench_probe" in syms:
     (out / "load.json").write_text(json.dumps(r, indent=1) + "\n")
     print(f"String partial bench: fixed {b[0]} us a block; cycles per partial per sample: decay mix {b[1] / 10}, "
           f"sine {b[2] / 10}, triangle+LP {b[3] / 10}, attack+stagger {b[4] / 10}, steal fade {b[5] / 10}")
+if "apsis_plan_probe" in syms:
+    pl = words("apsis_plan_probe", 3)
+    print(f"planning by piece, worst (us): runtime {pl[0]}, Spiral setup {pl[1]}, Bloom setup {pl[2]}")
 if blocks < 3000:
     sys.exit(f"FAIL: only {blocks} audio blocks in 20 s (expected ~3445): the audio stalled")
 if worst >= BUDGET:

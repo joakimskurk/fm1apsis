@@ -246,11 +246,19 @@ static uint32_t clock_voices(void)
     for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i) v += clock_dsp.voice[i].active;
     return v;
 }
+/* the planning part (5) by piece, per block, its worst (us): [0] the runtime's planning, [1] Spiral's note
+ * setup, [2] Bloom's note setup */
+static volatile uint32_t apsis_plan_probe[3];
+static uint32_t plan_ticks[3];
+#define PLAN_BEGIN() uint32_t plan_t0 = fm1_ticks()
+#define PLAN_END(k) (plan_ticks[(k)] += fm1_ticks() - plan_t0)
 #define COST_BEGIN(count) uint32_t cost_n = (count), cost_t0 = fm1_ticks()
 #define COST_END(k) cost_note((k), fm1_ticks() - cost_t0, cost_n)
 #else
 #define COST_BEGIN(count) do { } while (0)
 #define COST_END(k) do { } while (0)
+#define PLAN_BEGIN() do { } while (0)
+#define PLAN_END(k) do { } while (0)
 #endif
 
 static void block_part(uint32_t part)
@@ -454,6 +462,9 @@ static void render_block(int32_t *out, uint32_t n)
     if (runtime_ready) {
         block_mark = fm1_ticks();
         sound_ticks = 0u;
+#ifdef APSIS_STRESS
+        plan_ticks[0] = plan_ticks[1] = plan_ticks[2] = 0u;
+#endif
         apsis_space_target_begin_block(&space_target, n);
         if (apsis_string_motion_active || apsis_string_motion_mailbox.pending)
             apsis_p10_motion_prepare_block(n);
@@ -521,6 +532,7 @@ static void render_block(int32_t *out, uint32_t n)
             bloom_audio_started = 1u;
         if (bloom_audio_started) {
             spiral_block_start = apsis_runtime.cursor_sample;
+            { PLAN_BEGIN();
             apsis_runtime_process_bloom_audio(
                 &apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                 &mother_pending, &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
@@ -529,11 +541,14 @@ static void render_block(int32_t *out, uint32_t n)
                     ? &string_attractor_runtime : 0,
                 spiral_audio_started ? &spiral_audio_runtime : 0,
                 &bloom_audio_runtime, &rhythm_observation);
+            PLAN_END(0); }
             if (spiral_audio_started) {
+                { PLAN_BEGIN();
                 for (spiral_ix = 0u; spiral_ix < spiral_audio_runtime.binding_count; ++spiral_ix)
                     (void)apsis_spiral_dsp_trigger_binding(
                         &spiral_dsp, &apsis, &spiral_audio_runtime.binding[spiral_ix],
                         spiral_block_start);
+                PLAN_END(1); }
                 if (spiral_dsp.hit_trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
@@ -549,10 +564,12 @@ static void render_block(int32_t *out, uint32_t n)
             }
             {
                 uint8_t bloom_ix;
+                { PLAN_BEGIN();
                 for (bloom_ix = 0u; bloom_ix < bloom_audio_runtime.binding_count; ++bloom_ix)
                     (void)apsis_bloom_dsp_trigger_binding(
                         &bloom_dsp, &apsis, &bloom_audio_runtime.binding[bloom_ix],
                         spiral_block_start);
+                PLAN_END(2); }
                 if (bloom_dsp.trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
@@ -568,6 +585,7 @@ static void render_block(int32_t *out, uint32_t n)
             }
         } else if (spiral_audio_started) {
             spiral_block_start = apsis_runtime.cursor_sample;
+            { PLAN_BEGIN();
             apsis_runtime_process_spiral_audio(
                 &apsis_runtime, &apsis, &keep_bank, &chain_sequence,
                 &mother_pending, &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
@@ -575,10 +593,13 @@ static void render_block(int32_t *out, uint32_t n)
                  apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR)
                     ? &string_attractor_runtime : 0,
                 &spiral_audio_runtime, &rhythm_observation);
+            PLAN_END(0); }
+            { PLAN_BEGIN();
             for (spiral_ix = 0u; spiral_ix < spiral_audio_runtime.binding_count; ++spiral_ix)
                 (void)apsis_spiral_dsp_trigger_binding(
                     &spiral_dsp, &apsis, &spiral_audio_runtime.binding[spiral_ix],
                     spiral_block_start);
+            PLAN_END(1); }
             if (spiral_dsp.hit_trigger_count)
         {
             int32_t *space_source = apsis_space_target_source_buffer(&space_target, n);
@@ -593,17 +614,21 @@ static void render_block(int32_t *out, uint32_t n)
         }
         } else if (string_attractor_runtime.length ||
                    apsis.string.filter_mode == APSIS_STRING_FILTER_ATTRACTOR) {
+            { PLAN_BEGIN();
             apsis_runtime_process_observed_attractor(&apsis_runtime, &apsis,
                                                      &keep_bank, &chain_sequence,
                                                      &mother_pending,
                                                      &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
                                                      &string_attractor_runtime,
                                                      &rhythm_observation);
+            PLAN_END(0); }
         } else {
+            { PLAN_BEGIN();
             apsis_runtime_process_observed(&apsis_runtime, &apsis, &keep_bank,
                                            &chain_sequence, &mother_pending,
                                            &bloom_voicing_state, n, apsis_controls_apply_pending_item, 0,
                                            &rhythm_observation);
+            PLAN_END(0); }
         }
         block_part_planning();
         for (attr_ix = 0u; attr_ix < string_attractor_runtime.binding_count; ++attr_ix)
@@ -705,6 +730,11 @@ static void app_audio(int32_t *out, uint32_t n)
         apsis_voice_probe[0] = string_transient_pool.transient_logical_high_water;
         apsis_voice_probe[1] = string_transient_pool.transient_physical_high_water;
         if (apsis_bloom_dsp_active(&bloom_dsp) > apsis_voice_probe[2]) apsis_voice_probe[2] = apsis_bloom_dsp_active(&bloom_dsp);
+#ifdef APSIS_STRESS
+        if (apsis_load_probe[2] >= BOOT_BLOCKS)
+            for (i = 0u; i < 3u; ++i)
+                if (plan_ticks[i] / FM1_TICKS_PER_US > apsis_plan_probe[i]) apsis_plan_probe[i] = plan_ticks[i] / FM1_TICKS_PER_US;
+#endif
         if (us > 4644u) apsis_over_probe[0]++;
         if (us >= 5805u) apsis_over_probe[1]++;
     }

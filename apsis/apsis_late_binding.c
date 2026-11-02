@@ -144,17 +144,18 @@ uint8_t apsis_late_spiral_resolve(const ApsisState *s,
                                   uint8_t frozen_route_index,
                                   ApsisSpiralLateBinding *out)
 {
-    int16_t seq[APSIS_SPIRAL_ROUTE_MAX];
+    int16_t at;
     int32_t step;
     uint8_t n, ix, mode, pc;
     uint16_t strength;
     if (!out) return 0u;
     late_zero(out, (uint32_t)sizeof(*out));
     if (!s) return 0u;
-    n = apsis_spiral_derived_sequence(s, seq);
+    n = apsis_spiral_derived_count(s);
     if (!n) return 0u;
     ix = (uint8_t)(frozen_route_index % n);
-    step = (int32_t)seq[ix] + (int32_t)s->spiral.register_oct * 12;
+    if (!apsis_spiral_derived_step(s, ix, &at)) return 0u;
+    step = (int32_t)at + (int32_t)s->spiral.register_oct * 12;
     step = apsis_quantize_step_to_scale(step, s->gravity.tonic, s->gravity.scale,
                                         s->gravity.scale_lock ? 1u : 0u);
     mode = late_tuning_mode(s->temper.mode);

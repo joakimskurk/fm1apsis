@@ -34,18 +34,29 @@ static uint16_t rnd_energy_q15(uint32_t rnd)
     return (uint16_t)(lo + (uint16_t)(((uint64_t)rnd * span) >> 32));
 }
 
+/* the first scale index in -42..56 whose step is >= value (57 when none): apsis_scale_at never falls as the index
+ * rises (a scale's repeated degree only holds it level), so this is a binary search */
+static int32_t scale_lower_bound(const ApsisState *s, int32_t value)
+{
+    int32_t lo = -42, hi = 57;
+    while (lo < hi) {
+        int32_t mid = lo + (hi - lo) / 2;
+        if (apsis_scale_at(s->gravity.tonic, s->gravity.scale, mid) >= value) hi = mid;
+        else lo = mid + 1;
+    }
+    return lo;
+}
+
+/* the scale index nearest to step over -42..56, the lowest index on a tie: what a scan from -42 upward keeping
+ * the first strictly smaller error found (and tested against that scan, test_spiral_route) */
 static int32_t nearest_scale_index(const ApsisState *s, int32_t step)
 {
-    int32_t i, best = 0, err = 999;
-    for (i = -42; i <= 56; ++i) {
-        int32_t cand = apsis_scale_at(s->gravity.tonic, s->gravity.scale, i);
-        int32_t e = cand > step ? cand - step : step - cand;
-        if (e < err) {
-            err = e;
-            best = i;
-        }
-    }
-    return best;
+    int32_t hi = scale_lower_bound(s, step), lo_value, lo;
+    if (hi == -42) return -42;
+    lo_value = apsis_scale_at(s->gravity.tonic, s->gravity.scale, hi - 1);
+    lo = scale_lower_bound(s, lo_value);
+    if (hi > 56) return lo;
+    return step - lo_value <= apsis_scale_at(s->gravity.tonic, s->gravity.scale, hi) - step ? lo : hi;
 }
 
 static void set_default_tail(ApsisSpiralState *sp, uint8_t from)
@@ -72,28 +83,53 @@ uint8_t apsis_spiral_sanitize_route(ApsisSpiralState *sp)
     return sp->route_count;
 }
 
+/* one route point's step in the current frame (Study 126 spiralDerivedSequence's map) */
+static int16_t derived_entry(const ApsisState *s, int32_t raw)
+{
+    int32_t base;
+    if (!s->spiral.follow_frame)
+        return (int16_t)(s->gravity.scale_lock
+            ? apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u)
+            : raw);
+    base = apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u);
+    return (int16_t)apsis_scale_at(s->gravity.tonic, s->gravity.scale,
+                                   nearest_scale_index(s, base) +
+                                   (int32_t)(s->gravity.degree > 7u ? 7u : s->gravity.degree));
+}
+
 uint8_t apsis_spiral_derived_sequence(const ApsisState *s,
                                       int16_t out[APSIS_SPIRAL_ROUTE_MAX])
 {
     uint8_t i, written = 0u, count;
     if (!s || !out) return 0u;
     count = s->spiral.route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : s->spiral.route_count;
+    for (i = 0u; i < count; ++i)
+        if (s->spiral.route[i] <= 35u) out[written++] = derived_entry(s, s->spiral.route[i]);
+    return written;
+}
+
+uint8_t apsis_spiral_derived_count(const ApsisState *s)
+{
+    uint8_t i, n = 0u, count;
+    if (!s) return 0u;
+    count = s->spiral.route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : s->spiral.route_count;
+    for (i = 0u; i < count; ++i) n = (uint8_t)(n + (s->spiral.route[i] <= 35u));
+    return n;
+}
+
+uint8_t apsis_spiral_derived_step(const ApsisState *s, uint8_t index, int16_t *step)
+{
+    uint8_t i, n = 0u, count;
+    if (!s || !step) return 0u;
+    count = s->spiral.route_count > APSIS_SPIRAL_ROUTE_MAX ? APSIS_SPIRAL_ROUTE_MAX : s->spiral.route_count;
     for (i = 0u; i < count; ++i) {
-        int32_t raw = s->spiral.route[i];
-        int32_t base;
-        if (raw > 35) continue;
-        if (!s->spiral.follow_frame) {
-            out[written++] = (int16_t)(s->gravity.scale_lock
-                ? apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u)
-                : raw);
-        } else {
-            base = apsis_quantize_step_to_scale(raw, s->gravity.tonic, s->gravity.scale, 1u);
-            out[written++] = (int16_t)apsis_scale_at(s->gravity.tonic, s->gravity.scale,
-                                                     nearest_scale_index(s, base) +
-                                                     (int32_t)(s->gravity.degree > 7u ? 7u : s->gravity.degree));
+        if (s->spiral.route[i] > 35u) continue;
+        if (n++ == index) {
+            *step = derived_entry(s, s->spiral.route[i]);
+            return 1u;
         }
     }
-    return written;
+    return 0u;
 }
 
 uint8_t apsis_spiral_attractor_length(uint8_t length)

@@ -596,13 +596,12 @@ static uint8_t m3c_spiral_rate(uint8_t rate)
 static uint8_t m3c_prepare_spiral(ApsisRuntime *r, ApsisState *s,
                                   M3cSpiralDecision out[4])
 {
-    int16_t seq[APSIS_SPIRAL_ROUTE_MAX];
     uint8_t seq_n, rate, len, sub;
     if (!r || !s || !out) return 0u;
     runtime_zero(out, (uint32_t)(sizeof(M3cSpiralDecision) * 4u));
     if (r->transport.cycle_pos == 0u && s->clock.step_one_resync)
         r->spiral_attractor_pos = 0u;
-    seq_n = apsis_spiral_derived_sequence(s, seq);
+    seq_n = apsis_spiral_derived_count(s);
     rate = m3c_spiral_rate(s->spiral.attractor_rate);
     len = apsis_spiral_attractor_length(s->spiral.attractor_length);
 
