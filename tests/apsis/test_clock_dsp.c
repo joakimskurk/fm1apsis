@@ -291,12 +291,18 @@ static void test_worst_case_pool(void)
             ix++;
         }
         apsis_clock_dsp_render(&dsp, out, frames);
+        {   /* the budget (apsis_voice_budget.h): never more voices sounding than it allows, the fades aside */
+            uint16_t k, sounding = 0u;
+            for (k = 0u; k < APSIS_CLOCK_DSP_VOICES; ++k) sounding += dsp.voice[k].active && !dsp.voice[k].fading;
+            assert(sounding <= APSIS_BUDGET_CLOCK_VOICES);
+        }
     }
+    /* the contract's densest Clock once needed 23 voices at once; the budget fades the quietest out instead */
     assert(dsp.drop_count == 0u);
-    assert(dsp.high_water == 23u);
-    assert(APSIS_CLOCK_DSP_VOICES == 32u);
-    printf("PASS: M4e worst Clock pool high-water=23/32 triggers=%u drops=0\n",
-           (unsigned)dsp.trigger_count);
+    assert(dsp.high_water <= APSIS_CLOCK_DSP_VOICES);
+    printf("PASS: M4e worst Clock pool within the budget, high-water=%u/%u triggers=%u steals=%u drops=0\n",
+           (unsigned)dsp.high_water, (unsigned)APSIS_CLOCK_DSP_VOICES, (unsigned)dsp.trigger_count,
+           (unsigned)dsp.steal_count);
 }
 
 int main(void)

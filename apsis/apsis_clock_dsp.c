@@ -185,23 +185,61 @@ static uint16_t clock_active_count(const ApsisClockDsp *dsp)
     return n;
 }
 
+/* the budget's steal: the voice fades to -60 dB in 10 ms from where it is */
+static void clock_fade(ApsisClockDspVoice *v)
+{
+    uint32_t end = v->age_samples + APSIS_BUDGET_FADE_SAMPLES;
+    v->fading = 1u;
+    v->decay_mul_q31 = APSIS_BUDGET_FADE_MUL_Q31;
+    if (v->decay_end_samples > end) v->decay_end_samples = end;
+    if (v->life_samples > end) v->life_samples = end;
+}
+
+/* a voice slot. Over the budget's sounding voices, the quietest one past its attack fades first (a voice not
+ * begun simply goes); with no free slot, the quietest fade ends at once. */
 static ApsisClockDspVoice *clock_alloc(ApsisClockDsp *dsp)
 {
     uint8_t i;
+    uint16_t sounding = 0u, n;
+    int32_t free_ix = -1, quiet = -1, fade = -1;
+    uint32_t quiet_l = 0xFFFFFFFFu, fade_l = 0xFFFFFFFFu;
     if (!dsp) return 0;
     for (i = 0u; i < APSIS_CLOCK_DSP_VOICES; ++i) {
-        if (!dsp->voice[i].active) {
-            uint16_t n;
-            clock_zero(&dsp->voice[i], (uint32_t)sizeof(dsp->voice[i]));
-            dsp->voice[i].active = 1u;
-            dsp->trigger_count++;
-            n = clock_active_count(dsp);
-            if (n > dsp->high_water) dsp->high_water = n;
-            return &dsp->voice[i];
+        const ApsisClockDspVoice *v = &dsp->voice[i];
+        uint32_t l = v->gain_q23;
+        if (!v->active) {
+            if (free_ix < 0) free_ix = (int32_t)i;
+            continue;
         }
+        if (v->fading) {
+            if (l < fade_l) { fade_l = l; fade = (int32_t)i; }
+            continue;
+        }
+        ++sounding;
+        if (v->delay_samples) l = 0u;
+        else if (v->age_samples <= v->attack_samples) l = 0x80000000u + (v->peak_gain_q23 >> 1);
+        if (l < quiet_l) { quiet_l = l; quiet = (int32_t)i; }
     }
-    dsp->drop_count++;
-    return 0;
+    if (sounding >= APSIS_BUDGET_CLOCK_VOICES && quiet >= 0) {
+        if (dsp->voice[quiet].delay_samples) {
+            dsp->voice[quiet].active = 0u;
+            if (free_ix < 0) free_ix = quiet;
+        } else {
+            clock_fade(&dsp->voice[quiet]);
+        }
+        dsp->steal_count++;
+    }
+    if (free_ix < 0) free_ix = fade;
+    if (free_ix < 0) {
+        dsp->drop_count++;
+        return 0;
+    }
+    clock_zero(&dsp->voice[free_ix], (uint32_t)sizeof(dsp->voice[free_ix]));
+    dsp->voice[free_ix].active = 1u;
+    dsp->trigger_count++;
+    n = clock_active_count(dsp);
+    if (n > dsp->high_water) dsp->high_water = n;
+    return &dsp->voice[free_ix];
 }
 
 static uint32_t clock_decay_mul(uint32_t peak_q23, uint32_t decay_samples)

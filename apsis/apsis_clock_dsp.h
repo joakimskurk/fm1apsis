@@ -2,10 +2,11 @@
 #define APSIS_CLOCK_DSP_H
 
 #include <stdint.h>
+#include "apsis_voice_budget.h"
 #include "apsis_runtime.h"
 
 #define APSIS_CLOCK_DSP_RATE 44100u
-#define APSIS_CLOCK_DSP_VOICES 32u
+#define APSIS_CLOCK_DSP_VOICES (APSIS_BUDGET_CLOCK_VOICES + APSIS_BUDGET_CLOCK_FADES)   /* apsis_voice_budget.h */
 #define APSIS_CLOCK_DSP_BATCH_CAP 8u
 
 typedef struct {
@@ -31,6 +32,7 @@ typedef struct {
     uint8_t active;
     uint8_t waveform;
     uint8_t filter_count;
+    uint8_t fading;                  /* stolen by the budget: 10 ms to -60 dB, then free */
     uint32_t delay_samples;
     uint32_t age_samples;
     uint32_t life_samples;
@@ -58,6 +60,7 @@ typedef struct {
     uint16_t high_water;
     uint32_t trigger_count;
     uint32_t drop_count;
+    uint32_t steal_count;
 } ApsisClockDsp;
 
 typedef struct {
