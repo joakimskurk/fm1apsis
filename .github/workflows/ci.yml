@@ -92,8 +92,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { name: firmware, path: build }
+      - uses: actions/download-artifact@v4   # (the artifact keeps its build/ prefix: restore at the root)
+        with: { name: firmware, path: . }
       - name: fm1-emu (pinned), cached
         id: emu
         uses: actions/cache@v4
