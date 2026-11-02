@@ -20,11 +20,12 @@ static void bloom_dsp_zero(void *ptr, uint32_t n)
 }
 
 
-APSIS_INLINE int32_t bloom_filter_state(int64_t v)
+/* the filter state's clamp, on a value known to fit 32 bits (no 64-bit compare) */
+APSIS_INLINE int32_t bloom_clamp32(int32_t v)
 {
     if (v > BLOOM_FILTER_STATE_LIMIT) return BLOOM_FILTER_STATE_LIMIT;
     if (v < -BLOOM_FILTER_STATE_LIMIT) return -BLOOM_FILTER_STATE_LIMIT;
-    return (int32_t)v;
+    return v;
 }
 
 static uint32_t bloom_samples_ms(uint32_t ms)
@@ -481,7 +482,7 @@ APSIS_INLINE void bloom_petal_run(ApsisBloomDspPetal *v, int32_t *out, uint32_t 
         }
         x = sum;
         f = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
-        y = bloom_filter_state(f >> 30);
+        y = bloom_clamp32((int32_t)(f >> 30));   /* |x| < 3 * 2^16, |y| <= 2^17: |f >> 30| < 2^22 */
         x2 = x1;
         x1 = x;
         y2 = y1;

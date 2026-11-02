@@ -25,11 +25,12 @@ APSIS_INLINE int32_t spiral_sat_q15(int64_t v)
     return (int32_t)v;
 }
 
-APSIS_INLINE int32_t spiral_filter_state(int64_t v)
+/* the filter state's clamp, on a value known to fit 32 bits (no 64-bit compare) */
+APSIS_INLINE int32_t spiral_clamp32(int32_t v)
 {
     if (v > SPIRAL_FILTER_STATE_LIMIT) return SPIRAL_FILTER_STATE_LIMIT;
     if (v < -SPIRAL_FILTER_STATE_LIMIT) return -SPIRAL_FILTER_STATE_LIMIT;
-    return (int32_t)v;
+    return v;
 }
 
 static uint32_t spiral_samples_ms(uint32_t ms)
@@ -497,9 +498,10 @@ APSIS_INLINE void spiral_leg_render(ApsisSpiralDspLeg *v, int32_t *mix, uint32_t
             ph2 += in2;
             raw += ((t2 ? spiral_triangle_q15(ph2) : apsis_sine_q15(ph2)) * g2) >> 15;
         }
-        x = spiral_filter_state(raw);
+        x = spiral_clamp32(raw);
+        /* |coefficient| < 2^31, |state| <= 2^17: |acc >> 30| < 5 * 2^18 fits 32 bits before the clamp */
         acc = (int64_t)b0 * x + (int64_t)b1 * x1 + (int64_t)b2 * x2 - (int64_t)a1 * y1 - (int64_t)a2 * y2;
-        y = spiral_filter_state(acc >> 30);
+        y = spiral_clamp32((int32_t)(acc >> 30));
         x2 = x1;
         x1 = x;
         y2 = y1;
