@@ -6,7 +6,8 @@
 - [x] Dinghy 0.4 as source, no patch chain
 - [x] app on 0.4's own input/screen/flash API
 - [x] host tests against the shipping sources; host-mode sound pinned to P11W
-- [~] CI green: JieLi build, platform tests, emulator
+- [x] CI: JieLi build, platform tests, host tests (gcc, clang, ASan/UBSan, MSan)
+- [~] emulator load gate: red (188 % avg), see v2.1
 - [ ] first `.fwsc` from v2 to the user's emulator testing
 
 ## v2.1 — measured CPU budget

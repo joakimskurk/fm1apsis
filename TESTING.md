@@ -36,7 +36,8 @@ macOS: clang). Two Phase-5 tests that relied on one seed's random pick now check
 ## Emulator load
 
 `tests/emu.sh` fails if any audio block takes 5805 us or more (a drop-out) or if the audio stalls; it warns over
-50 %. First measurement: pending (CI).
+50 %. First measurement (2026-11-02, 92dbd5e): avg 188 %, worst 209 %: failing. `PROFILE=1 tests/emu.sh` on the
+`-fno-inline` build prints the cycles per function (CI's emulator job does both).
 
 ## Known gaps
 

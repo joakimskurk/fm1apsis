@@ -24,25 +24,33 @@ Done in v2 so far:
   (`tests/sound.sha256`, see TESTING.md)
 - one CI workflow: host tests, host-mode sound, JieLi build + Dinghy's platform tests, fm1-emu FM1_STRICT load
 
-## Not yet verified
+## Measured (CI, 2026-11-02, commit 92dbd5e)
 
-- the CI run of this branch (JieLi build, platform tests, emulator) — first run pending
-- the audio interrupt's load under FM1_STRICT (the first real measurement of CPU headroom)
-- anything on a physical FM-1 (none available)
+- real JieLi build: image 114,320 / 581,564 B, RAM 87,796 / 98,304 B, POOL 319,176 / 344,064 B, `FM-1_970`;
+  Dinghy's platform tests pass; package `apsis-92dbd5e.fwsc` SHA-256
+  `f243a0e153ac9273185cca3794e131b2c85c65422e3ad184b2cc34d88e5d3c3d`
+- host: 62 tests pass with gcc (plain, ASan/UBSan) and clang (plain, MSan); sound pinned
+- **fm1-emu FM1_STRICT, 20 s performance: the audio interrupt averages 10.9 ms per 5.8 ms block (188 %),
+  worst 12.1 ms (209 %); only 1556 of ~3445 blocks are rendered; 97 % of instructions run in interrupts, so
+  the panel and screen starve too.** This is the old P11W audio graph, unchanged; it cannot keep real time on
+  the emulator's cycle model. The user's interactive emulator (not strict) hides this.
+- where (the -fno-inline build, 6-8 s, Bloom sounding): Bloom DSP ~15 %, String transients ~20 %, the room
+  ~10 %, Clock/String/Drift a few % each
 
-## Known problems (found in the v2 review)
+## Known problems
 
+- **CPU:** see above; the emulator job is red until the audio fits (v2.1)
 - **level:** with the transport running the output is around -40 dBFS RMS / -23 dBFS peak before MASTER;
   compare with the browser and fix the gain staging
-- **surfaces:** the renderers are static (they ignore `animation_tick`) and simple; parity with the browser's
-  visuals is far off
-- the room runs at 11.025 kHz to save CPU; with a measured budget and the second core this can be revisited
+- **surfaces:** the renderers are static (they ignore `animation_tick`) and simple
+- the room runs at 11.025 kHz to save CPU
 
 ## Next action
 
-1. Push `v2`, read the CI run; fix what the real build/emulator finds.
-2. Give the user `apsis-<sha>.fwsc` (SHA-256 from CI) for the emulator.
-3. Then the roadmap: measured CPU budget -> level/gain parity -> living surfaces.
+v2.1, make the audio fit: per-voice cost of Bloom and String transients (algorithm first: per-sample work that
+can be per-block, voice caps against the browser's), hot DSP in RAM (`.ram_text`) against flash-cache misses,
+then the second core (fm1-dock's screened, fall-back-to-one-core layer) for the room or a source group. Gate:
+`tests/emu.sh` green with worst < 100 %, target < 70 %.
 
 ## Authority
 
