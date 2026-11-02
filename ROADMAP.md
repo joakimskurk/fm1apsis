@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11Q are complete; P11R is authorized as the separate production-validation phase for the proved FDN sine-endpoint cache.**
+Status: **[~] active on `p11-optimization`. P11A–P11R are complete; P11R is the accepted production baseline and P11S is the next measurement-only phase.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -436,15 +436,46 @@ Decision: authorize P11R production validation. The candidate spends exactly 32 
 
 ### P11R — production FDN sine endpoint-cache validation
 
-Status: **[ ] next.**
+Status: **[x] complete, exact-head validated and frozen.**
 
-- [ ] apply only the exact P11Q endpoint-cache candidate to production `apsis_space_dsp.c/.h`
-- [ ] keep reset phase, phase increment, interpolation, quadrant/wrap and all other FDN arithmetic/topology exact
-- [ ] actual-production P11Q equivalence against frozen P11O authority
-- [ ] complete historical host + ASAN/UBSAN behavior
-- [ ] exact real JieLi target resources matching P11Q projection
-- [ ] exact idle PCM/runtime and active Motion lifecycle
-- [ ] narrow-diff verification and frozen final package hashes before promotion
+- [x] production stores exactly two signed-16-bit sine endpoints per FDN line; reset initializes them and top-byte transitions refresh them
+- [x] reset phase/increment, interpolation, quadrant/wrap and all other FDN arithmetic/topology remain exact
+- [x] actual production bit-identical to frozen P11O authority across **65,536** interpolation cases, **262,144** transition cases and **5,376 blocks / 164,675 frames**
+- [x] optimized + ASAN/UBSAN production equivalence PASS
+- [x] complete historical host + sanitizer behavior PASS
+- [x] actual real-target build exactly matches P11Q projection
+- [x] production image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**
+- [x] production package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- [x] inlined FDN render **1,098 B / 366** static instruction lines
+- [x] exact idle PCM/runtime retained
+- [x] exact active Motion lifecycle retained; active image **137,736 B**, RAM **87,572 B**, POOL **319,176 B**
+- [x] active package SHA-256 `4e55174f0fd68f0752eba3ca331c397dddfbbc573591815c3f049b856ecdbccb`
+- [x] authoritative validation run `41361026431` on production head `fe8f9dc44a43ce427dab234934573b96108fe842`
+- [x] evidence artifact ID `13105652509`; ZIP SHA-256 `40a6658c752c67cea3bf14afa99b9428d23e72681004bdb02eb799cca7961849`
+- [x] validation workflow manual-only and pinned to the proven production head
+
+Frozen P11R production target:
+- image **140,472 / 581,564 B**
+- RAM **87,524 / 98,304 B**; headroom **10,780 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+
+P11R accepts the measured P11P/P11Q tradeoff: +32 B image and +32 B RAM for endpoint-pair reuse on 99.929% of the measured natural sine calls and a smaller target render code shape. Physical CPU/ISR improvement remains unverified.
+
+### P11S — FDN Q15 multiply operand-range census
+
+Status: **[ ] next. Measurement only; no production patch authorized.**
+
+- [ ] instrument the unchanged P11R FDN path only in tests and classify every `space_mul_q15()` call-site family
+- [ ] measure signed operand/product extrema over cold, fully warm, legal parameter sweeps and deterministic randomized/reset trajectories
+- [ ] include structural/adversarial boundary cases so observed high-water alone cannot justify a narrower multiply
+- [ ] determine exactly which call-site families, if any, provably fit signed 32-bit product plus the existing ±16,384 rounding term
+- [ ] preserve the current rounding/right-shift semantics as the authority; no arithmetic rewrite in P11S
+- [ ] capture current real-target FDN code shape/package unchanged from P11R
+- [ ] authorize a later proof phase only for a call-site set backed by both measured and structural bounds
+
+P11H measured **40 FDN Q15 multiplies per room frame / 655,360 over 16,384 room frames**. P11S asks whether the current 64-bit helper is necessary at each of those call-site families; it does not assume that a 32-bit replacement is safe or faster.
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -468,4 +499,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11Q proof/projection state to `p11-optimization`, then create one P11R production-validation branch. Apply only the proved FDN sine-endpoint cache and require actual-production equivalence, full historical host/sanitizer, exact real-target, exact idle and exact active-Motion gates before promotion.
+Promote frozen P11R production state to `p11-optimization`, then create one P11S measurement branch. Measure the remaining high-frequency FDN Q15 multiply operand/product ranges without changing production DSP; only structurally bounded call-site families may advance to a later proof phase.

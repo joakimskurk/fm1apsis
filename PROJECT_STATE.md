@@ -1,10 +1,10 @@
 # PROJECT_STATE
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11Q are complete. P11O remains the accepted production baseline; P11Q proved and target-projected the FDN sine-endpoint cache and authorizes P11R production validation.**
+**Phase 11 — FM-1 optimisation is active. P11A–P11R are complete. P11R is the accepted production baseline after the measured, proved and production-validated FDN sine-endpoint cache; P11S is the next measurement-only phase.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -29,19 +29,19 @@ Phase 10 merge authority:
 - 22/22 required workflows PASS
 - squash merge `378d2023df2afe59475be53c09cc001788586514` via PR #20
 
-## Current frozen production baseline — P11O
+## Current frozen production baseline — P11R
 
-P11O is the current accepted production target after the P11M/P11N measured-and-proved FDN line-read simplification layered over the P11L feedback-gain cache:
+P11R is the current accepted production target after the P11P/P11Q measured-and-proved FDN sine-endpoint cache layered over the P11O line-read specialization and P11L feedback-gain cache:
 
 - product `FM-1_972`
-- image **140,440 / 581,564 B**
-- ordinary RAM **87,492 / 98,304 B**
-- RAM headroom **10,812 B**
+- image **140,472 / 581,564 B**
+- ordinary RAM **87,524 / 98,304 B**
+- RAM headroom **10,780 B**
 - POOL **319,176 / 344,064 B**
 - POOL headroom **24,888 B**
 - package bytes **610,110**
-- package SHA-256 `0a3c1ecc8adf99a625979e1a5369c3cad1f4a87264a227a7feefba3388da98a2`
-- inlined FDN render **1,114 B / 374** static instruction lines
+- package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- inlined FDN render **1,098 B / 366** static instruction lines
 
 Integrated frozen idle baseline:
 - PCM SHA-256 `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
@@ -643,9 +643,47 @@ Ephemeral real-target projection:
 
 Combined with P11P, the candidate replaces repeated endpoint evaluation on more than 99.9% of the measured natural sine calls for a bounded 32-B RAM/image cost and a smaller render code shape. P11Q therefore authorizes P11R production validation. It does not claim measured physical CPU or ISR improvement.
 
-## Exact next phase — P11R production FDN sine endpoint-cache validation
+## P11R — production FDN sine endpoint-cache validation complete
 
-Apply exactly the P11Q candidate to production `apsis_space_dsp.c/.h` and nothing else in Space. Require actual-production equivalence against frozen P11O authority, complete historical host + sanitizer behavior, exact real-target match to the P11Q projection, exact idle PCM/runtime and exact active Motion lifecycle before promotion.
+Production authority:
+- validated production head `fe8f9dc44a43ce427dab234934573b96108fe842`
+- validation run `41361026431` — PASS
+- evidence artifact ID `13105652509`
+- evidence ZIP SHA-256 `40a6658c752c67cea3bf14afa99b9428d23e72681004bdb02eb799cca7961849`
+- historical validation workflow manual-only and pinned to the proven production head
+
+Actual production equivalence:
+- **65,536** complete top-16 interpolation authority cases
+- **262,144** old→new top-byte transition cases including `255 → 0`
+- **5,376 blocks / 164,675 frames** complete-FDN comparison with cold, warm, randomized/reset trajectories
+- optimized + ASAN/UBSAN PASS
+- complete historical host + sanitizer behavior PASS
+- actual production state/layout `ApsisSpaceFdnLine` **28 B**, `ApsisSpaceFdn` **264 B**
+
+Frozen production target:
+- image **140,472 / 581,564 B**
+- RAM **87,524 / 98,304 B**; headroom **10,780 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `bc1ff9cc52a5969a70bfeef3ae90b199b8aae6dfe25e54c771a3af46adbdc2f2`
+- inlined FDN render **1,098 B / 366** static instruction lines
+
+Idle authority remains exact:
+- PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+
+Active Motion authority remains exact:
+- active image **137,736 B**
+- RAM **87,572 B**; headroom **10,732 B**
+- POOL **319,176 B**
+- package SHA-256 `4e55174f0fd68f0752eba3ca331c397dddfbbc573591815c3f049b856ecdbccb`
+- seen `ff`, final `14`, 149/149 points, record 220,672→441,088, manual 450,560→466,176, cursor 481,024, queue 30/512, overflow 0, late flags 0, WAV peak 1,171, RMS 173
+
+P11R therefore replaces P11O as the accepted production baseline. It accepts +32 B image/RAM for the P11P-measured endpoint reuse and P11Q-proved smaller render code shape. It proves exact behavior and static target properties, not physical FM-1 cycle or ISR improvement.
+
+## Exact next phase — P11S FDN Q15 multiply operand-range census
+
+Return to measurement. P11H measured 40 FDN `space_mul_q15()` evaluations per room frame; the unchanged helper currently forms a signed 64-bit product. P11S must classify every call-site family, measure and structurally bound operand/product ranges, and preserve exact rounding semantics. Production remains P11R. Only a call-site set proven safe for a narrower exact representation may advance to a later proof phase.
 
 Physical FM-1 CPU cycles, ISR margin, stack high-water, LCD/audio contention and listening quality remain unverified.
 
