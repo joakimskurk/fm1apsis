@@ -18,7 +18,7 @@
 - [ ] remove the unreachable Dual code (controls, Motion lanes, surfaces); Study 98's hybrid/bowed characters
 
 ## v2.2 — margin by construction (docs/MARGIN_PLAN.md)
-- [ ] A: stress script, the bound (sum of the parts' worsts) in CI, a load-meter build for a real FM-1
+- [x] A: stress build, the bound (sum of the parts' worsts) in CI, a load-meter build for a real FM-1
 - [ ] B: one oscillator budget for String notes, Spiral and Bloom; least-audible stealing; same-pitch lanes if they pass A/B
 - [ ] C: planning out of the audio interrupt into sample-stamped events
 - [ ] D: the room on core 1 (fm1-dock's screening), a cheaper one-core fallback

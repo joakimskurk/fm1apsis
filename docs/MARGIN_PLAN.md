@@ -32,7 +32,31 @@ What this says:
 - **The model is not the chip.** FM1_STRICT is a cycle and cache model, and nobody has compared it with a real FM-1
   yet. USB and the key scan interrupt the audio on top of this.
 
-## The target
+## The stress run (step A, ca04914)
+
+The APSIS_STRESS build turns every source to its densest setting and plays plucks at the 35 ms guard and Bloom
+petals with grow. All of these settings can be reached from the panel.
+
+| part | own worst (us) |
+| --- | ---: |
+| planning | 17809 |
+| Spiral + Bloom sound (59 petals) | 15457 |
+| String notes (80 logical / 112 physical partials) | 10137 |
+| Clock | 1415 |
+| room + Motion | 1120 |
+| triggers | 811 |
+| String drone | 702 |
+| updates + Clock triggers | 637 |
+| Drift | 400 |
+
+The average was 302 % and the worst block 483 %. Only 970 of about 3445 blocks were rendered, so the audio
+collapses.
+
+This settles the order of the work. The voice budget (B) has to cover **Bloom petals** as well as String
+notes, because they are the largest sound cost. The planning spike (C) is the largest single cost, so it must be
+found and moved before anything else. The room (D) is a small part of the worst case; it matters for the steady
+average.
+
 
 Margin means a **bound by construction**: no input, however dense, can make the audio interrupt exceed its
 budget. It does not mean a good number from one script.

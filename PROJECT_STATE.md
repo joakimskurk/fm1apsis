@@ -36,8 +36,10 @@ Study 98's (one string), and the audio fits on the emulator's cycle model.
 ## Next action
 
 1. The user tests `apsis-5918797.fwsc` in the emulator (the String now sounds like Study 98).
-2. v2.2 margin (docs/MARGIN_PLAN.md): the parts' own worsts add up to 104 %, so the 69.8 % worst block is luck.
-   Start with step A (stress script, the bound in CI, a load-meter build).
+2. v2.2 margin (docs/MARGIN_PLAN.md), branch `v2.2-margin`. Step A is done: the stress build collapses
+   (302 % average, 483 % worst). The planning spike (17.8 ms) and Bloom petals (59, 15.5 ms) are the largest costs.
+   Next: C (find and move the planning spike), then B (one voice budget that includes Bloom).
+3. The load-meter build `apsis-loadmeter-ca04914.fwsc` is waiting for someone with an FM-1 (step F).
 
 ## Authority
 
