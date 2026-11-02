@@ -4,7 +4,7 @@ Last updated: 2026-11-02
 
 ## Current milestone
 
-**Phase 11 — FM-1 optimisation is active. P11A–P11Y are complete. P11W remains the accepted production baseline. P11Y proved fixed add/sub output mixing exact but rejected it on real-target regression; P11Z is the final pre-hardware closure/readiness matrix.**
+**Phase 11 — software/real-target/pinned-emulator closure is complete on `p11-optimization`. P11W is the final accepted production baseline and P11Z passed the final pre-hardware readiness matrix. Guarded merge to `main` is next; Phase 12 remains physical-FM-1 validation only.**
 
 Physical FM-1 hardware remains unavailable. All current claims are host, real JieLi target-build, static-target or pinned-emulator claims. Physical ISR margin, runtime stack high-water, LCD/audio bus contention, NOR timing and DAC/listening quality remain unverified.
 
@@ -900,9 +900,56 @@ Exact real-target projection:
 
 Decision: reject production validation. The candidate is mathematically/behaviorally exact, but every changed static target proxy regresses and there is no RAM/POOL saving. Physical timing is unavailable, so the 16 removed semantic sign multiplies/frame do not justify the larger target. P11W remains production authority.
 
-## Exact next phase — P11Z Phase-11 closure/readiness matrix
+## P11Z — Phase-11 closure/readiness matrix complete
 
-No production optimization is authorized. Regenerate and stress the accepted P11W stack as one final software/real-target/pinned-emulator checkpoint: complete host/sanitizer behavior, bounded-capacity/high-water authorities, exact production target/package, exact idle PCM/runtime and exact active Motion lifecycle. Freeze one closure head and move all remaining physical ISR/stack/LCD/NOR/DAC/listening checks to Phase 12.
+Authority:
+- technical closure head `fb1789477ada900d54ed319c9ee25645c6d3d055`
+- run `41399427006` — all closure gates PASS
+- evidence artifact ID `13120614128`
+- evidence ZIP SHA-256 `de7eb00947513f9d527fb116a20b06defa6bf677f44d3e0dff8fb08f13f39668`
+- closure adds no production optimization; accepted production remains exact P11W
+
+Final accepted production target:
+- product `FM-1_972`
+- image **140,472 / 581,564 B**
+- RAM **87,524 / 98,304 B**; headroom **10,780 B**
+- POOL **319,176 / 344,064 B**; headroom **24,888 B**
+- package bytes **610,110 B**
+- package SHA-256 `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- inlined FDN render **1,094 B / 364** static instruction lines
+
+Final bounded-capacity closure:
+- shared queue **415/512** observed high-water
+- Spiral late slots **59/64**
+- Bloom late slots **44/48**, exact legal maximum **44**
+- String transient **80/80 logical, 112/112 physical**, steals 480, drops 0
+- String Attractor pending **60/64**
+- Clock pool **23/32**
+- Spiral legs **30/32**
+- Bloom petals **125/136**
+
+Final emulator closure:
+- idle PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`
+- idle cursor 123,392; queue 28/512; overflow 0; late flags 0; trace `811c9dc5`
+- active Motion target image/RAM/POOL **137,736 / 87,572 / 319,176 B**
+- active Motion seen `ff`, final `14`, points 149/149
+- record 220,672→441,088; cycle 220,416 samples
+- manual override 450,560; resume 466,176; cursor 481,024
+- active queue 30/512; overflow 0; late flags 0; WAV peak 1,171; RMS 173
+
+Phase-12-only unverified boundary:
+- physical `app_audio()` ISR/callback cycle margin under worst-case combined load
+- physical runtime stack high-water and guard margin
+- LCD DMA/audio bus contention and physical control/LED/display behavior
+- real NOR erase/program timing and power-interruption behavior
+- DAC/listening quality and Cathedral perceptual tuning
+- real FM-1 install/rescue/update path
+
+No physical-hardware claim is made by P11Z.
+
+## Exact next phase — guarded Phase-11 merge, then Phase 12 hardware validation
+
+Rerun P11Z on the exact documentation head, open the guarded `p11-optimization` → `main` PR and merge only when the required exact-head workflows are green. After merge, do not reopen speculative Phase-11 micro-optimization without new measured evidence. Phase 12 is the physical FM-1 install/rescue, ISR/stack/LCD/NOR stress and DAC/listening phase.
 
 ## Do not regress
 

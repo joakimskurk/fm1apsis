@@ -95,7 +95,7 @@ Phase 10 is JieLi-target/pinned-emulator verified, **not physical-FM-1 verified*
 
 ## Phase 11 — FM-1 optimisation
 
-Status: **[~] active on `p11-optimization`. P11A–P11Y are complete. P11W remains the accepted production baseline; P11Y is a proved-but-rejected target regression. P11Z is the final pre-hardware Phase-11 closure/readiness matrix.**
+Status: **[x] software/target/emulator closure complete on `p11-optimization`. P11W remains the accepted production baseline. P11Z passed on the frozen closure head; guarded Phase-11 merge to `main` is next, followed by Phase 12 physical-hardware validation.**
 
 ### P11A — baseline inventory
 - [x] exact final Phase-10 image/RAM/POOL baseline
@@ -624,17 +624,21 @@ Decision: **reject production validation.** The candidate removes 16 explicit si
 
 ### P11Z — Phase-11 closure/readiness matrix
 
-Status: **[ ] next. Measurement/regression only; no new production optimization.**
+Status: **[x] complete, exact software/real-target/pinned-emulator closure frozen. No production optimization added.**
 
-- [ ] regenerate exact P11W production target/package and current ownership/resource inventory
-- [ ] rerun permanent high-water/stress authorities for scheduler, Bloom, Spiral, String transient/Attractor and Motion
-- [ ] run complete historical host + sanitizer matrix on the accepted P11W source
-- [ ] run exact idle pinned-emulator PCM/runtime gate
-- [ ] run exact active Motion lifecycle gate
-- [ ] capture final pre-hardware image/RAM/POOL/package hashes and explicit unmeasured hardware boundary
-- [ ] freeze one Phase-11 closure head and hand Phase 12 only the genuinely physical checks
+- [x] exact accepted P11W production source authority regenerated
+- [x] complete historical host + sanitizer behavior PASS
+- [x] bounded-capacity/high-water authorities revalidated: queue 415/512, Spiral 59/64, Bloom 44/48 with proven legal max 44, String transient 80/80 logical + 112/112 physical, String Attractor pending 60/64, Clock 23/32, Spiral legs 30/32, Bloom petals 125/136
+- [x] exact P11W real JieLi target regenerated: image **140,472 B**, RAM **87,524 B**, POOL **319,176 B**
+- [x] production package SHA-256 `f9ca07eaee94843dcfa94ee7d05cdfade412ef221a1a8984243454a095ee3168`
+- [x] exact idle PCM/runtime retained: PCM `c4fa18954cd5d5ecc895ec9457d673b8bdbe0f946c0d2aa3efa3d28f77c60f93`, cursor 123,392, queue 28/512, overflow 0, late 0
+- [x] exact active Motion target/lifecycle retained: 149/149 points, record 220,672→441,088, cycle 220,416, override 450,560, resume 466,176, cursor 481,024, queue 30/512, overflow 0, late 0
+- [x] closure branch contains no production mutation; P11W remains production authority
+- [x] authoritative closure run `41399427006` on technical head `fb1789477ada900d54ed319c9ee25645c6d3d055`
+- [x] evidence artifact ID `13120614128`; ZIP SHA-256 `de7eb00947513f9d527fb116a20b06defa6bf677f44d3e0dff8fb08f13f39668`
+- [x] physical ISR/callback margin, runtime stack high-water, LCD/audio contention, real NOR timing/power interruption, DAC/listening quality and install/rescue remain explicitly deferred to Phase 12
 
-P11Z is intended to close Phase 11, not discover another speculative micro-optimization. New optimization work after P11Z requires new evidence or physical timing data.
+P11Z closes software/target/emulator Phase 11. New optimization work after this checkpoint requires new measured evidence or physical timing data; it is not part of the closure path.
 
 ### Later Phase-11 work
 - [ ] further Cathedral/FDN optimization only from measured, equivalence-backed evidence
@@ -658,4 +662,4 @@ Physical hardware is not currently available, so no Phase 12 item is verified.
 
 ## Exact next action
 
-Promote frozen P11Y proof/rejection state to `p11-optimization`, then create one P11Z closure branch. Do not change production DSP. Run the final Phase-11 pre-hardware readiness matrix against accepted P11W and freeze a single closure head that cleanly separates verified software/target/emulator evidence from Phase-12 physical-hardware work.
+Freeze the documented P11Z closure head, rerun the closure matrix on that exact documentation head, then open the guarded Phase-11 PR from `p11-optimization` to `main`. Merge only after the required exact-head workflows are green. After merge, Phase 12 begins with physical FM-1 install/rescue, real ISR/stack/LCD/NOR stress and DAC/listening validation; no further speculative optimization is part of the pre-hardware closure.
