@@ -267,7 +267,7 @@ ApsisBloomPlan apsis_bloom_choose_voicing(const ApsisState *s, const ApsisBloomH
     for (inv = 0u; inv < n; ++inv) {
         for (pattern = 0u; pattern < 6u; ++pattern) {
             for (whole_ix = 0u; whole_ix < 3u; ++whole_ix) {
-                BloomCandidate c;
+                BloomCandidate c = {0};      /* (unused voices zero: the chosen plan is copied whole) */
                 int8_t whole = (int8_t)whole_ix - 1;
                 int16_t min, max;
                 c.plan.count = n;

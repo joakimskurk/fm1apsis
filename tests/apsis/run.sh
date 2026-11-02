@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # APSIS's own host tests: every tests/apsis/test_*.c against the apsis/ sources the firmware ships, once plainly
 # (-Werror) and once under AddressSanitizer + UndefinedBehaviorSanitizer. Linux or macOS, from the repo root:
-#   sh tests/apsis/run.sh            (SAN=0: skip the sanitizer pass)
+#   sh tests/apsis/run.sh            (SAN=0: skip the sanitizer pass; CC=clang MSAN=1: MemorySanitizer, Linux)
 set -e
 cd "$(dirname "$0")/../.."
 OUT=build/apsis-tests
@@ -31,6 +31,7 @@ pass() {   # $1 name, $2 flags
 
 pass plain "-std=c11 -O2 -Wall -Wextra -Werror -pedantic"
 [ "${SAN:-1}" = 0 ] || pass san "-std=c11 -O1 -g -Wall -Wextra -pedantic -fsanitize=address,undefined -fno-sanitize-recover=all"
+[ "${MSAN:-0}" = 0 ] || pass msan "-std=c11 -O1 -g -Wall -Wextra -pedantic -fsanitize=memory -fsanitize-memory-track-origins=2"
 
 [ "$fail" = 0 ] && echo "APSIS TESTS PASSED" || echo "APSIS TESTS FAILED"
 exit "$fail"

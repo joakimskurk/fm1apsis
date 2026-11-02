@@ -22,6 +22,14 @@ KEYS="$KEYS,7000:7,7050:7^,7500:15,7600:15^,8500:19,8600:19^,9500:22,9600:22^"
 KEYS="$KEYS,11000:3,11010:2,11060:2^,11070:3^,11500:e2:+8,12000:e4:+5"
 KEYS="$KEYS,13000:10,13050:10^,14000:11,14050:11^,15000:8,15050:8^,16000:e5:+3"
 
+if [ "${PROFILE:-0}" = 1 ]; then   # where the cycles go, 6..8 s into the performance (BLOOM, petals)
+    FM1_STRICT=1 FM1_TPROF="$OUT/tprof.txt,6000,8000" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 8100 \
+        > "$OUT/emu.log" 2>&1 || { cat "$OUT/emu.log"; exit 1; }
+    "$OBJDUMP" -t "$ELF" > "$OUT/symbols.txt"
+    python3 "$(dirname "$0")/../tools/profile_report.py" "$OUT/tprof.txt" "$OUT/symbols.txt" 40 > "$OUT/profile.txt"
+    exit 0
+fi
+
 FM1_STRICT=1 FM1_DUMP="$ADDR" FM1_BENCH_KEYS="$KEYS" "$EMU" --fwsc "$PKG" --shot 20000 > "$OUT/emu.log" 2>&1 || {
     cat "$OUT/emu.log"; echo "FAIL: the emulator stopped"; exit 1; }
 cp work/panel.ppm "$OUT/panel.ppm" 2>/dev/null || true

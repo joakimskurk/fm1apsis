@@ -25,6 +25,8 @@ jobs:
         run: sh tests/apsis/run.sh
       - name: APSIS tests, clang (the firmware's compiler family; C leaves some orders open)
         run: CC=clang SAN=0 sh tests/apsis/run.sh
+      - name: APSIS tests, clang MemorySanitizer (uninitialised reads make the sound depend on the stack)
+        run: CC=clang SAN=0 MSAN=1 sh tests/apsis/run.sh
       - name: The firmware in host mode, the sound against tests/sound.sha256
         run: sh tests/sound.sh
       - uses: actions/upload-artifact@v4
@@ -57,6 +59,8 @@ jobs:
           test -d ~/fw-AC79_AIoT_SDK
       - name: Build
         run: |
+          DINGHY_DEFS=-fno-inline sh build.sh > /dev/null       # a profiling build: functions stay apart
+          mkdir -p build/profile && mv build/apsis.fwsc build/apsis.elf build/profile/
           if [ "$GITHUB_REF_TYPE" = tag ]; then sh build.sh --release "${GITHUB_REF_NAME#v}"; fi
           sh build.sh | tee build-report.txt
           cp build/apsis.fwsc build/apsis-${GITHUB_SHA::7}.fwsc
@@ -69,6 +73,7 @@ jobs:
           path: |
             build/apsis*.fwsc
             build/apsis.elf
+            build/profile/
             build/SHA256SUMS
             build-report.txt
             toolchain.txt
@@ -115,6 +120,12 @@ jobs:
         run: sh tools/get_toolchain.sh
       - name: APSIS under FM1_STRICT
         run: EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain sh tests/emu.sh build/apsis.fwsc build/apsis.elf build/emu
+      - name: Where the cycles go (the -fno-inline build, FM1_TPROF)
+        if: always()
+        run: |
+          EMU=~/fm1-emu/target/release/fm1-live JIELI_TOOLCHAIN=~/.jieli/toolchain PROFILE=1 \
+            sh tests/emu.sh build/profile/apsis.fwsc build/profile/apsis.elf build/emu/profile || true
+          cat build/emu/profile/profile.txt || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
